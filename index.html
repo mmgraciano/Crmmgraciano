@@ -1,0 +1,412 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CRM Clientes</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+  :root {
+    --bg: #f5f6f8; --panel: #ffffff; --text: #1d2330; --muted: #6b7280;
+    --border: #e3e6eb; --accent: #2563eb; --accent-soft: #e8efff;
+    --danger: #dc2626; --star: #f59e0b;
+    --activo: #16a34a; --prospecto: #2563eb; --inactivo: #9ca3af;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #12151b; --panel: #1b1f27; --text: #e6e8ec; --muted: #9aa3b2;
+      --border: #2c323d; --accent: #60a5fa; --accent-soft: #1e2a40;
+      --danger: #f87171; --star: #fbbf24;
+      --activo: #4ade80; --prospecto: #60a5fa; --inactivo: #6b7280;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font: 14px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; background: var(--bg); color: var(--text); }
+  header { background: var(--panel); border-bottom: 1px solid var(--border); padding: 14px 20px; display: flex; flex-wrap: wrap; gap: 12px; align-items: center; position: sticky; top: 0; z-index: 5; }
+  header h1 { font-size: 18px; margin: 0 12px 0 0; }
+  #search { flex: 1 1 260px; padding: 9px 12px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg); color: var(--text); font-size: 14px; }
+  .actions { display: flex; flex-wrap: wrap; gap: 8px; }
+  button, .btn { font: inherit; padding: 8px 12px; border-radius: 8px; border: 1px solid var(--border); background: var(--panel); color: var(--text); cursor: pointer; white-space: nowrap; }
+  button:hover, .btn:hover { border-color: var(--accent); }
+  .primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+  .danger { color: var(--danger); }
+  main { padding: 16px 20px 40px; max-width: 1300px; margin: 0 auto; }
+  .tabs { display: flex; gap: 4px; flex-wrap: wrap; border-bottom: 1px solid var(--border); margin-bottom: 12px; }
+  .tab { border: none; border-bottom: 2px solid transparent; border-radius: 0; background: none; padding: 10px 14px; color: var(--muted); }
+  .tab.active { color: var(--accent); border-bottom-color: var(--accent); font-weight: 600; }
+  .tab .count { background: var(--accent-soft); color: var(--accent); border-radius: 10px; padding: 1px 7px; font-size: 12px; margin-left: 4px; }
+  .table-wrap { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; }
+  th, td { padding: 9px 12px; text-align: left; border-bottom: 1px solid var(--border); vertical-align: middle; }
+  th { font-size: 12px; text-transform: uppercase; letter-spacing: .03em; color: var(--muted); cursor: pointer; user-select: none; white-space: nowrap; }
+  th.nosort { cursor: default; }
+  th .arrow { opacity: .8; }
+  tr:last-child td { border-bottom: none; }
+  tbody tr:hover { background: var(--accent-soft); }
+  td.name { font-weight: 600; }
+  td .sub { color: var(--muted); font-size: 12px; font-weight: 400; }
+  .star { background: none; border: none; font-size: 18px; padding: 2px 6px; color: var(--inactivo); }
+  .star.on { color: var(--star); }
+  select.estado { padding: 4px 6px; border-radius: 6px; border: 1px solid var(--border); background: var(--panel); color: var(--text); font: inherit; }
+  .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; }
+  .row-actions, td.estado-cell { white-space: nowrap; }
+  .row-actions button { padding: 4px 8px; font-size: 12px; }
+  .empty { padding: 40px; text-align: center; color: var(--muted); }
+  .overdue { color: var(--danger); font-weight: 600; }
+  dialog { border: 1px solid var(--border); border-radius: 12px; padding: 0; width: min(560px, calc(100vw - 32px)); background: var(--panel); color: var(--text); }
+  dialog::backdrop { background: rgba(0,0,0,.4); }
+  dialog form { padding: 20px; }
+  dialog h2 { margin: 0 0 14px; font-size: 17px; }
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .grid .full { grid-column: 1 / -1; }
+  label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--muted); }
+  label.check { flex-direction: row; align-items: center; gap: 8px; font-size: 14px; color: var(--text); }
+  input, textarea, dialog select { font: inherit; padding: 8px 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg); color: var(--text); }
+  textarea { min-height: 70px; resize: vertical; }
+  .dialog-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; }
+  #toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: var(--text); color: var(--bg); padding: 10px 16px; border-radius: 8px; opacity: 0; transition: opacity .2s; pointer-events: none; }
+  #toast.show { opacity: 1; }
+  @media (max-width: 640px) {
+    header, main { padding-left: 16px; padding-right: 16px; }
+    .grid { grid-template-columns: 1fr; }
+    header { position: static; }
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1>CRM Clientes</h1>
+  <input id="search" type="search" placeholder="Buscar por nombre…" autocomplete="off">
+  <div class="actions">
+    <button class="primary" id="btnNew">+ Nuevo cliente</button>
+    <label class="btn" style="flex-direction:row;color:var(--text);font-size:14px">Importar Excel
+      <input id="fileInput" type="file" accept=".xlsx,.xls,.csv" hidden>
+    </label>
+    <button id="btnExport">Exportar Excel</button>
+    <button id="btnTemplate">Descargar plantilla</button>
+  </div>
+</header>
+
+<main>
+  <nav class="tabs" id="tabs"></nav>
+  <div class="table-wrap">
+    <table>
+      <thead><tr id="headRow"></tr></thead>
+      <tbody id="tbody"></tbody>
+    </table>
+    <div class="empty" id="empty" hidden></div>
+  </div>
+</main>
+
+<dialog id="dlg">
+  <form method="dialog" id="form">
+    <h2 id="dlgTitle">Nuevo cliente</h2>
+    <div class="grid">
+      <label class="full">Nombre *<input name="nombre" required></label>
+      <label>Empresa<input name="empresa"></label>
+      <label>Teléfono<input name="telefono"></label>
+      <label>Email<input name="email" type="email"></label>
+      <label>Estado
+        <select name="estado">
+          <option value="activo">Cliente activo</option>
+          <option value="prospecto">Prospecto</option>
+          <option value="inactivo">Inactivo</option>
+        </select>
+      </label>
+      <label class="check full"><input type="checkbox" name="operar"> Tengo que operarle a este cliente</label>
+      <label>Qué operar<input name="operacion" placeholder="Ej: renovar póliza, enviar cotización"></label>
+      <label>Próximo contacto<input name="proximo" type="date"></label>
+      <label class="full">Notas<textarea name="notas"></textarea></label>
+    </div>
+    <div class="dialog-actions">
+      <button type="button" id="btnCancel">Cancelar</button>
+      <button type="submit" class="primary">Guardar</button>
+    </div>
+  </form>
+</dialog>
+
+<div id="toast"></div>
+
+<script>
+const STORAGE_KEY = 'crm-clientes-v1';
+const ESTADOS = { activo: 'Cliente activo', prospecto: 'Prospecto', inactivo: 'Inactivo' };
+const TABS = [
+  { id: 'todos', label: 'Todos', filter: () => true },
+  { id: 'activo', label: 'Clientes activos', filter: c => c.estado === 'activo' },
+  { id: 'prospecto', label: 'Prospectos', filter: c => c.estado === 'prospecto' },
+  { id: 'inactivo', label: 'Inactivos', filter: c => c.estado === 'inactivo' },
+  { id: 'operar', label: '★ Para operar', filter: c => c.operar },
+];
+const COLUMNS = [
+  { key: 'operar', label: '★' },
+  { key: 'nombre', label: 'Nombre' },
+  { key: 'telefono', label: 'Teléfono' },
+  { key: 'email', label: 'Email' },
+  { key: 'estado', label: 'Estado' },
+  { key: 'operacion', label: 'Qué operar' },
+  { key: 'proximo', label: 'Próx. contacto' },
+  { key: 'creado', label: 'Alta' },
+  { key: null, label: '' },
+];
+// Encabezados del Excel (plantilla / exportación) y alias aceptados al importar
+const EXCEL_FIELDS = [
+  { key: 'nombre', header: 'Nombre', aliases: ['nombre', 'name', 'cliente', 'nombre y apellido', 'razon social'] },
+  { key: 'empresa', header: 'Empresa', aliases: ['empresa', 'compania', 'company'] },
+  { key: 'telefono', header: 'Teléfono', aliases: ['telefono', 'tel', 'celular', 'movil', 'whatsapp', 'phone'] },
+  { key: 'email', header: 'Email', aliases: ['email', 'e-mail', 'mail', 'correo', 'correo electronico'] },
+  { key: 'estado', header: 'Estado', aliases: ['estado', 'tipo', 'status'] },
+  { key: 'operar', header: 'Para operar', aliases: ['para operar', 'operar', 'a operar'] },
+  { key: 'operacion', header: 'Qué operar', aliases: ['que operar', 'operacion', 'tarea'] },
+  { key: 'proximo', header: 'Próximo contacto', aliases: ['proximo contacto', 'proximo', 'fecha contacto', 'seguimiento'] },
+  { key: 'notas', header: 'Notas', aliases: ['notas', 'observaciones', 'comentarios', 'nota'] },
+];
+
+let clientes = load();
+let tab = 'todos';
+let sort = { key: 'nombre', dir: 1 };
+let editingId = null;
+
+const $ = s => document.querySelector(s);
+const norm = s => String(s ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim();
+const esc = s => String(s ?? '').replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
+const today = () => new Date().toISOString().slice(0, 10);
+const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+
+function load() {
+  try { return JSON.parse(localStorage.getItem(STORAGE_KEY)) || []; } catch { return []; }
+}
+function save() {
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(clientes)); }
+  catch { toast('No se pudo guardar en el navegador'); }
+}
+function toast(msg) {
+  const t = $('#toast'); t.textContent = msg; t.classList.add('show');
+  clearTimeout(toast.timer); toast.timer = setTimeout(() => t.classList.remove('show'), 2600);
+}
+function fmtDate(d) {
+  if (!d) return '';
+  const [y, m, day] = d.split('-');
+  return `${day}/${m}/${y}`;
+}
+
+// ---------- Render ----------
+function render() {
+  const q = norm($('#search').value);
+  $('#tabs').innerHTML = TABS.map(t =>
+    `<button class="tab ${t.id === tab ? 'active' : ''}" data-tab="${t.id}">${t.label}<span class="count">${clientes.filter(t.filter).length}</span></button>`
+  ).join('');
+
+  $('#headRow').innerHTML = COLUMNS.map(c => {
+    if (!c.key) return `<th class="nosort"></th>`;
+    const arrow = sort.key === c.key ? `<span class="arrow">${sort.dir > 0 ? '▲' : '▼'}</span>` : '';
+    return `<th data-sort="${c.key}">${c.label} ${arrow}</th>`;
+  }).join('');
+
+  const currentTab = TABS.find(t => t.id === tab);
+  const rows = clientes
+    .filter(currentTab.filter)
+    .filter(c => !q || norm(c.nombre).includes(q) || norm(c.empresa).includes(q))
+    .sort(compare);
+
+  const empty = $('#empty');
+  if (!rows.length) {
+    empty.hidden = false;
+    empty.textContent = clientes.length
+      ? 'No hay clientes que coincidan.'
+      : 'Todavía no cargaste clientes. Usá "+ Nuevo cliente" o "Importar Excel" (podés bajar la plantilla primero).';
+  } else empty.hidden = true;
+
+  const t = today();
+  $('#tbody').innerHTML = rows.map(c => `
+    <tr data-id="${c.id}">
+      <td><button class="star ${c.operar ? 'on' : ''}" data-act="star" title="Marcar para operar">${c.operar ? '★' : '☆'}</button></td>
+      <td class="name">${esc(c.nombre)}${c.empresa ? `<div class="sub">${esc(c.empresa)}</div>` : ''}</td>
+      <td>${esc(c.telefono)}</td>
+      <td>${c.email ? `<a href="mailto:${esc(c.email)}">${esc(c.email)}</a>` : ''}</td>
+      <td class="estado-cell"><span class="dot" style="background:var(--${c.estado})"></span>
+        <select class="estado" data-act="estado">${Object.entries(ESTADOS).map(([k, v]) =>
+          `<option value="${k}" ${k === c.estado ? 'selected' : ''}>${v}</option>`).join('')}</select></td>
+      <td>${esc(c.operacion)}</td>
+      <td class="${c.proximo && c.proximo < t ? 'overdue' : ''}">${fmtDate(c.proximo)}</td>
+      <td>${fmtDate(c.creado)}</td>
+      <td class="row-actions">
+        <button data-act="edit">Editar</button>
+        <button data-act="del" class="danger">Borrar</button>
+      </td>
+    </tr>`).join('');
+}
+
+function compare(a, b) {
+  const k = sort.key;
+  let va = a[k], vb = b[k];
+  if (k === 'operar') { va = a.operar ? 0 : 1; vb = b.operar ? 0 : 1; }
+  else if (k === 'estado') { va = ESTADOS[a.estado]; vb = ESTADOS[b.estado]; }
+  va = norm(va); vb = norm(vb);
+  // Los vacíos siempre al final
+  if (!va && vb) return 1;
+  if (va && !vb) return -1;
+  return va.localeCompare(vb, 'es', { numeric: true }) * sort.dir || norm(a.nombre).localeCompare(norm(b.nombre), 'es');
+}
+
+// ---------- Eventos ----------
+$('#search').addEventListener('input', render);
+$('#tabs').addEventListener('click', e => {
+  const b = e.target.closest('[data-tab]'); if (!b) return;
+  tab = b.dataset.tab; render();
+});
+$('#headRow').addEventListener('click', e => {
+  const th = e.target.closest('[data-sort]'); if (!th) return;
+  const k = th.dataset.sort;
+  sort = sort.key === k ? { key: k, dir: -sort.dir } : { key: k, dir: 1 };
+  render();
+});
+$('#tbody').addEventListener('click', e => {
+  const btn = e.target.closest('[data-act]'); if (!btn || btn.tagName === 'SELECT') return;
+  const c = clientes.find(x => x.id === btn.closest('tr').dataset.id);
+  if (btn.dataset.act === 'star') { c.operar = !c.operar; save(); render(); }
+  if (btn.dataset.act === 'edit') openDialog(c);
+  if (btn.dataset.act === 'del' && confirm(`¿Borrar a ${c.nombre}?`)) {
+    clientes = clientes.filter(x => x.id !== c.id); save(); render(); toast('Cliente borrado');
+  }
+});
+$('#tbody').addEventListener('change', e => {
+  if (e.target.dataset.act !== 'estado') return;
+  const c = clientes.find(x => x.id === e.target.closest('tr').dataset.id);
+  c.estado = e.target.value; save(); render();
+  toast(`${c.nombre} → ${ESTADOS[c.estado]}`);
+});
+
+// ---------- Alta / edición ----------
+const form = $('#form');
+function openDialog(c) {
+  editingId = c ? c.id : null;
+  $('#dlgTitle').textContent = c ? 'Editar cliente' : 'Nuevo cliente';
+  form.reset();
+  const data = c || { estado: tab === 'prospecto' || tab === 'inactivo' ? tab : 'activo', operar: tab === 'operar' };
+  for (const el of form.elements) {
+    if (!el.name) continue;
+    if (el.type === 'checkbox') el.checked = !!data[el.name];
+    else el.value = data[el.name] ?? '';
+  }
+  $('#dlg').showModal();
+  form.elements.nombre.focus();
+}
+$('#btnNew').addEventListener('click', () => openDialog(null));
+$('#btnCancel').addEventListener('click', () => $('#dlg').close());
+form.addEventListener('submit', () => {
+  const data = {};
+  for (const el of form.elements) {
+    if (!el.name) continue;
+    data[el.name] = el.type === 'checkbox' ? el.checked : el.value.trim();
+  }
+  if (editingId) Object.assign(clientes.find(x => x.id === editingId), data);
+  else clientes.push({ id: uid(), creado: today(), ...data });
+  save(); render();
+  toast(editingId ? 'Cliente actualizado' : 'Cliente agregado');
+});
+
+// ---------- Excel ----------
+function toRow(c) {
+  return {
+    'Nombre': c.nombre, 'Empresa': c.empresa, 'Teléfono': c.telefono, 'Email': c.email,
+    'Estado': ESTADOS[c.estado], 'Para operar': c.operar ? 'Sí' : 'No', 'Qué operar': c.operacion,
+    'Próximo contacto': fmtDate(c.proximo), 'Notas': c.notas, 'Alta': fmtDate(c.creado),
+  };
+}
+function downloadSheet(rows, filename, headers) {
+  const ws = XLSX.utils.json_to_sheet(rows, { header: headers });
+  ws['!cols'] = headers.map(h => ({ wch: Math.max(h.length + 2, 16) }));
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Clientes');
+  XLSX.writeFile(wb, filename);
+}
+$('#btnTemplate').addEventListener('click', () => {
+  const headers = EXCEL_FIELDS.map(f => f.header);
+  downloadSheet([{
+    'Nombre': 'Juan Pérez', 'Empresa': 'Ejemplo SA', 'Teléfono': '11 5555-5555', 'Email': 'juan@ejemplo.com',
+    'Estado': 'Prospecto', 'Para operar': 'Sí', 'Qué operar': 'Enviar cotización',
+    'Próximo contacto': '15/10/2026', 'Notas': 'Borrá esta fila de ejemplo',
+  }], 'plantilla_clientes.xlsx', headers);
+});
+$('#btnExport').addEventListener('click', () => {
+  if (!clientes.length) return toast('No hay clientes para exportar');
+  const currentTab = TABS.find(t => t.id === tab);
+  const rows = clientes.filter(currentTab.filter).sort(compare).map(toRow);
+  downloadSheet(rows, `clientes_${tab}_${today()}.xlsx`, [...EXCEL_FIELDS.map(f => f.header), 'Alta']);
+  toast(`Exportados ${rows.length} clientes (${currentTab.label})`);
+});
+
+function parseEstado(v) {
+  const s = norm(v);
+  if (s.includes('prosp')) return 'prospecto';
+  if (s.includes('inact')) return 'inactivo';
+  return 'activo';
+}
+function parseBool(v) {
+  return ['si', 'x', 'true', '1', 'yes', 'verdadero', '★'].includes(norm(v));
+}
+function parseDate(v) {
+  if (!v) return '';
+  if (v instanceof Date && !isNaN(v)) {
+    return `${v.getFullYear()}-${String(v.getMonth() + 1).padStart(2, '0')}-${String(v.getDate()).padStart(2, '0')}`;
+  }
+  const s = String(v).trim();
+  let m = s.match(/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{2,4})$/); // dd/mm/aaaa
+  if (m) {
+    const y = m[3].length === 2 ? '20' + m[3] : m[3];
+    return `${y}-${m[2].padStart(2, '0')}-${m[1].padStart(2, '0')}`;
+  }
+  m = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  return m ? `${m[1]}-${m[2]}-${m[3]}` : '';
+}
+
+$('#fileInput').addEventListener('change', async e => {
+  const file = e.target.files[0]; if (!file) return;
+  e.target.value = '';
+  try {
+    const wb = XLSX.read(await file.arrayBuffer(), { cellDates: true });
+    const raw = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { defval: '' });
+    if (!raw.length) return toast('El archivo está vacío');
+
+    // Mapear encabezados del archivo a campos del CRM
+    const map = {};
+    for (const h of Object.keys(raw[0])) {
+      const f = EXCEL_FIELDS.find(f => f.aliases.includes(norm(h)));
+      if (f && !map[f.key]) map[f.key] = h;
+    }
+    if (!map.nombre) return toast('No encontré una columna "Nombre" en el archivo');
+
+    let added = 0, updated = 0;
+    for (const r of raw) {
+      const get = k => map[k] ? String(r[map[k]] instanceof Date ? '' : r[map[k]]).trim() : '';
+      const nombre = get('nombre');
+      if (!nombre) continue;
+      const data = { nombre };
+      for (const k of ['empresa', 'telefono', 'email', 'operacion', 'notas']) if (map[k]) data[k] = get(k);
+      if (map.estado) data.estado = parseEstado(r[map.estado]);
+      if (map.operar) data.operar = parseBool(r[map.operar]);
+      if (map.proximo) data.proximo = parseDate(r[map.proximo]);
+
+      // Si ya existe (mismo email, o mismo nombre y teléfono) se actualiza en vez de duplicar
+      const existing = clientes.find(c =>
+        (data.email && norm(c.email) === norm(data.email)) ||
+        (norm(c.nombre) === norm(nombre) && norm(c.telefono) === norm(data.telefono)));
+      if (existing) { Object.assign(existing, data); updated++; }
+      else {
+        clientes.push({ id: uid(), creado: today(), empresa: '', telefono: '', email: '', estado: 'activo',
+          operar: false, operacion: '', proximo: '', notas: '', ...data });
+        added++;
+      }
+    }
+    save(); render();
+    toast(`Importación lista: ${added} nuevos, ${updated} actualizados`);
+  } catch (err) {
+    console.error(err);
+    toast('No se pudo leer el archivo. ¿Es un Excel o CSV válido?');
+  }
+});
+
+render();
+</script>
+</body>
+</html>
