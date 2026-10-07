@@ -21,9 +21,9 @@ Panel para registrar tu base de cuentas, en un solo archivo (`index.html`).
 - **×** en WM3 elimina la cuenta; en otra pestaña solo la quita de esa pestaña.
 - **Eliminar sin cuenta** borra los registros que no tienen N° de cuenta (en la pestaña que estás viendo).
 
-## Tenencias
+## Tenencias detalladas
 
-La pestaña **Tenencias** muestra el detalle por especie de tus clientes. Tocá **Importar tenencias** estando en Tenencias y elegí el Excel
+Dentro de **Tenencia total** (submenú) está **Tenencias detalladas**, que muestra el detalle por especie de tus clientes. Tocá **Importar tenencias** estando en Tenencias detalladas y elegí el Excel
 (el reporte del broker con `descripcion_comitente_completa`, `valoracion_mep`, etc. se lee tal cual).
 
 - Necesita una columna con el N° de cuenta (`N° de cuenta`, `Cuenta`, `Comitente`…). Puede haber filas de título arriba.
@@ -45,7 +45,7 @@ La pestaña **Tenencia total** muestra el total en USD del último informe de te
 Arriba hay dos filtros: **Tipo de activo** (Obligaciones Negociables, Fondos, CEDEARS…) y **Activo** (AL30, GD30…).
 Al elegir uno se actualizan el total, el % sobre tu tenencia, el gráfico, la variación y la lista de clientes que lo tienen.
 El panel **Composición por tipo de activo** muestra cuánto pesa cada tipo; tocá una fila para filtrar.
-Los mismos filtros están en la pestaña **Tenencias**.
+Los mismos filtros están en **Tenencias detalladas**. El submenú de Tenencia total tiene: Resumen, Tenencias detalladas, En 0 y Menos de 10.000 USD.
 
 En **Ajustes de tenencia** se elige qué columna es la valuación, la moneda, la cantidad y la especie, y se carga el
 **tipo de cambio** para pasar a USD las posiciones en pesos. Si importás dos veces el mismo día, la segunda corrige a la primera.
@@ -62,7 +62,14 @@ La pestaña **Facturación** muestra lo que factura cada cliente por categoría 
 - **Top 10 clientes por facturación** con barras y el peso de cada uno sobre el total.
 - Los clientes del archivo que no están en WM3 se pueden agregar con un clic.
 
-## Pestañas automáticas
+## Research
+
+La pestaña **Research** muestra alertas de compra, venta, activos para sumar y eventos a vigilar, cada una con la explicación,
+los riesgos, las fuentes y la exposición actual de la cartera (USD, % y clientes). Una tarea programada en la nube
+("Research Panel WM", días hábiles 8:59 hora de Argentina) busca noticias oficiales y de mercado, las cruza con las tenencias
+y escribe el research del día en la base del panel; avisa por celular y mail. Es un insumo de análisis, no una orden de operar.
+
+## Pestañas automáticas (dentro de Tenencia total)
 
 - **En 0:** clientes de WM3 sin tenencia (o con saldo negativo) en el último informe.
 - **Menos de 10.000 USD:** clientes con tenencia mayor a 0 y menor al umbral (se cambia en Ajustes de tenencia).
