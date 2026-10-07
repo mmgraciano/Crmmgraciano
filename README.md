@@ -12,6 +12,9 @@ Panel para registrar tu base de cuentas, en un solo archivo (`index.html`).
 
 - **WM3** muestra todas las cuentas. Las demás pestañas (SGR, Prospects, Tareas pendientes, FAL, Notas Estructuradas, FWD)
   muestran solo las cuentas asignadas a cada una. Una cuenta puede estar en varias pestañas.
+- **Tareas pendientes:** con **+ Nueva tarea** anotás una tarea, con un cliente y una fecha si querés. Cada tarea tiene un
+  estado (**Sin hacer**, **Pendiente** o **Hecha ✓**): tocá el estado para pasar al siguiente. Las vencidas se marcan en rojo
+  y las hechas quedan guardadas abajo, en **Hechas**. Se guardan en la base del panel (colección `tareas`).
 - **Asignar pestañas:** tocá **+ pestaña** debajo del nombre de la cuenta, o marcalas al editarla.
 - **Agregar, renombrar o quitar pestañas:** botón **+** al final de las pestañas. Ahí también se cambian los días de la alarma.
 - **Alarma:** se pone en rojo cuando pasaron más de 21 días desde el último contacto (o si no hay fecha).

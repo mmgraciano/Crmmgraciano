@@ -133,6 +133,30 @@
 
   /* Tenencia total */
   #summary { display: flex; flex-direction: column; gap: 18px; }
+  #tareasBox { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; margin-bottom: 18px; }
+  .tk-head { display: flex; align-items: baseline; gap: 10px; padding: 14px 16px 10px; }
+  .tk-head h2 { margin: 0; font: 600 17px var(--font-display); }
+  .tk-head span { color: var(--muted); font-size: 12.5px; }
+  .tk-list { list-style: none; margin: 0; padding: 0; }
+  .tk { display: flex; align-items: center; gap: 12px; padding: 10px 16px; border-top: 1px solid var(--border); }
+  .tk-est { flex: none; display: inline-flex; align-items: center; gap: 6px; width: 112px; justify-content: flex-start; border: 1px solid var(--border); background: var(--panel); color: var(--muted);
+    font: 600 12px var(--font-body); padding: 6px 10px; border-radius: 999px; cursor: pointer; white-space: nowrap; }
+  .tk-est .ic { width: 13px; height: 13px; border: 2px solid currentColor; border-radius: 50%; flex: none; box-sizing: border-box;
+    display: inline-grid; place-items: center; font-size: 10px; line-height: 1; }
+  .tk-est.pend .ic { background: linear-gradient(90deg, currentColor 50%, transparent 50%); }
+  .tk-est.hecha .ic { color: var(--ok-bg); border-color: var(--ok); background: var(--ok); }
+  .tk-est.pend { background: var(--accent-soft); border-color: transparent; color: var(--accent); }
+  .tk-est.hecha { background: var(--ok-bg); border-color: transparent; color: var(--ok); }
+  .tk-body { flex: 1; min-width: 0; }
+  .tk-text { border: none; background: none; padding: 0; font: 500 14px var(--font-body); color: var(--text); text-align: left; cursor: pointer; overflow-wrap: anywhere; }
+  .tk-meta { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; align-items: center; font-size: 12px; color: var(--muted); }
+  .tk-due { font: 600 11.5px var(--font-body); padding: 2px 8px; border-radius: 999px; background: var(--soft); color: var(--muted); }
+  .tk-due.late { background: var(--late-bg); color: var(--late); }
+  .tk-due.hoy { background: var(--accent-soft); color: var(--accent); }
+  .tk.done .tk-text { text-decoration: line-through; color: var(--muted); }
+  .tk-empty { padding: 18px 16px 22px; color: var(--muted); border-top: 1px solid var(--border); }
+  .tk-done summary { padding: 11px 16px; border-top: 1px solid var(--border); cursor: pointer; color: var(--muted); font-size: 13px; }
+  .tk-sub { padding: 14px 16px 8px; border-top: 1px solid var(--border); font: 600 11px var(--font-body); letter-spacing: .07em; text-transform: uppercase; color: var(--muted); }
   .hero { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 20px 22px; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.6fr); gap: 24px; }
   .hero .label { font: 600 11px var(--font-body); letter-spacing: .07em; text-transform: uppercase; color: var(--muted); }
   .hero .big { font: 600 40px/1.1 var(--font-display); letter-spacing: -.02em; font-variant-numeric: tabular-nums; margin-top: 6px; }
@@ -306,6 +330,7 @@
       <input id="fileInput" type="file" accept=".xlsx,.xls,.csv" hidden>
       <button class="btn" id="btnAjustes" hidden>Ajustes de tenencia</button>
       <button class="btn primary" id="btnNew">+ Nueva cuenta</button>
+      <button class="btn primary" id="btnTask" hidden>+ Nueva tarea</button>
     </div>
   </div>
 
@@ -318,6 +343,7 @@
   <section id="summary" hidden></section>
   <section id="incomeTop" class="breakdown" hidden></section>
   <section id="research" hidden></section>
+  <section id="tareasBox" hidden></section>
 
   <div class="table-wrap" id="tableWrap">
     <table>
@@ -344,6 +370,24 @@
     </div>
     <div class="dialog-actions">
       <button type="button" class="btn ghost" id="btnCancel">Cancelar</button>
+      <button type="submit" class="btn primary">Guardar</button>
+    </div>
+  </form>
+</dialog>
+
+<!-- Alta / edición de tarea -->
+<dialog id="taskDlg">
+  <form method="dialog" id="taskForm">
+    <h2 id="taskTitle">Nueva tarea</h2>
+    <div class="grid">
+      <label class="full">Tarea *<textarea id="t-texto" name="texto" required placeholder="Ej: Llamar para reinvertir el vencimiento de la LECAP"></textarea></label>
+      <label>Cliente (opcional)<input id="t-cliente" name="cliente" list="taskClientes" placeholder="Buscar cliente…" autocomplete="off"></label>
+      <label>Para cuándo<input id="t-vence" name="vence" type="date"></label>
+      <label>Estado<select id="t-estado" name="estado"><option value="sin">Sin hacer</option><option value="pend">Pendiente</option><option value="hecha">Hecha ✓</option></select></label>
+    </div>
+    <datalist id="taskClientes"></datalist>
+    <div class="dialog-actions">
+      <button type="button" class="btn ghost" id="taskCancel">Cancelar</button>
       <button type="submit" class="btn primary">Guardar</button>
     </div>
   </form>
@@ -461,6 +505,7 @@ const INCOME_TAB = 'ingresos';    // facturación por cliente, por período
 const SUMMARY_TAB = 'total';      // resumen de la tenencia total y su variación
 const ZERO_TAB = 'cero';          // clientes sin tenencia
 const LOW_TAB = 'menos10k';       // clientes con menos del umbral en USD
+const TASKS_TAB = 'tareas';       // lista de tareas propia, además de las cuentas marcadas en la pestaña
 // Vistas que viven dentro de "Tenencia total" (no aparecen en la barra de pestañas)
 const SUB_TABS = [SUMMARY_TAB, HOLD_TAB, ZERO_TAB, LOW_TAB];
 const AUTO_TABS = new Set([HOLD_TAB, SUMMARY_TAB, ZERO_TAB, LOW_TAB, INCOME_TAB, RESEARCH_TAB]); // no se asignan a mano
@@ -520,6 +565,10 @@ let resSel = '', resFiltro = 'todas';
 let resView = 'alertas', vencMes = '', vencOpen = new Set();
 let modelPerfil = 'moderado', modelMonto = 100000;   // cartera nueva: perfil y monto elegidos  // subpestaña de Research, mes elegido y filas abiertas
 const LOCAL_RES = 'panel-wm-research-v1';
+// Tareas: un documento por tarea en "tareas/{id}" {texto, cuentaId, cliente, vence, hecha, hechaEl, creado}
+let tareas = [];
+let tasksRef = null;
+const LOCAL_TASKS = 'panel-wm-tareas-v1';
 let tenDb = null;
 
 const $ = s => document.querySelector(s);
@@ -612,6 +661,7 @@ function saveLocal() {
     localStorage.setItem(LOCAL_HIST, JSON.stringify(historial));
     localStorage.setItem(LOCAL_FACT, JSON.stringify(periodos));
     localStorage.setItem(LOCAL_RES, JSON.stringify(research));
+    localStorage.setItem(LOCAL_TASKS, JSON.stringify(tareas));
   } catch { toast('No se pudo guardar en este navegador'); }
 }
 async function write(fn) {
@@ -666,6 +716,7 @@ async function initStorage() {
     try { historial = JSON.parse(localStorage.getItem(LOCAL_HIST)) || []; } catch {}
     try { periodos = JSON.parse(localStorage.getItem(LOCAL_FACT)) || []; } catch {}
     try { research = JSON.parse(localStorage.getItem(LOCAL_RES)) || []; } catch {}
+    try { tareas = JSON.parse(localStorage.getItem(LOCAL_TASKS)) || []; } catch {}
     loading = false; setSync(); render(); return;
   }
   tenDb = db;
@@ -694,6 +745,11 @@ async function initStorage() {
   }, fail);
   db.collection('facturacion').onSnapshot(snap => {
     periodos = snap.docs.map(d => structuredClone(d.data()));
+    render();
+  }, fail);
+  tasksRef = db.collection('tareas');
+  tasksRef.onSnapshot(snap => {
+    tareas = snap.docs.map(d => ({ id: d.id, ...structuredClone(d.data()) }));
     render();
   }, fail);
   db.collection('tenencias_hist').onSnapshot(snap => {
@@ -912,7 +968,7 @@ function render() {
     return `<button data-tab="${esc(t.id)}" class="${t.id === tab ? 'on' : ''}">${t.id === SUMMARY_TAB ? 'Resumen' : esc(t.label)}${n === null ? '' : `<span class="n">${n}</span>`}</button>`;
   }).join('') : '';
   $('#tabs').innerHTML = allTabs.map(t => {
-    const n = t.id === SUMMARY_TAB ? null : t.id === HOLD_TAB ? holdCuentas().size : t.id === INCOME_TAB ? factClientes(periodoSel()).length : t.id === RESEARCH_TAB ? (research[0]?.alertas || []).filter(a => accionClase(a.accion) !== 'watch').length : cuentas.filter(c => inTab(c, t.id)).length;
+    const n = t.id === SUMMARY_TAB ? null : t.id === HOLD_TAB ? holdCuentas().size : t.id === INCOME_TAB ? factClientes(periodoSel()).length : t.id === RESEARCH_TAB ? (research[0]?.alertas || []).filter(a => accionClase(a.accion) !== 'watch').length : t.id === TASKS_TAB ? tareas.filter(x => !x.hecha).length : cuentas.filter(c => inTab(c, t.id)).length;
     return `<button class="tab ${t.id === tab || (t.id === SUMMARY_TAB && inGroup) ? 'active' : ''}" data-tab="${esc(t.id)}">${esc(t.label)}${n === null ? '' : `<span class="n">${n}</span>`}</button>`;
   }).join('') + `<button class="tab edit" id="btnTabs" title="Editar pestañas" aria-label="Editar pestañas">+</button>`;
 
@@ -920,7 +976,12 @@ function render() {
   $('#research').hidden = !res;
   $('.bar').hidden = res;
   $('#btnSinCuenta').hidden = hold || summary || income;
-  $('#btnNew').hidden = hold || summary || income;
+  const tasks = tab === TASKS_TAB;
+  $('#stats').hidden = $('#btnExport').hidden = false;
+  $('#btnNew').hidden = hold || summary || income || tasks;
+  $('#btnTask').hidden = !tasks;
+  $('#tareasBox').hidden = !tasks;
+  if (tasks) renderTareas();
   $('#btnAjustes').hidden = !(hold || summary);
   $('#btnImport').hidden = summary;
   $('#btnImport').textContent = hold ? 'Importar tenencias' : income ? 'Importar facturación' : 'Importar Excel';
@@ -936,6 +997,13 @@ function render() {
   if (hold) { renderTenencias(); restoreFocus(focus); return; }
 
   const base = currentRows();
+  if (tasks) {
+    // La tabla de cuentas solo aparece si hay cuentas marcadas en esta pestaña
+    const conCuentas = cuentas.some(c => inTab(c, TASKS_TAB));
+    $('#tableWrap').hidden = !conCuentas;
+    $('#searches').hidden = !conCuentas;
+    for (const id of ['#stats', '#btnSinCuenta', '#btnExport', '#btnImport']) $(id).hidden = !conCuentas;
+  }
   const late = base.filter(c => alarma(c).late).length;
   $('#stats').innerHTML = `
     <span class="stat"><b>${base.length}</b>cuentas cargadas</span>
@@ -1942,6 +2010,118 @@ $('#tbody').addEventListener('keydown', e => {
   if (e.key === 'Enter' && e.target.dataset.field) e.target.blur();
 });
 
+// ---------- Tareas ----------
+const TASK_FIELDS = ['texto', 'cuentaId', 'cliente', 'vence', 'estado', 'hecha', 'hechaEl', 'creado'];
+// Estados de una tarea; tocar el estado pasa al siguiente
+const ESTADOS = [
+  { id: 'sin', label: 'Sin hacer' },
+  { id: 'pend', label: 'Pendiente' },
+  { id: 'hecha', label: 'Hecha' },
+];
+const estadoDe = t => ESTADOS.some(e => e.id === t.estado) ? t.estado : t.hecha ? 'hecha' : 'sin';
+function setEstado(t, id) {
+  t.estado = id;
+  t.hecha = id === 'hecha';
+  t.hechaEl = t.hecha ? (t.hechaEl || today()) : '';
+}
+function saveTarea(t) {
+  if (!tasksRef) { saveLocal(); return Promise.resolve(); }
+  return write(() => tasksRef.doc(t.id).set(Object.fromEntries(TASK_FIELDS.map(k => [k, t[k] ?? (k === 'hecha' ? false : '')]))));
+}
+function deleteTarea(id) {
+  tareas = tareas.filter(x => x.id !== id);
+  if (!tasksRef) { saveLocal(); return Promise.resolve(); }
+  return write(() => tasksRef.doc(id).delete());
+}
+const tareaCliente = t => cuentas.find(c => c.id === t.cuentaId)?.nombre || t.cliente || '';
+function venceInfo(v) {
+  if (!v) return null;
+  const hoy = today();
+  if (v < hoy) return { cls: 'late', text: 'Vencida · ' + fmtDate(v) };
+  if (v === hoy) return { cls: 'hoy', text: 'Hoy' };
+  return { cls: '', text: fmtDate(v) };
+}
+function tareaItem(t) {
+  const v = venceInfo(t.vence), cli = tareaCliente(t);
+  const i = ESTADOS.findIndex(e => e.id === estadoDe(t)), est = ESTADOS[i], sig = ESTADOS[(i + 1) % ESTADOS.length];
+  const meta = [
+    cli ? `<span class="chip">${esc(cli)}</span>` : '',
+    v && !t.hecha ? `<span class="tk-due ${v.cls}">${esc(v.text)}</span>` : '',
+    t.hecha && t.hechaEl ? `<span>Hecha el ${esc(fmtDate(t.hechaEl))}</span>` : '',
+  ].join('');
+  return `<li class="tk ${t.hecha ? 'done' : ''}" data-tid="${esc(t.id)}">
+    <button class="tk-est ${est.id}" data-tact="estado" title="Cambiar estado (${esc(est.label)} → ${esc(sig.label)})" aria-label="Estado: ${esc(est.label)}. Tocar para pasar a ${esc(sig.label)}"><span class="ic" aria-hidden="true">${est.id === 'hecha' ? '✓' : ''}</span>${esc(est.label)}</button>
+    <div class="tk-body">
+      <button class="tk-text" data-tact="edit" title="Editar tarea">${esc(t.texto)}</button>
+      ${meta ? `<div class="tk-meta">${meta}</div>` : ''}
+    </div>
+    <button class="x" data-tact="remove" title="Eliminar tarea" aria-label="Eliminar tarea">×</button>
+  </li>`;
+}
+function renderTareas() {
+  // Pendientes: primero las que tienen fecha (la más próxima arriba), después las sin fecha por orden de carga
+  const pend = tareas.filter(t => !t.hecha).sort((a, b) => (a.vence || '9999').localeCompare(b.vence || '9999') || (a.creado || '').localeCompare(b.creado || ''));
+  const hechas = tareas.filter(t => t.hecha).sort((a, b) => (b.hechaEl || '').localeCompare(a.hechaEl || ''));
+  const vencidas = pend.filter(t => t.vence && t.vence < today()).length;
+  const conCuentas = cuentas.some(c => inTab(c, TASKS_TAB));
+  $('#tareasBox').innerHTML = `
+    <div class="tk-head"><h2>Tareas</h2><span>${plural(pend.filter(t => estadoDe(t) === 'sin').length, 'sin hacer', 'sin hacer')} · ${plural(pend.filter(t => estadoDe(t) === 'pend').length, 'pendiente', 'pendientes')} · ${plural(hechas.length, 'hecha', 'hechas')}${vencidas ? ` · ${plural(vencidas, 'vencida', 'vencidas')}` : ''}</span></div>
+    ${pend.length ? `<ul class="tk-list">${pend.map(tareaItem).join('')}</ul>`
+      : `<div class="tk-empty">${loading ? 'Cargando…' : 'No tenés tareas pendientes. Anotá una con <b>+ Nueva tarea</b>.'}</div>`}
+    ${hechas.length ? `<details class="tk-done"><summary>Hechas (${hechas.length})</summary><ul class="tk-list">${hechas.map(tareaItem).join('')}</ul></details>` : ''}
+    ${conCuentas ? `<div class="tk-sub">Cuentas marcadas en ${esc(tabLabel(TASKS_TAB))}</div>` : ''}`;
+}
+const taskForm = $('#taskForm');
+let editingTask = null;
+function openTask(t) {
+  editingTask = t ? t.id : null;
+  $('#taskTitle').textContent = t ? 'Editar tarea' : 'Nueva tarea';
+  taskForm.reset();
+  $('#taskClientes').innerHTML = cuentas.slice().sort((a, b) => norm(a.nombre).localeCompare(norm(b.nombre), 'es'))
+    .map(c => `<option value="${esc(c.nombre)}">${esc(c.cuenta)}</option>`).join('');
+  $('#t-texto').value = t?.texto || '';
+  $('#t-cliente').value = t ? tareaCliente(t) : '';
+  $('#t-vence').value = t?.vence || '';
+  $('#t-estado').value = t ? estadoDe(t) : 'sin';
+  $('#taskDlg').showModal();
+  $('#t-texto').focus();
+}
+$('#btnTask').addEventListener('click', () => openTask(null));
+$('#taskCancel').addEventListener('click', () => $('#taskDlg').close());
+taskForm.addEventListener('submit', async () => {
+  const texto = $('#t-texto').value.trim();
+  if (!texto) return;
+  const cliente = $('#t-cliente').value.trim();
+  const c = cliente ? cuentas.find(x => norm(x.nombre) === norm(cliente)) : null;
+  const prev = editingTask ? tareas.find(x => x.id === editingTask) : null;
+  const t = { ...(prev || { id: uid(), hechaEl: '', creado: new Date().toISOString() }), texto, cuentaId: c?.id || '', cliente: c ? c.nombre : cliente, vence: $('#t-vence').value };
+  setEstado(t, $('#t-estado').value);
+  tareas = [...tareas.filter(x => x.id !== t.id), t];
+  render();
+  await saveTarea(t);
+  toast(prev ? 'Tarea actualizada' : 'Tarea agregada');
+});
+$('#tareasBox').addEventListener('click', async e => {
+  const el = e.target.closest('[data-tact]');
+  const li = e.target.closest('[data-tid]');
+  if (!el || !li) return;
+  const t = tareas.find(x => x.id === li.dataset.tid);
+  if (!t) return;
+  if (el.dataset.tact === 'edit') openTask(t);
+  else if (el.dataset.tact === 'estado') {
+    const i = ESTADOS.findIndex(x => x.id === estadoDe(t));
+    const sig = ESTADOS[(i + 1) % ESTADOS.length];
+    setEstado(t, sig.id);
+    render();
+    await saveTarea(t);
+    toast('Tarea: ' + sig.label);
+  } else if (el.dataset.tact === 'remove') {
+    if (!await confirmAsk('Eliminar tarea', `¿Eliminar "${t.texto.slice(0, 80)}"?`, 'Eliminar')) return;
+    await deleteTarea(t.id);
+    render();
+  }
+});
+
 // ---------- Confirmación ----------
 function confirmAsk(title, text, yes) {
   const dlg = $('#confirmDlg');
@@ -2010,7 +2190,7 @@ $('#tagsForm').addEventListener('submit', async () => {
 let draftTabs = [];
 function renderTabRows() {
   $('#tabRows').innerHTML = [{ id: MAIN, label: config.principal, main: true }, ...draftTabs].map((t, i) => {
-    const n = t.main ? cuentas.length : t.id === SUMMARY_TAB ? null : t.id === HOLD_TAB ? holdCuentas().size : t.id === INCOME_TAB ? factClientes(periodoSel()).length : t.id === RESEARCH_TAB ? (research[0]?.alertas || []).filter(a => accionClase(a.accion) !== 'watch').length : cuentas.filter(c => inTab(c, t.id)).length;
+    const n = t.main ? cuentas.length : t.id === SUMMARY_TAB ? null : t.id === HOLD_TAB ? holdCuentas().size : t.id === INCOME_TAB ? factClientes(periodoSel()).length : t.id === RESEARCH_TAB ? (research[0]?.alertas || []).filter(a => accionClase(a.accion) !== 'watch').length : t.id === TASKS_TAB ? tareas.filter(x => !x.hecha).length : cuentas.filter(c => inTab(c, t.id)).length;
     return `<div class="tab-row" data-i="${i - 1}">
       <input id="tabname-${esc(t.id)}" value="${esc(t.label)}" aria-label="Nombre de la pestaña">
       <span class="count">${n === null ? '' : n + ' cuentas'}</span>
