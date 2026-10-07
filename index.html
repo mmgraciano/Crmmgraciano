@@ -156,6 +156,18 @@
   .tk.done .tk-text { text-decoration: line-through; color: var(--muted); }
   .tk-empty { padding: 18px 16px 22px; color: var(--muted); border-top: 1px solid var(--border); }
   .tk-done summary { padding: 11px 16px; border-top: 1px solid var(--border); cursor: pointer; color: var(--muted); font-size: 13px; }
+  .gan-ctl { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; padding: 0 16px 12px; color: var(--muted); font-size: 12.5px; }
+  .gan-ctl input { width: 64px; font: 13px var(--font-body); padding: 4px 8px; border: 1px solid var(--border); border-radius: 7px; background: var(--bg); color: var(--text); }
+  .gan-ctl label { display: inline-flex; flex-direction: row; align-items: center; gap: 6px; }
+  #tareasBox .scroll { overflow-x: auto; border-top: 1px solid var(--border); }
+  #tareasBox .gan { min-width: 760px; }
+  #tareasBox .gan td { padding: 8px 12px; }
+  #tareasBox .gan tr.cli td { background: var(--soft); border-top: 2px solid var(--border); padding-top: 10px; padding-bottom: 10px; }
+  .gan .cli-row { display: flex; flex-wrap: wrap; gap: 6px 14px; align-items: center; justify-content: space-between; }
+  .gan .cli-row b { font-size: 14px; }
+  .gan .chip.warn { background: var(--late-bg); color: var(--late); }
+  .gan .chip.keep { background: var(--soft); color: var(--muted); border: 1px solid var(--border); }
+  .gan .btn { padding: 6px 12px; font-size: 12.5px; }
   .tk-sub { padding: 14px 16px 8px; border-top: 1px solid var(--border); font: 600 11px var(--font-body); letter-spacing: .07em; text-transform: uppercase; color: var(--muted); }
   .hero { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 20px 22px; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.6fr); gap: 24px; }
   .hero .label { font: 600 11px var(--font-body); letter-spacing: .07em; text-transform: uppercase; color: var(--muted); }
@@ -591,6 +603,12 @@ const LOCAL_RES = 'panel-wm-research-v1';
 let tareas = [];
 let tasksRef = null;
 const LOCAL_TASKS = 'panel-wm-tareas-v1';
+// Tomar ganancia: informe de rendimientos por posición en "ganancias/actual" {fecha, fileName, rows: [...]}
+let ganancias = null;
+let tkView = 'tareas';            // solapa de Tareas pendientes: 'tareas' o 'ganancias'
+let ganUmbral = 10;               // % de suba desde la compra a partir del cual se sugiere tomar ganancia
+const GAN_MIN_USD = 100;          // posiciones más chicas no se listan
+const LOCAL_GAN = 'panel-wm-ganancias-v1';
 let tenDb = null;
 
 const $ = s => document.querySelector(s);
@@ -684,6 +702,7 @@ function saveLocal() {
     localStorage.setItem(LOCAL_FACT, JSON.stringify(periodos));
     localStorage.setItem(LOCAL_RES, JSON.stringify(research));
     localStorage.setItem(LOCAL_TASKS, JSON.stringify(tareas));
+    localStorage.setItem(LOCAL_GAN, JSON.stringify(ganancias));
   } catch { toast('No se pudo guardar en este navegador'); }
 }
 async function write(fn) {
@@ -739,6 +758,7 @@ async function initStorage() {
     try { periodos = JSON.parse(localStorage.getItem(LOCAL_FACT)) || []; } catch {}
     try { research = JSON.parse(localStorage.getItem(LOCAL_RES)) || []; } catch {}
     try { tareas = JSON.parse(localStorage.getItem(LOCAL_TASKS)) || []; } catch {}
+    try { ganancias = JSON.parse(localStorage.getItem(LOCAL_GAN)) || null; } catch {}
     loading = false; setSync(); render(); return;
   }
   tenDb = db;
@@ -767,6 +787,10 @@ async function initStorage() {
   }, fail);
   db.collection('facturacion').onSnapshot(snap => {
     periodos = snap.docs.map(d => structuredClone(d.data()));
+    render();
+  }, fail);
+  db.doc('ganancias/actual').onSnapshot(s => {
+    ganancias = s.exists ? structuredClone(s.data()) : null;
     render();
   }, fail);
   tasksRef = db.collection('tareas');
@@ -984,8 +1008,12 @@ function render() {
   const allTabs = [{ id: MAIN, label: config.principal }, ...config.tabs.filter(t => t.id === SUMMARY_TAB || !GROUP.includes(t.id))];
   const inGroup = GROUP.includes(tab);
   const sub = GROUP.map(id => config.tabs.find(t => t.id === id) || (id === SUMMARY_TAB ? { id, label: 'Tenencia total' } : null)).filter(Boolean);
-  $('#subtabs').hidden = !inGroup;
-  $('#subtabs').innerHTML = inGroup ? sub.map(t => {
+  $('#subtabs').hidden = !inGroup && tab !== TASKS_TAB;
+  $('#subtabs').innerHTML = tab === TASKS_TAB ? [
+    { id: 'tareas', label: 'Mis tareas', n: tareas.filter(x => !x.hecha).length },
+    { id: 'ganancias', label: `Tomar ganancia (+${ganUmbral}%)`, n: ganClientes().length },
+  ].map(t => `<button data-tkv="${t.id}" class="${tkView === t.id ? 'on' : ''}">${esc(t.label)}<span class="n">${t.n}</span></button>`).join('')
+  : inGroup ? sub.map(t => {
     const n = t.id === SUMMARY_TAB ? null : t.id === HOLD_TAB ? holdCuentas().size : cuentas.filter(c => inTab(c, t.id)).length;
     return `<button data-tab="${esc(t.id)}" class="${t.id === tab ? 'on' : ''}">${t.id === SUMMARY_TAB ? 'Resumen' : esc(t.label)}${n === null ? '' : `<span class="n">${n}</span>`}</button>`;
   }).join('') : '';
@@ -1001,9 +1029,10 @@ function render() {
   const tasks = tab === TASKS_TAB;
   $('#stats').hidden = $('#btnExport').hidden = false;
   $('#btnNew').hidden = hold || summary || income || tasks;
-  $('#btnTask').hidden = !tasks;
+  const gan = tasks && tkView === 'ganancias';
+  $('#btnTask').hidden = !tasks || gan;
   $('#tareasBox').hidden = !tasks;
-  if (tasks) renderTareas();
+  if (tasks) gan ? renderGanancias() : renderTareas();
   $('#btnAjustes').hidden = !(hold || summary);
   $('#btnImport').hidden = summary;
   $('#btnImport').textContent = hold ? 'Importar tenencias' : income ? 'Importar facturación' : 'Importar Excel';
@@ -1021,10 +1050,11 @@ function render() {
   const base = currentRows();
   if (tasks) {
     // La tabla de cuentas solo aparece si hay cuentas marcadas en esta pestaña
-    const conCuentas = cuentas.some(c => inTab(c, TASKS_TAB));
+    const conCuentas = cuentas.some(c => inTab(c, TASKS_TAB)) && !gan;
     $('#tableWrap').hidden = !conCuentas;
     $('#searches').hidden = !conCuentas;
     for (const id of ['#stats', '#btnSinCuenta', '#btnExport', '#btnImport']) $(id).hidden = !conCuentas;
+    if (gan) { $('#btnImport').hidden = false; $('#btnImport').textContent = 'Importar rendimientos'; }
   }
   const late = base.filter(c => alarma(c).late).length;
   $('#stats').innerHTML = `
@@ -2136,6 +2166,8 @@ document.addEventListener('change', e => {
 // ---------- Eventos de la tabla ----------
 ['#qNombre', '#qCuenta'].forEach(s => $(s).addEventListener('input', render));
 $('#subtabs').addEventListener('click', e => {
+  const v = e.target.closest('[data-tkv]');
+  if (v) { tkView = v.dataset.tkv; render(); return; }
   const b = e.target.closest('[data-tab]'); if (!b) return;
   tab = b.dataset.tab; render();
 });
@@ -2306,6 +2338,124 @@ $('#tareasBox').addEventListener('click', async e => {
     await deleteTarea(t.id);
     render();
   }
+});
+
+// ---------- Tomar ganancia ----------
+// Fecha de compra: número de Excel o texto "AAAA-MM-DD…"
+function isoDeCelda(v) {
+  if (typeof v === 'number' && v > 20000 && v < 80000) { const d = new Date(Math.round((v - 25569) * 864e5)); return `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())}`; }
+  const m = String(v ?? '').match(/(\d{4})-(\d{2})-(\d{2})/);
+  return m ? `${m[1]}-${m[2]}-${m[3]}` : '';
+}
+async function importGanancias(file) {
+  let grid;
+  try {
+    const wb = XLSX.read(await file.arrayBuffer());
+    grid = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1, defval: '', raw: true, blankrows: false });
+  } catch { return toast('No se pudo leer el archivo. Tiene que ser un Excel (.xlsx o .xls) o un CSV.'); }
+  const hi = grid.slice(0, 20).findIndex(r => r.some(h => normHeader(h) === 'comitente') && r.some(h => /pppc|ppc|precio de compra/.test(normHeader(h))));
+  if (hi < 0) return toast('No encontré las columnas "Comitente" y "Pppc" (precio promedio de compra) en el archivo');
+  const hs = grid[hi].map(normHeader);
+  const col = (...res) => { for (const re of res) { const i = hs.findIndex(h => re.test(h)); if (i >= 0) return i; } return -1; };
+  const c = {
+    com: col(/^comitente$/), tk: col(/^ticker$/, /especie|abreviatura/), desc: col(/desc/), tipo: col(/^tipo$/, /tipo/),
+    fecha: col(/fecha/), q: col(/cant/), precio: col(/precio actual mep/, /precio.*mep/), ppc: col(/^pppc mep$/, /pp?pc.*mep/),
+    rend: col(/^rendim mep$/, /rendim.*mep/), gan: col(/rendimientos en dolares/, /ganancia.*(usd|dolar)/),
+  };
+  if (c.precio < 0 || c.ppc < 0) return toast('Faltan las columnas de precio actual y precio de compra en USD MEP');
+  const rows = [];
+  for (const r of grid.slice(hi + 1)) {
+    const com = String(r[c.com] ?? '').trim(); if (!com) continue;
+    const m = com.match(/^(\d+)\s*-\s*(.+)$/);
+    const tipo = c.tipo >= 0 ? String(r[c.tipo] ?? '').trim() : '';
+    const q = toNumber(r[c.q]), precio = toNumber(r[c.precio]), ppc = toNumber(r[c.ppc]);
+    if (tipo === 'MON' || !(ppc > 0) || isNaN(precio)) continue;
+    const rend = c.rend >= 0 && !isNaN(toNumber(r[c.rend])) ? toNumber(r[c.rend]) : precio / ppc - 1;
+    if (rend < 0.05) continue;   // se guardan desde +5% para poder bajar el umbral sin volver a importar
+    const val = isNaN(q) ? 0 : q * precio;
+    rows.push({ cuenta: m ? m[1] : '', nombre: (m ? m[2] : com).trim(), tk: String(r[c.tk] ?? '').trim(), desc: c.desc >= 0 ? String(r[c.desc] ?? '').trim() : '', tipo,
+      compra: c.fecha >= 0 ? isoDeCelda(r[c.fecha]) : '', q: isNaN(q) ? 0 : q, ppc, precio, rend: Math.round(rend * 10000) / 10000,
+      val: Math.round(val * 100) / 100, gan: Math.round((c.gan >= 0 && !isNaN(toNumber(r[c.gan])) ? toNumber(r[c.gan]) : (precio - ppc) * q) * 100) / 100 });
+  }
+  const doc = { fecha: today(), fileName: file.name, rows };
+  ganancias = doc; render();
+  try {
+    if (tenDb) await write(() => tenDb.doc('ganancias/actual').set(doc)); else saveLocal();
+    toast(`Rendimientos cargados: ${plural(ganClientes().length, 'cliente', 'clientes')} con posiciones +${ganUmbral}%`);
+  } catch {}
+}
+// Cartera recomendada del último research: esos activos se sugiere vender solo en parte
+function tickersModelo() {
+  const set = new Set();
+  const perf = research[0]?.carteraModelo?.perfiles || {};
+  for (const p of Object.values(perf)) for (const l of p?.lineas || []) if (l.activo || l.ticker) set.add(String(l.activo || l.ticker).toUpperCase());
+  return set;
+}
+function ganClientes() {
+  if (!ganancias?.rows?.length) return [];
+  const u = ganUmbral / 100;
+  const by = new Map();
+  for (const r of ganancias.rows) {
+    if (r.rend < u || r.val < GAN_MIN_USD || /fondo/i.test(r.tipo)) continue;
+    const k = r.cuenta || norm(r.nombre);
+    const e = by.get(k) || { key: k, cuenta: r.cuenta, nombre: r.nombre, pos: [], val: 0, gan: 0, dudosas: 0 };
+    e.pos.push(r);
+    // Una suba de 300% o más suele ser un precio de compra mal cargado: se muestra, pero no se suma
+    if (r.rend >= 3) e.dudosas++; else { e.val += r.val; e.gan += r.gan; }
+    by.set(k, e);
+  }
+  for (const e of by.values()) e.pos.sort((a, b) => (a.rend >= 3) - (b.rend >= 3) || b.gan - a.gan);
+  return [...by.values()].sort((a, b) => b.gan - a.gan);
+}
+const ganTareaDe = e => {
+  const c = findCuenta(e.cuenta, e.nombre);
+  return tareas.find(t => !t.hecha && /^Tomar ganancia/.test(t.texto || '') && (c ? t.cuentaId === c.id : norm(t.cliente) === norm(e.nombre)));
+};
+const fmtRend = v => '+' + (v * 100).toLocaleString('es-AR', { maximumFractionDigits: v >= 1 ? 0 : 1 }) + '%';
+function renderGanancias() {
+  if (!ganancias?.rows) {
+    $('#tareasBox').innerHTML = `<div class="tk-head"><h2>Tomar ganancia</h2></div>
+      <div class="tk-empty">Subí con <b>Importar rendimientos</b> el Excel de rendimientos por posición (con Comitente, Ticker, Pppc Mep y Precio Actual Mep) y acá vas a ver qué clientes tienen activos ${ganUmbral}% o más arriba de su precio de compra.</div>`;
+    return;
+  }
+  const list = ganClientes(), modelo = tickersModelo();
+  const npos = list.reduce((a, e) => a + e.pos.length, 0);
+  const tot = list.reduce((a, e) => a + e.gan, 0);
+  const dud = list.reduce((a, e) => a + e.dudosas, 0);
+  $('#tareasBox').innerHTML = `
+    <div class="tk-head"><h2>Tomar ganancia</h2><span>${plural(list.length, 'cliente', 'clientes')} · ${plural(npos, 'posición', 'posiciones')} · USD ${fmtUSD(tot)} de ganancia${dud ? ` · ${plural(dud, 'posición', 'posiciones')} para revisar (no se suman)` : ''}</span></div>
+    <div class="gan-ctl"><label>Avisar desde <input id="ganUmbral" type="number" min="1" max="500" step="1" value="${ganUmbral}"> % de suba desde la compra</label>
+      <span>Rendimientos en USD MEP · informe del ${esc(fmtDate(ganancias.fecha))} (${esc(ganancias.fileName)}) · sin fondos ni posiciones de menos de USD ${GAN_MIN_USD}</span></div>
+    ${list.length ? `<div class="scroll"><table class="gan"><thead><tr><th class="nosort">Activo</th><th class="nosort">Comprado</th><th class="nosort num">Compra USD</th><th class="nosort num">Hoy USD</th><th class="nosort num">Suba</th><th class="nosort num">Valor USD</th><th class="nosort num">Ganancia USD</th></tr></thead><tbody>
+    ${list.map(e => { const t = ganTareaDe(e);
+      return `<tr class="cli" data-gan="${esc(e.key)}"><td colspan="7"><div class="cli-row"><span><b>${esc(e.nombre)}</b>${e.cuenta ? ` <span class="acct">${esc(e.cuenta)}</span>` : ''} · ${plural(e.pos.length, 'activo', 'activos')} · ganancia USD ${fmtUSD(e.gan)}</span>
+        ${t ? `<button class="chip" data-gact="ver">Tarea creada ✓</button>` : `<button class="btn primary" data-gact="tarea">+ Tarea</button>`}</div></td></tr>` +
+      e.pos.map(r => `<tr><td><b>${esc(r.tk)}</b> <span class="muted">${esc(r.tipo)}</span>${r.desc ? `<div class="acct">${esc(r.desc)}</div>` : ''}
+          ${r.rend >= 3 ? ' <span class="chip warn" title="Una suba tan grande suele venir de un precio de compra viejo o mal cargado">Revisar precio de compra</span>' : ''}
+          ${modelo.has(String(r.tk).toUpperCase()) ? ' <span class="chip keep" title="Está en la cartera recomendada del research">En cartera recomendada: vender solo una parte</span>' : ''}</td>
+        <td class="muted">${r.compra ? esc(fmtDate(r.compra)) : '—'}</td><td class="num">${fmtPrecio(r.ppc)}</td><td class="num">${fmtPrecio(r.precio)}</td>
+        <td class="num pos"><b>${fmtRend(r.rend)}</b></td><td class="num">${fmtUSD(r.val)}</td><td class="num pos">${fmtUSD(r.gan)}</td></tr>`).join(''); }).join('')}
+    </tbody></table></div>` : `<div class="tk-empty">Ningún cliente tiene activos ${ganUmbral}% o más arriba del precio de compra.</div>`}`;
+}
+const fmtPrecio = v => v >= 100 ? fmtUSD(v) : v.toLocaleString('es-AR', { maximumFractionDigits: v >= 1 ? 2 : 4 });
+document.addEventListener('change', e => {
+  if (e.target.id !== 'ganUmbral') return;
+  const v = Math.round(Number(e.target.value));
+  if (v >= 1) ganUmbral = v; else e.target.value = ganUmbral;
+  render();
+});
+$('#tareasBox').addEventListener('click', async e => {
+  const b = e.target.closest('[data-gact]'); if (!b) return;
+  if (b.dataset.gact === 'ver') { tkView = 'tareas'; render(); return; }
+  const e2 = ganClientes().find(x => x.key === b.closest('[data-gan]').dataset.gan); if (!e2) return;
+  const c = findCuenta(e2.cuenta, e2.nombre);
+  const detalle = e2.pos.map(r => `${r.tk} ${fmtRend(r.rend)}${r.rend >= 3 ? ' (revisar precio de compra)' : ''}`).join(', ');
+  const t = { id: uid(), texto: `Tomar ganancia: ${detalle} (USD ${fmtUSD(e2.gan)} de ganancia)`, cuentaId: c?.id || '', cliente: c ? c.nombre : e2.nombre, vence: today(), creado: new Date().toISOString(), hechaEl: '' };
+  setEstado(t, 'sin');
+  tareas = [...tareas, t];
+  render();
+  await saveTarea(t);
+  toast('Tarea agregada en Mis tareas');
 });
 
 // ---------- Confirmación ----------
@@ -2527,6 +2677,7 @@ $('#fileInput').addEventListener('change', async e => {
   e.target.value = '';
   if (tab === HOLD_TAB || tab === SUMMARY_TAB) return importTenencias(file);
   if (tab === INCOME_TAB) return importIngresos(file);
+  if (tab === TASKS_TAB && tkView === 'ganancias') return importGanancias(file);
   let raw;
   try {
     const wb = XLSX.read(await file.arrayBuffer());
