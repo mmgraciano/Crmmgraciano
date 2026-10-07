@@ -123,6 +123,41 @@
   tr.group-start td { border-top: 2px solid var(--border); }
   td.muted { color: var(--muted); }
   table.hold { min-width: 0; }
+  td.pos { color: var(--ok); } td.neg { color: var(--late); }
+
+  /* Tenencia total */
+  #summary { display: flex; flex-direction: column; gap: 18px; }
+  .hero { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 20px 22px; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.6fr); gap: 24px; }
+  .hero .label { font: 600 11px var(--font-body); letter-spacing: .07em; text-transform: uppercase; color: var(--muted); }
+  .hero .big { font: 600 40px/1.1 var(--font-display); letter-spacing: -.02em; font-variant-numeric: tabular-nums; margin-top: 6px; }
+  .hero .big small { font-size: 18px; color: var(--muted); font-weight: 500; margin-right: 6px; }
+  .hero .meta { color: var(--muted); font-size: 12.5px; margin-top: 6px; }
+  .delta { display: inline-flex; align-items: center; gap: 6px; margin-top: 14px; padding: 6px 12px; border-radius: 999px; font: 600 13px var(--font-body); font-variant-numeric: tabular-nums; }
+  .delta.up { background: var(--ok-bg); color: var(--ok); }
+  .delta.down { background: var(--late-bg); color: var(--late); }
+  .delta.flat { background: var(--soft); color: var(--muted); }
+  .split { display: flex; flex-direction: column; gap: 6px; margin-top: 14px; font-size: 13px; }
+  .split div { display: flex; justify-content: space-between; gap: 12px; border-top: 1px solid var(--border); padding-top: 6px; }
+  .split span:last-child { font-variant-numeric: tabular-nums; font-weight: 600; white-space: nowrap; }
+  .acct { color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; }
+  .chart { position: relative; min-width: 0; }
+  .chart svg { display: block; width: 100%; height: 220px; overflow: visible; }
+  .chart .note { color: var(--muted); font-size: 13px; padding: 30px 0; }
+  .tip { position: absolute; pointer-events: none; background: var(--text); color: var(--bg); border-radius: 8px; padding: 7px 10px; font-size: 12px; white-space: nowrap; transform: translate(-50%, calc(-100% - 12px)); font-variant-numeric: tabular-nums; }
+  .tip[hidden] { display: none; }
+  .tip b { display: block; font-size: 13px; }
+  .breakdown { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; }
+  .panel { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; min-width: 0; display: flex; flex-direction: column; }
+  .panel h3 { margin: 0; padding: 14px 16px 4px; font: 600 16px var(--font-display); }
+  .panel .sub { padding: 0 16px 10px; color: var(--muted); font-size: 12.5px; }
+  .panel .scroll { overflow: auto; max-height: 460px; border-top: 1px solid var(--border); }
+  .panel table { min-width: 520px; }
+  .panel thead th { position: sticky; top: 0; z-index: 1; padding: 10px 12px; }
+  .panel td { padding: 8px 12px; }
+  details.hist { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 12px 16px; }
+  details.hist summary { cursor: pointer; font-weight: 600; }
+  details.hist table { min-width: 0; margin-top: 8px; }
+  @media (max-width: 900px) { .hero, .breakdown { grid-template-columns: 1fr; } }
   [hidden] { display: none !important; }
 
   /* Diálogos */
@@ -134,7 +169,7 @@
   .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
   .grid .full { grid-column: 1 / -1; }
   label { display: flex; flex-direction: column; gap: 5px; font-size: 12px; color: var(--muted); }
-  dialog input:not([type="checkbox"]), dialog textarea { font: 14px var(--font-body); padding: 9px 11px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg); color: var(--text); }
+  dialog input:not([type="checkbox"]), dialog textarea, dialog select { font: 14px var(--font-body); padding: 9px 11px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg); color: var(--text); }
   textarea { min-height: 70px; resize: vertical; }
   .checks { display: flex; flex-wrap: wrap; gap: 8px; }
   .check { flex-direction: row; align-items: center; gap: 7px; font-size: 13.5px; color: var(--text); padding: 7px 11px; border: 1px solid var(--border); border-radius: 8px; cursor: pointer; }
@@ -181,16 +216,19 @@
       <button class="btn" id="btnExport">Exportar Excel</button>
       <label class="btn" for="fileInput" id="btnImport">Importar Excel</label>
       <input id="fileInput" type="file" accept=".xlsx,.xls,.csv" hidden>
+      <button class="btn" id="btnAjustes" hidden>Ajustes de tenencia</button>
       <button class="btn primary" id="btnNew">+ Nueva cuenta</button>
     </div>
   </div>
 
-  <div class="searches">
+  <div class="searches" id="searches">
     <input class="search" id="qNombre" type="search" placeholder="Buscar por nombre…" autocomplete="off">
     <input class="search" id="qCuenta" type="search" placeholder="Buscar por N° de cuenta…" autocomplete="off" inputmode="numeric">
   </div>
 
-  <div class="table-wrap">
+  <section id="summary" hidden></section>
+
+  <div class="table-wrap" id="tableWrap">
     <table>
       <thead><tr id="headRow"></tr></thead>
       <tbody id="tbody"></tbody>
@@ -251,6 +289,27 @@
   </form>
 </dialog>
 
+<!-- Ajustes de tenencia -->
+<dialog id="tenDlg">
+  <form method="dialog" id="tenForm">
+    <h2>Ajustes de tenencia</h2>
+    <p>Elegí qué columnas del Excel de tenencias se usan para calcular el total en USD.</p>
+    <div class="grid">
+      <label>Columna de valuación<select id="t-val"></select></label>
+      <label>Moneda<select id="t-mon"></select></label>
+      <label>Columna de cantidad<select id="t-qty"></select></label>
+      <label>Columna de especie<select id="t-esp"></select></label>
+      <label>Tipo de cambio (pesos por USD)<input id="t-tc" type="number" min="0" step="0.01" placeholder="Ej: 1150"></label>
+      <label>Umbral de la pestaña "menos de" (USD)<input id="t-umbral" type="number" min="1" step="1"></label>
+    </div>
+    <p id="tenHint"></p>
+    <div class="dialog-actions">
+      <button type="button" class="btn ghost" id="tenCancel">Cancelar</button>
+      <button type="submit" class="btn primary">Guardar</button>
+    </div>
+  </form>
+</dialog>
+
 <!-- Confirmación -->
 <dialog id="confirmDlg">
   <form method="dialog">
@@ -267,21 +326,33 @@
 
 <script>
 const DEFAULT_CONFIG = {
+  v: 2,
   principal: 'WM3',
   dias: 21,
+  umbral: 10000,
+  ten: {},   // columnas elegidas para valuar las tenencias (por nombre de columna)
   tabs: [
+    { id: 'total', label: 'Tenencia total' },
     { id: 'sgr', label: 'SGR' },
     { id: 'prospects', label: 'Prospects' },
     { id: 'tareas', label: 'Tareas pendientes' },
     { id: 'fal', label: 'FAL' },
     { id: 'notas', label: 'Notas Estructuradas' },
     { id: 'fwd', label: 'FWD' },
+    { id: 'cero', label: 'En 0' },
+    { id: 'menos10k', label: 'Menos de 10.000 USD' },
   ],
 };
 const MAIN = 'wm3';
 const HOLD_TAB = 'fwd';           // la pestaña FWD muestra las tenencias cargadas por Excel
+const SUMMARY_TAB = 'total';      // resumen de la tenencia total y su variación
+const ZERO_TAB = 'cero';          // clientes sin tenencia
+const LOW_TAB = 'menos10k';       // clientes con menos del umbral en USD
+const AUTO_TABS = new Set([HOLD_TAB, SUMMARY_TAB, ZERO_TAB, LOW_TAB]); // no se asignan a mano
 const HOLD_CHUNK = 400;           // filas por documento en la base de datos
 const LOCAL_HOLD = 'panel-wm-tenencias-v1';
+const LOCAL_PREV = 'panel-wm-tenencias-prev-v1';
+const LOCAL_HIST = 'panel-wm-historial-v1';
 const LOCAL_KEY = 'panel-wm-cuentas-v1';
 const LOCAL_CFG = 'panel-wm-config-v1';
 const FIELDS = ['cuenta', 'nombre', 'telefono', 'email', 'ultimoContacto', 'accion', 'notas', 'pestanas', 'creado'];
@@ -316,7 +387,13 @@ let pending = 0, syncError = false;
 // Tenencias: columnas tal como vienen en el Excel; cada fila guarda sus valores como {c0, c1, …}
 let tenencias = { columns: [], cuentaCol: -1, nombreCol: -1, rows: [], updatedAt: '', fileName: '' };
 let holdSort = { key: 'cuenta', dir: 1 };
-let tenCol = null, tenMetaRef = null, tenChunks = new Map(), tenMeta = null;
+const EMPTY_DS = () => ({ columns: [], cuentaCol: -1, nombreCol: -1, rows: [], updatedAt: '', fileName: '', tc: 0 });
+let tenPrev = EMPTY_DS();         // informe anterior, para calcular la variación
+let historial = [];               // [{fecha, total, tc, fileName}] un registro por informe
+// Dos juegos de tenencias en la base: el actual y el anterior, cada uno en bloques de filas
+const DS = { cur: { coll: 'tenencias', meta: 'actual' }, prev: { coll: 'tenencias_prev', meta: 'anterior' } };
+const dsState = { cur: { meta: null, chunks: new Map() }, prev: { meta: null, chunks: new Map() } };
+let tenDb = null;
 
 const $ = s => document.querySelector(s);
 const norm = s => String(s ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim();
@@ -330,8 +407,19 @@ const slug = s => normHeader(s).replace(/ /g, '-').slice(0, 40) || uid();
 const plural = (n, uno, varios) => `${n} ${n === 1 ? uno : varios}`;
 const fmtDate = d => { if (!d) return ''; const [y, m, day] = d.split('-'); return `${day}/${m}/${y}`; };
 const tabLabel = id => id === MAIN ? config.principal : (config.tabs.find(t => t.id === id)?.label ?? '');
-const validTags = c => (c.pestanas || []).filter(id => id !== HOLD_TAB && config.tabs.some(t => t.id === id));
-const tagTabs = () => config.tabs.filter(t => t.id !== HOLD_TAB);
+const validTags = c => (c.pestanas || []).filter(id => !AUTO_TABS.has(id) && config.tabs.some(t => t.id === id));
+const tagTabs = () => config.tabs.filter(t => !AUTO_TABS.has(t.id));
+// Suma las pestañas nuevas a configuraciones guardadas antes de que existieran
+function migrateConfig(c) {
+  c = { ...structuredClone(DEFAULT_CONFIG), ...c };
+  if ((c.v || 1) < 2) {
+    if (!c.tabs.some(t => t.id === SUMMARY_TAB)) c.tabs.unshift({ id: SUMMARY_TAB, label: 'Tenencia total' });
+    if (!c.tabs.some(t => t.id === ZERO_TAB)) c.tabs.push({ id: ZERO_TAB, label: 'En 0' });
+    if (!c.tabs.some(t => t.id === LOW_TAB)) c.tabs.push({ id: LOW_TAB, label: 'Menos de 10.000 USD' });
+    c.v = 2;
+  }
+  return c;
+}
 
 function toast(msg) {
   const t = $('#toast'); t.textContent = msg; t.classList.add('show');
@@ -367,6 +455,8 @@ function saveLocal() {
     localStorage.setItem(LOCAL_KEY, JSON.stringify(cuentas));
     localStorage.setItem(LOCAL_CFG, JSON.stringify(config));
     localStorage.setItem(LOCAL_HOLD, JSON.stringify(tenencias));
+    localStorage.setItem(LOCAL_PREV, JSON.stringify(tenPrev));
+    localStorage.setItem(LOCAL_HIST, JSON.stringify(historial));
   } catch { toast('No se pudo guardar en este navegador'); }
 }
 async function write(fn) {
@@ -415,70 +505,215 @@ async function initStorage() {
   const db = window.claude?.use ? await window.claude.use('db') : null;
   if (!db) {
     try { cuentas = JSON.parse(localStorage.getItem(LOCAL_KEY)) || []; } catch { cuentas = []; }
-    try { config = { ...structuredClone(DEFAULT_CONFIG), ...(JSON.parse(localStorage.getItem(LOCAL_CFG)) || {}) }; } catch {}
+    try { config = migrateConfig(JSON.parse(localStorage.getItem(LOCAL_CFG)) || {}); } catch {}
     try { tenencias = JSON.parse(localStorage.getItem(LOCAL_HOLD)) || tenencias; } catch {}
+    try { tenPrev = JSON.parse(localStorage.getItem(LOCAL_PREV)) || tenPrev; } catch {}
+    try { historial = JSON.parse(localStorage.getItem(LOCAL_HIST)) || []; } catch {}
     loading = false; setSync(); render(); return;
   }
+  tenDb = db;
   col = db.collection('cuentas');
   cfgRef = db.doc('config/panel');
+  const fail = () => { syncError = true; setSync(); };
   cfgRef.onSnapshot(s => {
-    if (s.exists) config = { ...structuredClone(DEFAULT_CONFIG), ...structuredClone(s.data()) };
+    config = migrateConfig(s.exists ? structuredClone(s.data()) : {});
     if (tab !== MAIN && !config.tabs.some(t => t.id === tab)) tab = MAIN;
     render();
-  }, () => { syncError = true; setSync(); });
-  tenCol = db.collection('tenencias');
-  tenMetaRef = db.doc('tenencias_meta/actual');
-  tenMetaRef.onSnapshot(s => { tenMeta = s.exists ? structuredClone(s.data()) : null; assembleTenencias(); },
-    () => { syncError = true; setSync(); });
-  tenCol.onSnapshot(snap => {
-    tenChunks = new Map(snap.docs.map(d => [d.id, d.data().rows || []]));
-    assembleTenencias();
-  }, () => { syncError = true; setSync(); });
+  }, fail);
+  db.collection('tenencias_meta').onSnapshot(snap => {
+    const m = new Map(snap.docs.map(d => [d.id, structuredClone(d.data())]));
+    for (const k of Object.keys(DS)) dsState[k].meta = m.get(DS[k].meta) || null;
+    assemble('cur'); assemble('prev');
+  }, fail);
+  for (const k of Object.keys(DS)) {
+    db.collection(DS[k].coll).onSnapshot(snap => {
+      dsState[k].chunks = new Map(snap.docs.map(d => [d.id, d.data().rows || []]));
+      assemble(k);
+    }, fail);
+  }
+  db.collection('tenencias_hist').onSnapshot(snap => {
+    historial = snap.docs.map(d => structuredClone(d.data())).sort((a, b) => a.fecha.localeCompare(b.fecha));
+    render();
+  }, fail);
   col.onSnapshot(snap => {
     cuentas = snap.docs.map(d => ({ id: d.id, ...structuredClone(d.data()) }));
     loading = false; setSync(); render();
   }, () => { syncError = true; loading = false; setSync(); render(); });
 }
 
-// Junta los bloques de filas de tenencias que indica el documento "tenencias_meta/actual"
-function assembleTenencias() {
-  if (!tenMeta) { tenencias = { columns: [], cuentaCol: -1, nombreCol: -1, rows: [], updatedAt: '', fileName: '' }; render(); return; }
-  const rows = [];
-  for (let i = 0; i < tenMeta.chunks; i++) {
-    const part = tenChunks.get('parte-' + i);
-    if (!part) return; // todavía no llegó todo; se vuelve a armar en el próximo aviso
-    rows.push(...part);
+// Junta los bloques de filas de un juego de tenencias según su documento en "tenencias_meta"
+function assemble(k) {
+  const { meta, chunks } = dsState[k];
+  let ds = EMPTY_DS();
+  if (meta) {
+    const rows = [];
+    for (let i = 0; i < meta.chunks; i++) {
+      const part = chunks.get('parte-' + i);
+      if (!part) return; // todavía no llegó todo; se vuelve a armar en el próximo aviso
+      rows.push(...part);
+    }
+    ds = { ...EMPTY_DS(), ...meta, rows: rows.map(structuredClone) };
   }
-  tenencias = { ...tenMeta, rows: rows.map(structuredClone) };
+  if (k === 'cur') tenencias = ds; else tenPrev = ds;
   render();
 }
-async function saveTenencias(next) {
-  tenencias = next;
-  if (!tenCol) { saveLocal(); return; }
+async function saveDataset(k, next) {
+  if (k === 'cur') tenencias = next; else tenPrev = next;
+  if (!tenDb) { saveLocal(); return; }
+  const coll = tenDb.collection(DS[k].coll);
   const chunks = [];
   for (let i = 0; i < next.rows.length; i += HOLD_CHUNK) chunks.push(next.rows.slice(i, i + HOLD_CHUNK));
-  const old = [...tenChunks.keys()];
-  let done = 0;
+  const old = [...dsState[k].chunks.keys()];
   for (let i = 0; i < chunks.length; i++) {
-    await write(() => tenCol.doc('parte-' + i).set({ rows: chunks[i] }));
-    toast(`Guardando tenencias ${Math.min(++done * HOLD_CHUNK, next.rows.length)} de ${next.rows.length}…`);
+    await write(() => coll.doc('parte-' + i).set({ rows: chunks[i] }));
+    if (k === 'cur') toast(`Guardando tenencias ${Math.min((i + 1) * HOLD_CHUNK, next.rows.length)} de ${next.rows.length}…`);
   }
-  const { rows, ...meta } = next;
-  await write(() => tenMetaRef.set({ ...meta, chunks: chunks.length }));
-  for (const id of old) if (Number(id.split('-')[1]) >= chunks.length) await write(() => tenCol.doc(id).delete());
+  await saveDatasetMeta(k, next, chunks.length);
+  for (const id of old) if (Number(id.split('-')[1]) >= chunks.length) await write(() => coll.doc(id).delete());
 }
+function saveDatasetMeta(k, ds, nChunks = Math.ceil(ds.rows.length / HOLD_CHUNK)) {
+  if (!tenDb) { saveLocal(); return Promise.resolve(); }
+  const { rows, ...meta } = ds;
+  return write(() => tenDb.doc('tenencias_meta/' + DS[k].meta).set({ ...meta, chunks: nChunks }));
+}
+function saveHist(entry) {
+  historial = [...historial.filter(h => h.fecha !== entry.fecha), entry].sort((a, b) => a.fecha.localeCompare(b.fecha));
+  if (!tenDb) { saveLocal(); return Promise.resolve(); }
+  return write(() => tenDb.doc('tenencias_hist/' + entry.fecha).set(entry));
+}
+
+// ---------- Valuación en USD ----------
+const VAL_RE = /valuaci|valor|monto|importe|saldo|tenencia|total/;
+const USD_HEADER_RE = /\busd\b|u s|dolar|dolares/;
+const ARS_HEADER_RE = /\bars\b|pesos|\$/;
+const QTY_RE = /cantidad|\bcant\b|nominal|cuotapartes|\bvn\b|titulos/;
+const ESP_RE = /especie|instrumento|ticker|activo|simbolo|descripcion|titulo|producto|abreviatura|fondo/;
+const MON_RE = /moneda|divisa|currency/;
+const isUSD = v => /usd|u\$s|us\$|dolar|mep|cable|ccl|\bext/.test(norm(v));
+function toNumber(v) {
+  if (typeof v === 'number') return v;
+  const s = String(v ?? '').trim().replace(/[^\d,.\-]/g, '');
+  if (!s) return NaN;
+  // "1.234,56" (formato argentino) o "1,234.56"
+  const n = s.lastIndexOf(',') > s.lastIndexOf('.') ? s.replace(/\./g, '').replace(',', '.') : s.replace(/,/g, '');
+  return Number(n);
+}
+// Columnas para valuar: las elegidas en Ajustes si existen en el archivo; si no, las que se detectan por nombre
+function tenCols(ds) {
+  const hs = ds.columns.map(normHeader);
+  const pick = (name, test) => {
+    const chosen = config.ten?.[name];
+    if (chosen && ds.columns.includes(chosen)) return ds.columns.indexOf(chosen);
+    if (chosen === '__none') return -1;
+    return test();
+  };
+  const numeric = i => ds.rows.some(r => !isNaN(toNumber(r['c' + i])) && r['c' + i] !== '');
+  const val = pick('val', () => {
+    const cand = hs.map((h, i) => i).filter(i => VAL_RE.test(hs[i]) && numeric(i));
+    return cand.find(i => USD_HEADER_RE.test(hs[i])) ?? cand[cand.length - 1] ?? -1;
+  });
+  const qty = pick('qty', () => hs.findIndex(h => QTY_RE.test(h)));
+  const esp = pick('esp', () => hs.findIndex((h, i) => ESP_RE.test(h) && i !== ds.cuentaCol && i !== ds.nombreCol));
+  let mon = config.ten?.mon;
+  if (!(mon === '__usd' || mon === '__ars' || (mon && ds.columns.includes(mon)))) {
+    const mi = hs.findIndex(h => MON_RE.test(h));
+    mon = mi >= 0 ? ds.columns[mi] : val >= 0 && ARS_HEADER_RE.test(ds.columns[val].toLowerCase()) && !USD_HEADER_RE.test(hs[val]) ? '__ars' : '__usd';
+  }
+  return { val, qty, esp, mon, monIdx: ds.columns.indexOf(mon) };
+}
+const valCache = new WeakMap();
+function valuar(ds) {
+  if (!ds || !ds.rows.length) return null;
+  const sig = JSON.stringify(config.ten || {}) + '|' + ds.tc;
+  const hit = valCache.get(ds);
+  if (hit && hit.sig === sig) return hit.res;
+  const cols = tenCols(ds);
+  const res = { total: 0, porCuenta: new Map(), porEspecie: new Map(), pos: new Map(), needsTC: false, cols, ok: cols.val >= 0 };
+  if (res.ok) {
+    for (const r of ds.rows) {
+      const v = toNumber(r['c' + cols.val]);
+      if (isNaN(v)) continue;
+      const enUSD = cols.mon === '__usd' || (cols.mon !== '__ars' && isUSD(r['c' + cols.monIdx]));
+      if (!enUSD && !(ds.tc > 0)) { res.needsTC = true; continue; }
+      const usd = enUSD ? v : v / ds.tc;
+      const cuenta = String(r['c' + ds.cuentaCol] ?? '').trim();
+      const kc = norm(cuenta);
+      const especie = cols.esp >= 0 ? String(r['c' + cols.esp] ?? '').trim() || '(sin especie)' : '(sin especie)';
+      const q = cols.qty >= 0 ? toNumber(r['c' + cols.qty]) : NaN;
+      res.total += usd;
+      const pc = res.porCuenta.get(kc) || { cuenta, nombre: ds.nombreCol >= 0 ? String(r['c' + ds.nombreCol] ?? '').trim() : '', usd: 0 };
+      pc.usd += usd; res.porCuenta.set(kc, pc);
+      res.porEspecie.set(especie, (res.porEspecie.get(especie) || 0) + usd);
+      const kp = kc + '|' + norm(especie);
+      const pp = res.pos.get(kp) || { cuenta, especie, usd: 0, q: 0, hasQ: false };
+      pp.usd += usd; if (!isNaN(q)) { pp.q += q; pp.hasQ = true; }
+      res.pos.set(kp, pp);
+    }
+  }
+  valCache.set(ds, { sig, res });
+  return res;
+}
+// Variación contra el informe anterior, separando precio y movimientos cuando hay cantidades
+function variacion() {
+  const a = valuar(tenencias), b = valuar(tenPrev);
+  if (!a?.ok || !b?.ok) return null;
+  const hasQty = a.cols.qty >= 0 && b.cols.qty >= 0;
+  const porCuenta = new Map(), porEspecie = new Map();
+  const add = (map, key, label, x) => {
+    const e = map.get(key) || { label, sub: '', anterior: 0, actual: 0, delta: 0, precio: 0, mov: 0 };
+    e.anterior += x.v0; e.actual += x.v1; e.delta += x.v1 - x.v0; e.precio += x.precio; e.mov += x.mov;
+    if (!e.sub && x.sub) e.sub = x.sub;
+    map.set(key, e);
+  };
+  let precio = 0, mov = 0;
+  for (const k of new Set([...a.pos.keys(), ...b.pos.keys()])) {
+    const p1 = a.pos.get(k), p0 = b.pos.get(k);
+    const v1 = p1?.usd || 0, v0 = p0?.usd || 0;
+    let m = 0;
+    if (!p0) m = v1;                         // posición nueva
+    else if (!p1) m = -v0;                   // posición cerrada
+    else if (hasQty && p1.hasQ && p0.hasQ && p1.q) m = (p1.q - p0.q) * (v1 / p1.q);
+    const x = { v0, v1, mov: m, precio: v1 - v0 - m };
+    precio += x.precio; mov += x.mov;
+    const ref = p1 || p0;
+    const kc = norm(ref.cuenta);
+    const nombre = a.porCuenta.get(kc)?.nombre || b.porCuenta.get(kc)?.nombre || cuentas.find(c => norm(c.cuenta) === kc)?.nombre || '';
+    add(porCuenta, kc, nombre || `Cuenta ${ref.cuenta}`, { ...x, sub: nombre ? ref.cuenta : '' });
+    add(porEspecie, norm(ref.especie), ref.especie, x);
+  }
+  return { actual: a.total, anterior: b.total, delta: a.total - b.total, precio, mov, hasQty, porCuenta, porEspecie };
+}
+const tenenciaCuenta = c => {
+  const v = valuar(tenencias);
+  if (!v?.ok || !c.cuenta) return null;
+  return v.porCuenta.get(norm(c.cuenta))?.usd || 0;
+};
+const fmtUSD = v => Math.round(v).toLocaleString('es-AR');
+const fmtSigned = v => (v > 0.5 ? '+' : v < -0.5 ? '−' : '') + fmtUSD(Math.abs(v));
+const fmtPct = (d, base) => base ? `${d >= 0 ? '+' : '−'}${Math.abs(d / base * 100).toLocaleString('es-AR', { maximumFractionDigits: 1, minimumFractionDigits: 1 })}%` : '';
+const signCls = v => v > 0.5 ? 'pos' : v < -0.5 ? 'neg' : '';
 
 // ---------- Render ----------
 function currentRows() {
   const qn = norm($('#qNombre').value);
   const qc = norm($('#qCuenta').value).replace(/\s/g, '');
   return cuentas
-    .filter(c => tab === MAIN || (c.pestanas || []).includes(tab))
+    .filter(c => inTab(c, tab))
     .filter(c => !qn || norm(c.nombre).includes(qn))
     .filter(c => !qc || norm(c.cuenta).replace(/\s/g, '').includes(qc));
 }
+function inTab(c, t) {
+  if (t === MAIN) return true;
+  if (t === ZERO_TAB || t === LOW_TAB) {
+    const v = tenenciaCuenta(c);
+    if (v === null) return false;
+    return t === ZERO_TAB ? Math.abs(v) < 1 : v >= 1 && v < config.umbral;
+  }
+  return (c.pestanas || []).includes(t);
+}
 function compare(a, b) {
   const k = sort.key;
+  if (k === 'tenencia') return ((tenenciaCuenta(a) ?? -1) - (tenenciaCuenta(b) ?? -1)) * sort.dir || norm(a.nombre).localeCompare(norm(b.nombre), 'es');
   if (k === 'alarma') return (alarma(a).sortVal - alarma(b).sortVal) * -sort.dir || norm(a.nombre).localeCompare(norm(b.nombre), 'es');
   const va = norm(a[k]), vb = norm(b[k]);
   if (!va && vb) return 1;   // vacíos siempre al final
@@ -493,15 +728,21 @@ function render() {
 
   const allTabs = [{ id: MAIN, label: config.principal }, ...config.tabs];
   $('#tabs').innerHTML = allTabs.map(t => {
-    const n = t.id === MAIN ? cuentas.length : t.id === HOLD_TAB ? holdCuentas().size : cuentas.filter(c => (c.pestanas || []).includes(t.id)).length;
-    return `<button class="tab ${t.id === tab ? 'active' : ''}" data-tab="${esc(t.id)}">${esc(t.label)}<span class="n">${n}</span></button>`;
+    const n = t.id === SUMMARY_TAB ? null : t.id === HOLD_TAB ? holdCuentas().size : cuentas.filter(c => inTab(c, t.id)).length;
+    return `<button class="tab ${t.id === tab ? 'active' : ''}" data-tab="${esc(t.id)}">${esc(t.label)}${n === null ? '' : `<span class="n">${n}</span>`}</button>`;
   }).join('') + `<button class="tab edit" id="btnTabs" title="Editar pestañas" aria-label="Editar pestañas">+</button>`;
 
-  const hold = tab === HOLD_TAB;
-  $('#btnSinCuenta').hidden = hold;
-  $('#btnNew').hidden = hold;
+  const hold = tab === HOLD_TAB, summary = tab === SUMMARY_TAB;
+  $('#btnSinCuenta').hidden = hold || summary;
+  $('#btnNew').hidden = hold || summary;
+  $('#btnAjustes').hidden = !(hold || summary);
+  $('#btnImport').hidden = summary;
   $('#btnImport').textContent = hold ? 'Importar tenencias' : 'Importar Excel';
+  $('#summary').hidden = !summary;
+  $('#tableWrap').hidden = summary;
+  $('#searches').hidden = summary;
   $('table').classList.toggle('hold', hold);
+  if (summary) { renderSummary(); return; }
   if (hold) { renderTenencias(); restoreFocus(focus); return; }
 
   const base = currentRows();
@@ -510,7 +751,10 @@ function render() {
     <span class="stat"><b>${base.length}</b>cuentas cargadas</span>
     <button class="stat ${soloContactar ? 'on' : ''}" id="btnLate" title="${soloContactar ? 'Ver todas' : 'Ver solo las que hay que contactar'}"><b>${late}</b>para contactar (+${config.dias} días)</button>`;
 
-  $('#headRow').innerHTML = COLUMNS.map(c => c.key
+  const val = valuar(tenencias);
+  const showTen = !!val?.ok;
+  const cols = showTen ? [...COLUMNS.slice(0, 4), { key: 'tenencia', label: 'Tenencia USD', cls: 'num' }, ...COLUMNS.slice(4)] : COLUMNS;
+  $('#headRow').innerHTML = cols.map(c => c.key
     ? `<th class="${c.cls || ''} ${sort.key === c.key ? 'sorted' : ''}" data-sort="${c.key}">${c.label}<span class="ar">${sort.key === c.key ? (sort.dir > 0 ? '↑' : '↓') : '↕'}</span></th>`
     : `<th class="nosort ${c.cls}"></th>`).join('');
 
@@ -522,6 +766,10 @@ function render() {
     else if (!cuentas.length) empty.innerHTML = `<div>Todavía no cargaste cuentas. Agregá una con <b>+ Nueva cuenta</b> o subí tu Excel con <b>Importar Excel</b>.</div>
       <div>El Excel necesita una columna <b>Nombre</b> y, si querés, <b>N° de cuenta</b>, <b>Última vez contactado</b> y <b>Acción / comentarios</b>.</div>
       <button class="btn ghost" id="btnTemplate">Descargar plantilla de Excel</button>`;
+    else if ((tab === ZERO_TAB || tab === LOW_TAB) && !showTen)
+      empty.innerHTML = `<div>Esta pestaña se arma sola con las tenencias.</div><div>Cargá el Excel de tenencias en <b>${esc(tabLabel(HOLD_TAB))}</b> y acá vas a ver ${tab === ZERO_TAB ? 'los clientes que están en 0' : `los clientes con menos de ${fmtUSD(config.umbral)} USD`}.</div>`;
+    else if ((tab === ZERO_TAB || tab === LOW_TAB) && !base.length && !$('#qNombre').value && !$('#qCuenta').value)
+      empty.innerHTML = tab === ZERO_TAB ? 'Ningún cliente de ' + esc(config.principal) + ' está en 0.' : `Ningún cliente tiene entre 1 y ${fmtUSD(config.umbral)} USD.`;
     else if (tab !== MAIN && !base.length && !$('#qNombre').value && !$('#qCuenta').value)
       empty.innerHTML = `<div>No hay cuentas en <b>${esc(tabLabel(tab))}</b>.</div><div>Para sumar una, tocá <b>+ pestaña</b> debajo de su nombre en ${esc(config.principal)}, o importá un Excel estando en esta pestaña.</div>`;
     else empty.innerHTML = 'No hay cuentas que coincidan con la búsqueda.';
@@ -537,8 +785,9 @@ function render() {
         <div class="chips">${chips}<button class="chip add" data-act="tags">+ pestaña</button></div></td>
       <td class="c-date"><input class="inline" type="date" data-field="ultimoContacto" value="${esc(c.ultimoContacto)}" aria-label="Última vez contactado"></td>
       <td><input class="inline" data-field="accion" value="${esc(c.accion)}" placeholder="Agregar acción…" aria-label="Acción / comentarios"></td>
+      ${showTen ? `<td class="num">${c.cuenta ? fmtUSD(tenenciaCuenta(c)) : '<span class="muted">—</span>'}</td>` : ''}
       <td class="c-alarm"><button class="pill ${a.late ? 'late' : 'ok'}" data-act="hoy" title="Marcar contactado hoy">${a.text}</button></td>
-      <td class="c-x"><button class="x" data-act="remove" title="${tab === MAIN ? 'Eliminar cuenta' : 'Quitar de ' + esc(tabLabel(tab))}" aria-label="Eliminar">×</button></td>
+      <td class="c-x"><button class="x" data-act="remove" title="${tab === MAIN || AUTO_TABS.has(tab) ? 'Eliminar cuenta' : 'Quitar de ' + esc(tabLabel(tab))}" aria-label="Eliminar">×</button></td>
     </tr>`;
   }).join('');
 
@@ -634,6 +883,181 @@ function renderTenencias() {
   }).join('');
 }
 
+// ---------- Tenencia total ----------
+function recordHist() {
+  const v = valuar(tenencias);
+  if (!v?.ok || v.needsTC) return Promise.resolve();
+  return saveHist({ fecha: tenencias.updatedAt, total: Math.round(v.total * 100) / 100, tc: tenencias.tc || 0, fileName: tenencias.fileName || '' });
+}
+function breakdownTable(map, kind, hasQty) {
+  const rows = [...map.values()].filter(e => Math.abs(e.delta) >= 0.5).sort((x, y) => Math.abs(y.delta) - Math.abs(x.delta));
+  if (!rows.length) return '<div class="empty">Sin variaciones.</div>';
+  return `<table><thead><tr><th class="nosort">${kind}</th><th class="nosort num">Anterior</th><th class="nosort num">Actual</th><th class="nosort num">Variación</th><th class="nosort num">%</th>
+    ${hasQty ? '<th class="nosort num">Por precio</th><th class="nosort num">Por movimientos</th>' : ''}</tr></thead><tbody>
+    ${rows.map(e => `<tr><td>${esc(e.label)}${e.sub ? `<div class="acct">${esc(e.sub)}</div>` : ''}</td>
+      <td class="num">${fmtUSD(e.anterior)}</td><td class="num">${fmtUSD(e.actual)}</td>
+      <td class="num ${signCls(e.delta)}">${fmtSigned(e.delta)}</td><td class="num ${signCls(e.delta)}">${e.anterior ? fmtPct(e.delta, e.anterior) : 'nueva'}</td>
+      ${hasQty ? `<td class="num ${signCls(e.precio)}">${fmtSigned(e.precio)}</td><td class="num ${signCls(e.mov)}">${fmtSigned(e.mov)}</td>` : ''}</tr>`).join('')}
+    </tbody></table>`;
+}
+function renderSummary() {
+  const el = $('#summary');
+  const v = valuar(tenencias);
+  const nZero = cuentas.filter(c => inTab(c, ZERO_TAB)).length, nLow = cuentas.filter(c => inTab(c, LOW_TAB)).length;
+  $('#stats').innerHTML = v?.ok ? `
+    <span class="stat"><b>${v.porCuenta.size}</b>clientes con tenencia</span>
+    <button class="stat" data-goto="${ZERO_TAB}"><b>${nZero}</b>${esc(tabLabel(ZERO_TAB))}</button>
+    <button class="stat" data-goto="${LOW_TAB}"><b>${nLow}</b>${esc(tabLabel(LOW_TAB))}</button>` : '';
+  if (loading) { el.innerHTML = '<div class="empty">Cargando…</div>'; return; }
+  if (!v) { el.innerHTML = `<div class="panel"><div class="empty"><div>Todavía no cargaste tenencias.</div><div>Entrá a <b>${esc(tabLabel(HOLD_TAB))}</b> y tocá <b>Importar tenencias</b>. Acá vas a ver tu tenencia total en USD y de dónde vienen las subas y bajas.</div></div></div>`; return; }
+  if (!v.ok) { el.innerHTML = `<div class="panel"><div class="empty"><div>No encontré una columna de valuación en el Excel de tenencias.</div><div>Tocá <b>Ajustes de tenencia</b> y elegí qué columna tiene el valor de cada posición.</div></div></div>`; return; }
+
+  const d = variacion();
+  const prevFecha = tenPrev.updatedAt;
+  const dir = !d ? '' : d.delta > 0.5 ? 'up' : d.delta < -0.5 ? 'down' : 'flat';
+  el.innerHTML = `
+    <div class="hero">
+      <div>
+        <div class="label">Tenencia total</div>
+        <div class="big"><small>USD</small>${fmtUSD(v.total)}</div>
+        <div class="meta">Informe del ${fmtDate(tenencias.updatedAt)}${tenencias.fileName ? ` · ${esc(tenencias.fileName)}` : ''}${tenencias.tc ? ` · TC ${tenencias.tc.toLocaleString('es-AR')}` : ''}</div>
+        ${v.needsTC ? `<div class="delta down">Faltan posiciones en pesos: cargá el tipo de cambio en Ajustes</div>` : ''}
+        ${d ? `<div class="delta ${dir}">${dir === 'up' ? '▲' : dir === 'down' ? '▼' : '='} ${fmtSigned(d.delta)} USD (${fmtPct(d.delta, d.anterior)}) vs ${fmtDate(prevFecha)}</div>
+          ${d.hasQty ? `<div class="split">
+            <div><span>Por precio (mercado y tipo de cambio)</span><span class="${signCls(d.precio)}">${fmtSigned(d.precio)} USD</span></div>
+            <div><span>Por movimientos (ingresos, retiros, compras y ventas)</span><span class="${signCls(d.mov)}">${fmtSigned(d.mov)} USD</span></div>
+          </div>` : `<div class="meta">Para separar precio y movimientos, el Excel necesita una columna de cantidad.</div>`}`
+        : `<div class="meta" style="margin-top:14px">Cuando cargues el próximo informe vas a ver cuánto subió o bajó y por qué.</div>`}
+      </div>
+      <div class="chart" id="chart"></div>
+    </div>
+    ${d ? `<div class="breakdown">
+      <div class="panel"><h3>Variación por cliente</h3><div class="sub">De mayor a menor impacto, en USD</div><div class="scroll">${breakdownTable(d.porCuenta, 'Cliente', d.hasQty)}</div></div>
+      <div class="panel"><h3>Variación por especie</h3><div class="sub">De mayor a menor impacto, en USD</div><div class="scroll">${breakdownTable(d.porEspecie, 'Especie', d.hasQty)}</div></div>
+    </div>` : ''}
+    ${historial.length ? `<details class="hist"><summary>Historial de informes (${historial.length})</summary>
+      <table><thead><tr><th class="nosort">Fecha</th><th class="nosort num">Total USD</th><th class="nosort num">Variación</th><th class="nosort">Archivo</th></tr></thead><tbody>
+      ${historial.slice().reverse().map((h, i, arr) => { const p = arr[i + 1]; const dd = p ? h.total - p.total : 0;
+        return `<tr><td>${fmtDate(h.fecha)}</td><td class="num">${fmtUSD(h.total)}</td><td class="num ${signCls(dd)}">${p ? fmtSigned(dd) : ''}</td><td class="muted">${esc(h.fileName)}</td></tr>`; }).join('')}
+      </tbody></table></details>` : ''}`;
+  drawChart();
+}
+
+// Línea de la tenencia total en el tiempo, con detalle al pasar el cursor
+function drawChart() {
+  const box = $('#chart'); if (!box) return;
+  const pts = historial.filter(h => typeof h.total === 'number');
+  if (pts.length < 2) { box.innerHTML = '<div class="note">El gráfico de evolución aparece a partir del segundo informe de tenencias.</div>'; return; }
+  const W = Math.max(box.clientWidth, 260), H = 220, m = { t: 14, r: 16, b: 26, l: 52 };
+  const t = pts.map(p => { const [y, mo, d] = p.fecha.split('-').map(Number); return new Date(y, mo - 1, d).getTime(); });
+  const t0 = t[0], t1 = t[t.length - 1] === t0 ? t0 + 864e5 : t[t.length - 1];
+  let lo = Math.min(...pts.map(p => p.total)), hi = Math.max(...pts.map(p => p.total));
+  const padY = (hi - lo) * 0.15 || hi * 0.05 || 1; lo -= padY; hi += padY;
+  const step = niceStep((hi - lo) / 4); lo = Math.floor(lo / step) * step; hi = Math.ceil(hi / step) * step;
+  const x = v => m.l + (v - t0) / (t1 - t0) * (W - m.l - m.r);
+  const y = v => m.t + (hi - v) / (hi - lo) * (H - m.t - m.b);
+  const ticks = []; for (let v = lo; v <= hi + step / 2; v += step) ticks.push(v);
+  const short = v => Math.abs(v) >= 1e6 ? (v / 1e6).toLocaleString('es-AR', { maximumFractionDigits: 1 }) + ' M' : Math.abs(v) >= 1e3 ? (v / 1e3).toLocaleString('es-AR', { maximumFractionDigits: 0 }) + ' k' : String(Math.round(v));
+  const xl = [0, Math.floor((pts.length - 1) / 2), pts.length - 1].filter((v, i, a) => a.indexOf(v) === i);
+  const path = pts.map((p, i) => `${i ? 'L' : 'M'}${x(t[i]).toFixed(1)},${y(p.total).toFixed(1)}`).join('');
+  const area = `${path}L${x(t[t.length - 1]).toFixed(1)},${H - m.b}L${x(t[0]).toFixed(1)},${H - m.b}Z`;
+  box.innerHTML = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Evolución de la tenencia total en USD">
+    ${ticks.map(v => `<line x1="${m.l}" x2="${W - m.r}" y1="${y(v)}" y2="${y(v)}" stroke="var(--border)" stroke-width="1"/>
+      <text x="${m.l - 8}" y="${y(v) + 4}" text-anchor="end" font-size="11" fill="var(--muted)">${short(v)}</text>`).join('')}
+    ${xl.map(i => `<text x="${x(t[i])}" y="${H - 6}" text-anchor="${i === 0 ? 'start' : i === pts.length - 1 ? 'end' : 'middle'}" font-size="11" fill="var(--muted)">${fmtDate(pts[i].fecha).slice(0, 5)}</text>`).join('')}
+    <path d="${area}" fill="var(--accent)" fill-opacity=".08"/>
+    <path d="${path}" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+    ${pts.length <= 40 ? pts.map((p, i) => `<circle cx="${x(t[i])}" cy="${y(p.total)}" r="4" fill="var(--accent)" stroke="var(--panel)" stroke-width="2"/>`).join('') : ''}
+    <line id="cross" y1="${m.t}" y2="${H - m.b}" stroke="var(--muted)" stroke-width="1" stroke-dasharray="3 3" visibility="hidden"/>
+    <circle id="dot" r="5" fill="var(--accent)" stroke="var(--panel)" stroke-width="2" visibility="hidden"/>
+    <rect x="${m.l}" y="0" width="${W - m.l - m.r}" height="${H}" fill="transparent" id="hit"/>
+  </svg><div class="tip" id="tip" hidden></div>`;
+  const svg = box.querySelector('svg'), tip = $('#tip'), cross = $('#cross'), dot = $('#dot');
+  const move = e => {
+    const r = svg.getBoundingClientRect();
+    const px = (e.clientX - r.left) * (W / r.width);
+    let i = 0; for (let j = 1; j < pts.length; j++) if (Math.abs(x(t[j]) - px) < Math.abs(x(t[i]) - px)) i = j;
+    const cx = x(t[i]), cy = y(pts[i].total);
+    cross.setAttribute('x1', cx); cross.setAttribute('x2', cx); cross.setAttribute('visibility', 'visible');
+    dot.setAttribute('cx', cx); dot.setAttribute('cy', cy); dot.setAttribute('visibility', 'visible');
+    const dd = i ? pts[i].total - pts[i - 1].total : null;
+    tip.innerHTML = `${fmtDate(pts[i].fecha)}<b>USD ${fmtUSD(pts[i].total)}</b>${dd === null ? '' : `${fmtSigned(dd)} (${fmtPct(dd, pts[i - 1].total)}) vs anterior`}`;
+    tip.style.left = Math.min(Math.max(cx * r.width / W, 70), r.width - 70) + 'px';
+    tip.style.top = (cy * r.height / H) + 'px';
+    tip.hidden = false;
+  };
+  const leave = () => { tip.hidden = true; cross.setAttribute('visibility', 'hidden'); dot.setAttribute('visibility', 'hidden'); };
+  const hit = $('#hit');
+  hit.addEventListener('pointermove', move); hit.addEventListener('pointerdown', move); hit.addEventListener('pointerleave', leave);
+}
+function niceStep(raw) {
+  const p = Math.pow(10, Math.floor(Math.log10(raw || 1)));
+  const f = raw / p;
+  return (f <= 1 ? 1 : f <= 2 ? 2 : f <= 5 ? 5 : 10) * p;
+}
+let resizeT;
+window.addEventListener('resize', () => { clearTimeout(resizeT); resizeT = setTimeout(() => { if (tab === SUMMARY_TAB) drawChart(); }, 150); });
+
+async function exportVariacion() {
+  const d = variacion();
+  if (!d) return toast('Hace falta un informe anterior para exportar la variación');
+  const sheet = (map, kind) => [...map.values()].sort((x, y) => Math.abs(y.delta) - Math.abs(x.delta)).map(e => ({
+    [kind]: e.label, ...(kind === 'Cliente' ? { 'N° de cuenta': e.sub } : {}), 'Anterior USD': Math.round(e.anterior), 'Actual USD': Math.round(e.actual),
+    'Variación USD': Math.round(e.delta), ...(d.hasQty ? { 'Por precio USD': Math.round(e.precio), 'Por movimientos USD': Math.round(e.mov) } : {}) }));
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(sheet(d.porCuenta, 'Cliente')), 'Por cliente');
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(sheet(d.porEspecie, 'Especie')), 'Por especie');
+  const filename = `variacion_tenencia_${today()}.xlsx`;
+  const dl = window.claude?.use ? await window.claude.use('downloads') : null;
+  try {
+    if (dl) await dl.save({ filename, data: new Uint8Array(XLSX.write(wb, { type: 'array', bookType: 'xlsx' })) });
+    else XLSX.writeFile(wb, filename);
+    toast('Variación exportada');
+  } catch (e) { if (e?.code !== 'declined') toast('No se pudo descargar el archivo'); }
+}
+
+// ---------- Ajustes de tenencia ----------
+function openTenDialog() {
+  const ds = tenencias;
+  if (!ds.rows.length) return toast(`Primero cargá el Excel de tenencias en ${tabLabel(HOLD_TAB)}`);
+  const c = tenCols(ds);
+  const opts = (sel, extra) => extra + ds.columns.map((h, i) => `<option value="${esc(h)}" ${i === sel ? 'selected' : ''}>${esc(h)}</option>`).join('');
+  $('#t-val').innerHTML = opts(c.val, c.val < 0 ? '<option value="" selected disabled>Elegí una columna</option>' : '');
+  $('#t-qty').innerHTML = opts(c.qty, `<option value="__none" ${c.qty < 0 ? 'selected' : ''}>(no hay)</option>`);
+  $('#t-esp').innerHTML = opts(c.esp, `<option value="__none" ${c.esp < 0 ? 'selected' : ''}>(no hay)</option>`);
+  $('#t-mon').innerHTML = `<option value="__usd" ${c.mon === '__usd' ? 'selected' : ''}>Todo está en USD</option>
+    <option value="__ars" ${c.mon === '__ars' ? 'selected' : ''}>Todo está en pesos</option>`
+    + ds.columns.map(h => `<option value="${esc(h)}" ${h === c.mon ? 'selected' : ''}>Según la columna "${esc(h)}"</option>`).join('');
+  $('#t-tc').value = ds.tc || '';
+  $('#t-umbral').value = config.umbral;
+  const v = valuar(ds);
+  $('#tenHint').textContent = v?.needsTC ? 'Hay posiciones en pesos: cargá el tipo de cambio para pasarlas a USD.' : '';
+  $('#tenDlg').showModal();
+}
+$('#btnAjustes').addEventListener('click', openTenDialog);
+$('#tenCancel').addEventListener('click', () => $('#tenDlg').close());
+$('#tenForm').addEventListener('submit', async () => {
+  const umbral = Math.max(1, parseInt($('#t-umbral').value, 10) || config.umbral);
+  const lowTab = config.tabs.find(t => t.id === LOW_TAB);
+  const tabs = config.tabs.map(t => t.id === LOW_TAB && /^menos de [\d.]+ usd$/i.test(lowTab.label) ? { ...t, label: `Menos de ${fmtUSD(umbral)} USD` } : t);
+  config = { ...config, umbral, tabs, ten: { val: $('#t-val').value || undefined, qty: $('#t-qty').value, esp: $('#t-esp').value, mon: $('#t-mon').value } };
+  const tc = Number($('#t-tc').value) || 0;
+  const tcChanged = tc !== (tenencias.tc || 0);
+  if (tcChanged) tenencias = { ...tenencias, tc };
+  render();
+  try {
+    await saveConfig();
+    if (tcChanged) await saveDatasetMeta('cur', tenencias);
+    await recordHist();
+    render();
+    toast('Ajustes guardados');
+  } catch {}
+});
+$('#stats').addEventListener('click', e => {
+  const b = e.target.closest('[data-goto]'); if (!b) return;
+  tab = b.dataset.goto; render();
+});
+
 // ---------- Eventos de la tabla ----------
 ['#qNombre', '#qCuenta'].forEach(s => $(s).addEventListener('input', render));
 $('#tabs').addEventListener('click', e => {
@@ -671,7 +1095,7 @@ $('#tbody').addEventListener('click', async e => {
     toast(`${c.nombre}: contactado hoy`);
   }
   if (act === 'remove') {
-    if (tab !== MAIN) {
+    if (tab !== MAIN && !AUTO_TABS.has(tab)) {
       c.pestanas = (c.pestanas || []).filter(id => id !== tab); render(); await saveCuenta(c);
       return toast(`${c.nombre} se quitó de ${tabLabel(tab)}`);
     }
@@ -714,7 +1138,7 @@ function openDialog(c) {
   editingId = c ? c.id : null;
   $('#dlgTitle').textContent = c ? 'Editar cuenta' : 'Nueva cuenta';
   form.reset();
-  const data = c || { pestanas: tab === MAIN ? [] : [tab] };
+  const data = c || { pestanas: tab === MAIN || AUTO_TABS.has(tab) ? [] : [tab] };
   for (const el of form.elements) if (el.name) el.value = data[el.name] ?? '';
   $('#formTabs').innerHTML = tabChecks(data.pestanas || []);
   $('#dlg').showModal();
@@ -761,10 +1185,10 @@ $('#tagsForm').addEventListener('submit', async () => {
 let draftTabs = [];
 function renderTabRows() {
   $('#tabRows').innerHTML = [{ id: MAIN, label: config.principal, main: true }, ...draftTabs].map((t, i) => {
-    const n = t.main ? cuentas.length : t.id === HOLD_TAB ? holdCuentas().size : cuentas.filter(c => (c.pestanas || []).includes(t.id)).length;
+    const n = t.main ? cuentas.length : t.id === SUMMARY_TAB ? null : t.id === HOLD_TAB ? holdCuentas().size : cuentas.filter(c => inTab(c, t.id)).length;
     return `<div class="tab-row" data-i="${i - 1}">
       <input id="tabname-${esc(t.id)}" value="${esc(t.label)}" aria-label="Nombre de la pestaña">
-      <span class="count">${n} cuentas</span>
+      <span class="count">${n === null ? '' : n + ' cuentas'}</span>
       ${t.main ? '<span class="btn ghost" style="visibility:hidden">Quitar</span>' : '<button type="button" class="btn danger" data-del>Quitar</button>'}
     </div>`;
   }).join('');
@@ -853,15 +1277,17 @@ function downloadTemplate() {
 }
 $('#btnExport').addEventListener('click', async () => {
   if (tab === HOLD_TAB) return exportTenencias();
+  if (tab === SUMMARY_TAB) return exportVariacion();
   const rows = currentRows().filter(c => !soloContactar || alarma(c).late).sort(compare);
   if (!rows.length) return toast('No hay cuentas para exportar en esta vista');
   const data = rows.map(c => ({
     'N° de cuenta': c.cuenta, 'Nombre': c.nombre, 'Teléfono': c.telefono, 'Email': c.email,
     'Última vez contactado': fmtDate(c.ultimoContacto), 'Acción / comentarios': c.accion,
     'Pestañas': validTags(c).map(tabLabel).join(', '), 'Notas': c.notas, 'Alarma': alarma(c).text,
+    ...(valuar(tenencias)?.ok ? { 'Tenencia USD': c.cuenta ? Math.round(tenenciaCuenta(c)) : '' } : {}),
   }));
   const name = `${slug(tabLabel(tab))}_${today()}.xlsx`;
-  if (await downloadBook(data, [...HEADERS, 'Alarma'], name)) toast(`Exportadas ${rows.length} cuentas de ${tabLabel(tab)}`);
+  if (await downloadBook(data, [...HEADERS, 'Alarma', ...(valuar(tenencias)?.ok ? ['Tenencia USD'] : [])], name)) toast(`Exportadas ${rows.length} cuentas de ${tabLabel(tab)}`);
 });
 
 async function exportTenencias() {
@@ -904,7 +1330,7 @@ function parseTabs(v, created) {
 $('#fileInput').addEventListener('change', async e => {
   const file = e.target.files[0]; if (!file) return;
   e.target.value = '';
-  if (tab === HOLD_TAB) return importTenencias(file);
+  if (tab === HOLD_TAB || tab === SUMMARY_TAB) return importTenencias(file);
   let raw;
   try {
     const wb = XLSX.read(await file.arrayBuffer());
@@ -930,7 +1356,7 @@ $('#fileInput').addEventListener('change', async e => {
     for (const k of ['cuenta', 'nombre', 'telefono', 'email', 'accion', 'notas']) if (map[k] && get(k)) data[k] = get(k);
     if (map.ultimoContacto && r[map.ultimoContacto] !== '') data.ultimoContacto = parseDate(r[map.ultimoContacto]);
     let tags = map.pestanas ? parseTabs(r[map.pestanas], created) : [];
-    if (tab !== MAIN && !tags.includes(tab)) tags.push(tab);
+    if (tab !== MAIN && !AUTO_TABS.has(tab) && !tags.includes(tab)) tags.push(tab);
 
     // Si ya existe (mismo N° de cuenta, o mismo nombre cuando no hay número) se actualiza en vez de duplicar
     const existing = cuentas.find(c => cuenta
@@ -1000,8 +1426,14 @@ async function importTenencias(file) {
   if (tenencias.rows.length && !await confirmAsk('Reemplazar tenencias',
     `Se van a reemplazar las tenencias actuales (${plural(tenencias.rows.length, 'posición', 'posiciones')}) por las del archivo "${file.name}": ${plural(rows.length, 'posición', 'posiciones')} de ${plural(nCuentas, 'cuenta', 'cuentas')}.`, 'Reemplazar')) return;
   try {
-    await saveTenencias({ columns, cuentaCol, nombreCol, rows, updatedAt: today(), fileName: file.name });
+    // El informe actual pasa a ser el "anterior", salvo que sea una corrección del mismo día
+    if (tenencias.rows.length && tenencias.updatedAt !== today()) await saveDataset('prev', structuredClone(tenencias));
+    const next = { columns, cuentaCol, nombreCol, rows, updatedAt: today(), fileName: file.name, tc: tenencias.tc || tenPrev.tc || 0 };
+    await saveDataset('cur', next);
+    await recordHist();
     render();
+    const v = valuar(tenencias);
+    if (v && (!v.ok || v.needsTC)) { openTenDialog(); return; }
     toast(`Tenencias cargadas: ${plural(rows.length, 'posición', 'posiciones')} de ${plural(nCuentas, 'cuenta', 'cuentas')}`);
   } catch { /* write() ya avisó */ }
 }

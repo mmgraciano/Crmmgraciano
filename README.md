@@ -31,6 +31,24 @@ La pestaña **FWD** muestra las tenencias de tus clientes. Tocá **Importar tene
 - El nombre sale del archivo, o si no hay columna de nombre, de la cuenta cargada en WM3.
 - Cada importación **reemplaza** las tenencias anteriores (te pide confirmación).
 
+## Tenencia total
+
+La pestaña **Tenencia total** muestra el total en USD del último informe de tenencias y, desde el segundo informe:
+
+- cuánto subió o bajó contra el informe anterior, en USD y en %;
+- cuánto de esa variación viene **por precio** (mercado y tipo de cambio) y cuánto **por movimientos**
+  (ingresos, retiros, compras y ventas). Para separarlo, el Excel necesita una columna de cantidad;
+- tablas **por cliente** y **por especie**, ordenadas por impacto;
+- un gráfico con la evolución del total y el historial de informes.
+
+En **Ajustes de tenencia** se elige qué columna es la valuación, la moneda, la cantidad y la especie, y se carga el
+**tipo de cambio** para pasar a USD las posiciones en pesos. Si importás dos veces el mismo día, la segunda corrige a la primera.
+
+## Pestañas automáticas
+
+- **En 0:** clientes de WM3 sin tenencia en el último informe.
+- **Menos de 10.000 USD:** clientes con tenencia mayor a 0 y menor al umbral (se cambia en Ajustes de tenencia).
+
 ## Importar desde Excel
 
 El archivo necesita una columna `Nombre` o `N° de cuenta`. También reconoce `Última vez contactado`, `Acción / comentarios`,
