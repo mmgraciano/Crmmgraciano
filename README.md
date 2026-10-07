@@ -10,7 +10,7 @@ Panel para registrar tu base de cuentas, en un solo archivo (`index.html`).
 
 ## Cómo funciona
 
-- **WM3** muestra todas las cuentas. Las demás pestañas (SGR, Prospects, Tareas pendientes, FAL, Notas Estructuradas, FWD)
+- **WM3** muestra todas las cuentas. Las demás pestañas (Tareas pendientes y, dentro de Tenencia total, SGR, Prospects, FAL y Notas Estructuradas)
   muestran solo las cuentas asignadas a cada una. Una cuenta puede estar en varias pestañas.
 - **Tareas pendientes:** con **+ Nueva tarea** anotás una tarea, con un cliente y una fecha si querés. Cada tarea tiene un
   estado (**Sin hacer**, **Pendiente** o **Hecha ✓**): tocá el estado para pasar al siguiente. Las vencidas se marcan en rojo
@@ -48,7 +48,7 @@ La pestaña **Tenencia total** muestra el total en USD del último informe de te
 Arriba hay dos filtros: **Tipo de activo** (Obligaciones Negociables, Fondos, CEDEARS…) y **Activo** (AL30, GD30…).
 Al elegir uno se actualizan el total, el % sobre tu tenencia, el gráfico, la variación y la lista de clientes que lo tienen.
 El panel **Composición por tipo de activo** muestra cuánto pesa cada tipo; tocá una fila para filtrar.
-Los mismos filtros están en **Tenencias detalladas**. El submenú de Tenencia total tiene: Resumen, Tenencias detalladas, En 0 y Menos de 10.000 USD.
+Los mismos filtros están en **Tenencias detalladas**. El submenú de Tenencia total tiene: Resumen, Tenencias detalladas, En 0, Menos de 10.000 USD, SGR, Prospects, FAL y Notas Estructuradas (estas cuatro se siguen asignando con **+ pestaña** y se renombran o quitan desde **+**).
 
 En **Ajustes de tenencia** se elige qué columna es la valuación, la moneda, la cantidad y la especie, y se carga el
 **tipo de cambio** para pasar a USD las posiciones en pesos. Si importás dos veces el mismo día, la segunda corrige a la primera.

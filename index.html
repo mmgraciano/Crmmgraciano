@@ -508,6 +508,9 @@ const LOW_TAB = 'menos10k';       // clientes con menos del umbral en USD
 const TASKS_TAB = 'tareas';       // lista de tareas propia, además de las cuentas marcadas en la pestaña
 // Vistas que viven dentro de "Tenencia total" (no aparecen en la barra de pestañas)
 const SUB_TABS = [SUMMARY_TAB, HOLD_TAB, ZERO_TAB, LOW_TAB];
+// Pestañas de cuentas que también se muestran dentro de "Tenencia total" (siguen siendo editables desde +)
+const GROUP_TAGS = ['sgr', 'prospects', 'fal', 'notas'];
+const GROUP = [...SUB_TABS, ...GROUP_TAGS];
 const AUTO_TABS = new Set([HOLD_TAB, SUMMARY_TAB, ZERO_TAB, LOW_TAB, INCOME_TAB, RESEARCH_TAB]); // no se asignan a mano
 const HOLD_CHUNK = 150;           // filas por documento en la base de datos
 const LOCAL_HOLD = 'panel-wm-tenencias-v1';
@@ -959,9 +962,9 @@ function render() {
   const ae = document.activeElement;
   const focus = ae?.dataset?.field && ae.closest('tr') ? { id: ae.closest('tr').dataset.id, field: ae.dataset.field, value: ae.value, sel: ae.selectionStart } : null;
 
-  const allTabs = [{ id: MAIN, label: config.principal }, ...config.tabs.filter(t => t.id === SUMMARY_TAB || !SUB_TABS.includes(t.id))];
-  const inGroup = SUB_TABS.includes(tab);
-  const sub = SUB_TABS.map(id => config.tabs.find(t => t.id === id) || (id === SUMMARY_TAB ? { id, label: 'Tenencia total' } : null)).filter(Boolean);
+  const allTabs = [{ id: MAIN, label: config.principal }, ...config.tabs.filter(t => t.id === SUMMARY_TAB || !GROUP.includes(t.id))];
+  const inGroup = GROUP.includes(tab);
+  const sub = GROUP.map(id => config.tabs.find(t => t.id === id) || (id === SUMMARY_TAB ? { id, label: 'Tenencia total' } : null)).filter(Boolean);
   $('#subtabs').hidden = !inGroup;
   $('#subtabs').innerHTML = inGroup ? sub.map(t => {
     const n = t.id === SUMMARY_TAB ? null : t.id === HOLD_TAB ? holdCuentas().size : cuentas.filter(c => inTab(c, t.id)).length;
