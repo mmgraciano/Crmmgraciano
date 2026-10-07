@@ -42,6 +42,11 @@ La pestaña **Tenencia total** muestra el total en USD del último informe de te
 - tablas **por cliente** y **por especie**, ordenadas por impacto;
 - un gráfico con la evolución del total y el historial de informes.
 
+Arriba hay dos filtros: **Tipo de activo** (Obligaciones Negociables, Fondos, CEDEARS…) y **Activo** (AL30, GD30…).
+Al elegir uno se actualizan el total, el % sobre tu tenencia, el gráfico, la variación y la lista de clientes que lo tienen.
+El panel **Composición por tipo de activo** muestra cuánto pesa cada tipo; tocá una fila para filtrar.
+Los mismos filtros están en la pestaña **Tenencias**.
+
 En **Ajustes de tenencia** se elige qué columna es la valuación, la moneda, la cantidad y la especie, y se carga el
 **tipo de cambio** para pasar a USD las posiciones en pesos. Si importás dos veces el mismo día, la segunda corrige a la primera.
 
@@ -52,7 +57,7 @@ Tocá **Importar ingresos** estando en esa pestaña. Los clientes del archivo qu
 
 ## Pestañas automáticas
 
-- **En 0:** clientes de WM3 sin tenencia en el último informe.
+- **En 0:** clientes de WM3 sin tenencia (o con saldo negativo) en el último informe.
 - **Menos de 10.000 USD:** clientes con tenencia mayor a 0 y menor al umbral (se cambia en Ajustes de tenencia).
 
 ## Importar desde Excel

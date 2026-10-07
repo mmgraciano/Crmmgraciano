@@ -54,7 +54,7 @@
   .sync.error::before { background: var(--late); }
 
   /* Pestañas */
-  .tabs { display: flex; gap: 2px; border-bottom: 1px solid var(--border); overflow-x: auto; scrollbar-width: thin; }
+  .tabs { display: flex; flex-wrap: wrap; gap: 2px 2px; border-bottom: 1px solid var(--border); }
   .tab { flex: none; border: none; background: none; font: 500 13.5px var(--font-body); color: var(--muted); padding: 9px 10px 10px;
     border-bottom: 2px solid transparent; margin-bottom: -1px; cursor: pointer; display: inline-flex; align-items: center; gap: 7px; }
   .tab:hover { color: var(--text); }
@@ -154,6 +154,17 @@
   .panel table { min-width: 520px; }
   .panel thead th { position: sticky; top: 0; z-index: 1; padding: 10px 12px; }
   .panel td { padding: 8px 12px; }
+  .filters { display: flex; flex-wrap: wrap; gap: 10px; align-items: flex-end; }
+  .filters label { font-size: 12px; color: var(--muted); }
+  .filters select { min-width: 220px; max-width: min(420px, 100%); padding: 9px 14px; border: 1px solid var(--border); border-radius: 999px;
+    background: var(--panel); color: var(--text); font: 13.5px var(--font-body); }
+  .filters select.on { border-color: var(--accent); background: var(--accent-soft); }
+  .searches .filters { display: contents; }
+  .bar-track { background: var(--soft); border-radius: 4px; height: 8px; min-width: 60px; }
+  .bar-fill { background: var(--accent); border-radius: 4px; height: 8px; }
+  tr.pick { cursor: pointer; }
+  tr.pick:hover td { background: var(--accent-soft); }
+  tr.pick td:first-child { font-weight: 500; }
   details.hist { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 12px 16px; }
   details.hist summary { cursor: pointer; font-weight: 600; }
   details.hist table { min-width: 0; margin-top: 8px; }
@@ -190,6 +201,8 @@
   @media (max-width: 700px) {
     .wrap { padding-inline: 16px; }
     .search { flex: 1 1 100%; }
+    .filters label { flex: 1 1 100%; min-width: 0; }
+    .filters select { width: 100%; min-width: 0; }
     .grid { grid-template-columns: 1fr; }
   }
 </style>
@@ -224,6 +237,7 @@
   <div class="searches" id="searches">
     <input class="search" id="qNombre" type="search" placeholder="Buscar por nombre…" autocomplete="off">
     <input class="search" id="qCuenta" type="search" placeholder="Buscar por N° de cuenta…" autocomplete="off" inputmode="numeric">
+    <span id="holdFilters"></span>
   </div>
 
   <section id="summary" hidden></section>
@@ -389,6 +403,7 @@ let pending = 0, syncError = false;
 // Tenencias: columnas tal como vienen en el Excel; cada fila guarda sus valores como {c0, c1, …}
 let tenencias = { columns: [], cuentaCol: -1, nombreCol: -1, rows: [], updatedAt: '', fileName: '' };
 let holdSort = { key: 'cuenta', dir: 1 };
+let filtro = { tipo: '', activo: '' }; // filtro por tipo de activo y por activo (Tenencia total y Tenencias)
 const EMPTY_DS = () => ({ columns: [], cuentaCol: -1, nombreCol: -1, rows: [], updatedAt: '', fileName: '', tc: 0 });
 let tenPrev = EMPTY_DS();         // informe anterior, para calcular la variación
 let historial = [];               // [{fecha, total, tc, fileName}] un registro por informe
@@ -632,24 +647,33 @@ function tenCols(ds) {
     return cand.find(i => USD_HEADER_RE.test(hs[i])) ?? cand[cand.length - 1] ?? -1;
   });
   const qty = pick('qty', () => hs.findIndex(h => QTY_RE.test(h)));
-  const esp = pick('esp', () => hs.findIndex((h, i) => ESP_RE.test(h) && i !== ds.cuentaCol && i !== ds.nombreCol));
+  const tipo = pick('tipo', () => hs.findIndex((h, i) => /^tipo$|grupo|clase|tipo de (instrumento|activo)|tipo instrumento/.test(h) && i !== ds.cuentaCol && i !== ds.nombreCol));
+  const esp = pick('esp', () => hs.findIndex((h, i) => ESP_RE.test(h) && !/^instrumento$|descripcion/.test(h) && i !== ds.cuentaCol && i !== ds.nombreCol && i !== tipo)
+    ?? -1);
+  const desc = hs.findIndex((h, i) => /^instrumento$|descripcion instrumento/.test(h) && i !== esp);
   let mon = config.ten?.mon;
   if (!(mon === '__usd' || mon === '__ars' || (mon && ds.columns.includes(mon)))) {
     const mi = hs.findIndex(h => MON_RE.test(h));
     mon = val >= 0 && USD_HEADER_RE.test(hs[val]) ? '__usd' : mi >= 0 ? ds.columns[mi] : val >= 0 && ARS_HEADER_RE.test(ds.columns[val].toLowerCase()) && !USD_HEADER_RE.test(hs[val]) ? '__ars' : '__usd';
   }
-  return { val, qty, esp, mon, monIdx: ds.columns.indexOf(mon) };
+  return { val, qty, esp: esp >= 0 ? esp : hs.findIndex((h, i) => ESP_RE.test(h) && i !== ds.cuentaCol && i !== ds.nombreCol && i !== tipo), tipo, desc, mon, monIdx: ds.columns.indexOf(mon) };
 }
 const valCache = new WeakMap();
-function valuar(ds) {
+const noFiltro = { tipo: '', activo: '' };
+const rowTipo = (r, cols) => cols.tipo >= 0 ? String(r['c' + cols.tipo] ?? '').trim() || '(sin tipo)' : '(sin tipo)';
+const rowEspecie = (r, cols) => cols.esp >= 0 ? String(r['c' + cols.esp] ?? '').trim() || '(sin especie)' : '(sin especie)';
+const pasaFiltro = (r, cols, f) => (!f.tipo || rowTipo(r, cols) === f.tipo) && (!f.activo || rowEspecie(r, cols) === f.activo);
+function valuar(ds, f = noFiltro) {
   if (!ds || !ds.rows.length) return null;
-  const sig = JSON.stringify(config.ten || {}) + '|' + ds.tc;
-  const hit = valCache.get(ds);
-  if (hit && hit.sig === sig) return hit.res;
+  const sig = JSON.stringify(config.ten || {}) + '|' + ds.tc + '|' + f.tipo + '|' + f.activo;
+  let cache = valCache.get(ds);
+  if (!cache || cache.base !== JSON.stringify(config.ten || {}) + '|' + ds.tc) { cache = { base: JSON.stringify(config.ten || {}) + '|' + ds.tc, map: new Map() }; valCache.set(ds, cache); }
+  if (cache.map.has(sig)) return cache.map.get(sig);
   const cols = tenCols(ds);
-  const res = { total: 0, porCuenta: new Map(), porEspecie: new Map(), pos: new Map(), needsTC: false, cols, ok: cols.val >= 0 };
+  const res = { total: 0, porCuenta: new Map(), porEspecie: new Map(), porTipo: new Map(), espInfo: new Map(), pos: new Map(), needsTC: false, cols, ok: cols.val >= 0 };
   if (res.ok) {
     for (const r of ds.rows) {
+      if (!pasaFiltro(r, cols, f)) continue;
       const v = toNumber(r['c' + cols.val]);
       if (isNaN(v)) continue;
       const enUSD = cols.mon === '__usd' || (cols.mon !== '__ars' && isUSD(r['c' + cols.monIdx]));
@@ -663,18 +687,21 @@ function valuar(ds) {
       const pc = res.porCuenta.get(kc) || { cuenta, nombre: ds.nombreCol >= 0 ? String(r['c' + ds.nombreCol] ?? '').trim() : '', usd: 0 };
       pc.usd += usd; res.porCuenta.set(kc, pc);
       res.porEspecie.set(especie, (res.porEspecie.get(especie) || 0) + usd);
+      const tipo = rowTipo(r, cols);
+      res.porTipo.set(tipo, (res.porTipo.get(tipo) || 0) + usd);
+      if (!res.espInfo.has(especie)) res.espInfo.set(especie, { tipo, desc: cols.desc >= 0 ? String(r['c' + cols.desc] ?? '').trim() : '' });
       const kp = kc + '|' + norm(especie);
       const pp = res.pos.get(kp) || { cuenta, especie, usd: 0, q: 0, hasQ: false };
       pp.usd += usd; if (!isNaN(q)) { pp.q += q; pp.hasQ = true; }
       res.pos.set(kp, pp);
     }
   }
-  valCache.set(ds, { sig, res });
+  cache.map.set(sig, res);
   return res;
 }
 // Variación contra el informe anterior, separando precio y movimientos cuando hay cantidades
-function variacion() {
-  const a = valuar(tenencias), b = valuar(tenPrev);
+function variacion(f = noFiltro) {
+  const a = valuar(tenencias, f), b = valuar(tenPrev, f);
   if (!a?.ok || !b?.ok) return null;
   const hasQty = a.cols.qty >= 0 && b.cols.qty >= 0;
   const porCuenta = new Map(), porEspecie = new Map();
@@ -726,7 +753,7 @@ function inTab(c, t) {
   if (t === ZERO_TAB || t === LOW_TAB) {
     const v = tenenciaCuenta(c);
     if (v === null) return false;
-    return t === ZERO_TAB ? Math.abs(v) < 1 : v >= 1 && v < config.umbral;
+    return t === ZERO_TAB ? v < 1 : v >= 1 && v < config.umbral; // "En 0" incluye saldos negativos
   }
   return (c.pestanas || []).includes(t);
 }
@@ -761,6 +788,7 @@ function render() {
   $('#tableWrap').hidden = summary;
   $('#searches').hidden = summary;
   $('table').classList.toggle('hold', hold || income);
+  if (!hold) $('#holdFilters').innerHTML = '';
   if (summary) { renderSummary(); return; }
   if (income) { renderIngresos(); return; }
   if (hold) { renderTenencias(); restoreFocus(focus); return; }
@@ -789,7 +817,7 @@ function render() {
     else if ((tab === ZERO_TAB || tab === LOW_TAB) && !showTen)
       empty.innerHTML = `<div>Esta pestaña se arma sola con las tenencias.</div><div>Cargá el Excel de tenencias en <b>${esc(tabLabel(HOLD_TAB))}</b> y acá vas a ver ${tab === ZERO_TAB ? 'los clientes que están en 0' : `los clientes con menos de ${fmtUSD(config.umbral)} USD`}.</div>`;
     else if ((tab === ZERO_TAB || tab === LOW_TAB) && !base.length && !$('#qNombre').value && !$('#qCuenta').value)
-      empty.innerHTML = tab === ZERO_TAB ? 'Ningún cliente de ' + esc(config.principal) + ' está en 0.' : `Ningún cliente tiene entre 1 y ${fmtUSD(config.umbral)} USD.`;
+      empty.innerHTML = tab === ZERO_TAB ? 'Ningún cliente de ' + esc(config.principal) + ' está en 0 o en negativo.' : `Ningún cliente tiene entre 1 y ${fmtUSD(config.umbral)} USD.`;
     else if (tab !== MAIN && !base.length && !$('#qNombre').value && !$('#qCuenta').value)
       empty.innerHTML = `<div>No hay cuentas en <b>${esc(tabLabel(tab))}</b>.</div><div>Para sumar una, tocá <b>+ pestaña</b> debajo de su nombre en ${esc(config.principal)}, o importá un Excel estando en esta pestaña.</div>`;
     else empty.innerHTML = 'No hay cuentas que coincidan con la búsqueda.';
@@ -847,7 +875,9 @@ function fmtNum(v) {
 function holdRows() {
   const qn = norm($('#qNombre').value);
   const qc = norm($('#qCuenta').value).replace(/\s/g, '');
+  const cols = tenCols(tenencias);
   return tenencias.rows
+    .filter(r => pasaFiltro(r, cols, filtro))
     .filter(r => !qn || norm(holdNombre(r)).includes(qn))
     .filter(r => !qc || norm(holdCuenta(r)).replace(/\s/g, '').includes(qc));
 }
@@ -865,6 +895,7 @@ function holdCompare(a, b) {
   return res * holdSort.dir || holdCuenta(a).localeCompare(holdCuenta(b), 'es', { numeric: true });
 }
 function renderTenencias() {
+  $('#holdFilters').innerHTML = filterBar();
   const base = holdRows();
   const nCuentas = new Set(base.map(holdCuenta)).size;
   const fuera = [...holdCuentas()].filter(k => !cuentas.some(c => norm(c.cuenta) === norm(k))).length;
@@ -942,7 +973,9 @@ const isIndexCol = (grid, hi, i) => !String(grid[hi][i] ?? '').trim() && grid.sl
 function recordHist() {
   const v = valuar(tenencias);
   if (!v?.ok || v.needsTC) return Promise.resolve();
-  return saveHist({ fecha: tenencias.updatedAt, total: Math.round(v.total * 100) / 100, tc: tenencias.tc || 0, fileName: tenencias.fileName || '' });
+  const round = m => Object.fromEntries([...m].map(([k, x]) => [k, Math.round(x * 100) / 100]));
+  return saveHist({ fecha: tenencias.updatedAt, total: Math.round(v.total * 100) / 100, tc: tenencias.tc || 0, fileName: tenencias.fileName || '',
+    porTipo: round(v.porTipo), porEspecie: round(v.porEspecie) });
 }
 function breakdownTable(map, kind, hasQty) {
   const rows = [...map.values()].filter(e => Math.abs(e.delta) >= 0.5).sort((x, y) => Math.abs(y.delta) - Math.abs(x.delta));
@@ -955,9 +988,57 @@ function breakdownTable(map, kind, hasQty) {
       ${hasQty ? `<td class="num ${signCls(e.precio)}">${fmtSigned(e.precio)}</td><td class="num ${signCls(e.mov)}">${fmtSigned(e.mov)}</td>` : ''}</tr>`).join('')}
     </tbody></table>`;
 }
+// Selects de tipo de activo y activo, con el monto de cada opción
+function filterBar() {
+  const all = valuar(tenencias);
+  if (!all?.ok) return '';
+  if (filtro.tipo && !all.porTipo.has(filtro.tipo)) filtro = { tipo: '', activo: '' };
+  if (filtro.activo && !all.porEspecie.has(filtro.activo)) filtro = { ...filtro, activo: '' };
+  const tipos = [...all.porTipo].sort((a, b) => b[1] - a[1]);
+  const scope = filtro.tipo ? valuar(tenencias, { tipo: filtro.tipo, activo: '' }) : all;
+  const activos = [...scope.porEspecie].sort((a, b) => b[1] - a[1]);
+  const short = t => t.length > 38 ? t.slice(0, 37) + '…' : t;
+  return `<div class="filters">
+    <label>Tipo de activo<br><select id="fTipo" class="${filtro.tipo ? 'on' : ''}"><option value="">Todos los tipos</option>
+      ${tipos.map(([k, x]) => `<option value="${esc(k)}" ${k === filtro.tipo ? 'selected' : ''}>${esc(k)} · USD ${fmtUSD(x)}</option>`).join('')}</select></label>
+    <label>Activo<br><select id="fActivo" class="${filtro.activo ? 'on' : ''}"><option value="">${filtro.tipo ? 'Todos los de ' + esc(filtro.tipo) : 'Todos los activos'}</option>
+      ${activos.map(([k, x]) => { const d = all.espInfo.get(k)?.desc; return `<option value="${esc(k)}" ${k === filtro.activo ? 'selected' : ''}>${esc(k)}${d && d !== k ? ' — ' + esc(short(d)) : ''} · USD ${fmtUSD(x)}</option>`; }).join('')}</select></label>
+    ${filtro.tipo || filtro.activo ? '<button class="btn ghost" id="fClear">Quitar filtros</button>' : ''}
+  </div>`;
+}
+document.addEventListener('change', e => {
+  if (e.target.id === 'fTipo') { filtro = { tipo: e.target.value, activo: '' }; render(); }
+  if (e.target.id === 'fActivo') {
+    const act = e.target.value;
+    const info = valuar(tenencias)?.espInfo.get(act);
+    filtro = { tipo: act && info ? (filtro.tipo || '') : filtro.tipo, activo: act };
+    render();
+  }
+});
+document.addEventListener('click', e => {
+  if (e.target.closest('#fClear')) { filtro = { tipo: '', activo: '' }; render(); return; }
+  const row = e.target.closest('[data-ftipo], [data-factivo]');
+  if (!row) return;
+  if (row.dataset.ftipo !== undefined) filtro = { tipo: row.dataset.ftipo, activo: '' };
+  else filtro = { ...filtro, activo: row.dataset.factivo };
+  render();
+});
+const filtroLabel = () => [filtro.tipo, filtro.activo].filter(Boolean).join(' · ');
+function shareTable(entries, total, kind, attr) {
+  if (!entries.length) return '<div class="empty">Sin datos.</div>';
+  const max = Math.max(...entries.map(e => e[1]), 1);
+  return `<table><thead><tr><th class="nosort">${kind}</th><th class="nosort num">USD</th><th class="nosort num">%</th><th class="nosort"></th></tr></thead><tbody>
+    ${entries.map(([k, x, sub]) => `<tr class="${attr ? 'pick' : ''}" ${attr ? `${attr}="${esc(k)}" title="Filtrar por ${esc(k)}"` : ''}>
+      <td>${esc(k)}${sub ? `<div class="acct">${esc(sub)}</div>` : ''}</td><td class="num">${fmtUSD(x)}</td>
+      <td class="num">${total ? (x / total * 100).toLocaleString('es-AR', { maximumFractionDigits: 1, minimumFractionDigits: 1 }) + '%' : ''}</td>
+      <td style="width:30%"><div class="bar-track"><div class="bar-fill" style="width:${Math.max(0, x / max * 100).toFixed(1)}%"></div></div></td></tr>`).join('')}
+    </tbody></table>`;
+}
+
 function renderSummary() {
   const el = $('#summary');
-  const v = valuar(tenencias);
+  const all = valuar(tenencias);
+  const v = (filtro.tipo || filtro.activo) && all?.ok ? valuar(tenencias, filtro) : all;
   const nZero = cuentas.filter(c => inTab(c, ZERO_TAB)).length, nLow = cuentas.filter(c => inTab(c, LOW_TAB)).length;
   $('#stats').innerHTML = v?.ok ? `
     <span class="stat"><b>${v.porCuenta.size}</b>clientes con tenencia</span>
@@ -967,14 +1048,25 @@ function renderSummary() {
   if (!v) { el.innerHTML = `<div class="panel"><div class="empty"><div>Todavía no cargaste tenencias.</div><div>Entrá a <b>${esc(tabLabel(HOLD_TAB))}</b> y tocá <b>Importar tenencias</b>. Acá vas a ver tu tenencia total en USD y de dónde vienen las subas y bajas.</div></div></div>`; return; }
   if (!v.ok) { el.innerHTML = `<div class="panel"><div class="empty"><div>No encontré una columna de valuación en el Excel de tenencias.</div><div>Tocá <b>Ajustes de tenencia</b> y elegí qué columna tiene el valor de cada posición.</div></div></div>`; return; }
 
-  const d = variacion();
+  const fb = filterBar();
+  const d = variacion(filtro);
   const prevFecha = tenPrev.updatedAt;
+  const filtered = !!(filtro.tipo || filtro.activo);
+  const info = filtro.activo ? all.espInfo.get(filtro.activo) : null;
+  // Composición: por tipo sin filtro; por activo dentro del tipo elegido
+  const comp = filtro.activo || (!filtro.tipo && v.cols.tipo < 0) ? null : filtro.tipo
+    ? { title: `Activos en ${filtro.tipo}`, kind: 'Activo', attr: 'data-factivo', rows: [...v.porEspecie].sort((a, b) => b[1] - a[1]).map(([k, x]) => [k, x, all.espInfo.get(k)?.desc !== k ? all.espInfo.get(k)?.desc : '']) }
+    : { title: 'Composición por tipo de activo', kind: 'Tipo de activo', attr: 'data-ftipo', rows: [...v.porTipo].sort((a, b) => b[1] - a[1]).filter(([, x]) => Math.abs(x) >= 0.5) };
+  const clientes = [...v.porCuenta.values()].filter(c => Math.abs(c.usd) >= 0.5).sort((a, b) => b.usd - a.usd)
+    .map(c => [c.nombre || cuentas.find(x => norm(x.cuenta) === norm(c.cuenta))?.nombre || `Cuenta ${c.cuenta}`, c.usd, c.cuenta]);
   const dir = !d ? '' : d.delta > 0.5 ? 'up' : d.delta < -0.5 ? 'down' : 'flat';
   el.innerHTML = `
+    ${fb}
     <div class="hero">
       <div>
-        <div class="label">Tenencia total</div>
+        <div class="label">${filtered ? 'Tenencia en ' + esc(filtroLabel()) : 'Tenencia total'}</div>
         <div class="big"><small>USD</small>${fmtUSD(v.total)}</div>
+        ${filtered ? `<div class="meta">${info?.desc && info.desc !== filtro.activo ? esc(info.desc) + ' · ' : ''}${all.total ? (v.total / all.total * 100).toLocaleString('es-AR', { maximumFractionDigits: 1, minimumFractionDigits: 1 }) : 0}% de tu tenencia total (USD ${fmtUSD(all.total)}) · ${plural(clientes.length, 'cliente', 'clientes')}</div>` : ''}
         <div class="meta">Informe del ${fmtDate(tenencias.updatedAt)}${tenencias.fileName ? ` · ${esc(tenencias.fileName)}` : ''}${tenencias.tc ? ` · TC ${tenencias.tc.toLocaleString('es-AR')}` : ''}</div>
         ${v.needsTC ? `<div class="delta down">Faltan posiciones en pesos: cargá el tipo de cambio en Ajustes</div>` : ''}
         ${d ? `<div class="delta ${dir}">${dir === 'up' ? '▲' : dir === 'down' ? '▼' : '='} ${fmtSigned(d.delta)} USD (${fmtPct(d.delta, d.anterior)}) vs ${fmtDate(prevFecha)}</div>
@@ -986,9 +1078,13 @@ function renderSummary() {
       </div>
       <div class="chart" id="chart"></div>
     </div>
+    <div class="breakdown">
+      ${comp ? `<div class="panel"><h3>${esc(comp.title)}</h3><div class="sub">Tocá una fila para filtrar</div><div class="scroll">${shareTable(comp.rows, v.total, comp.kind, comp.attr)}</div></div>` : ''}
+      <div class="panel"><h3>${filtered ? 'Clientes con ' + esc(filtroLabel()) : 'Clientes por tenencia'}</h3><div class="sub">${plural(clientes.length, 'cliente', 'clientes')}, de mayor a menor</div><div class="scroll">${shareTable(clientes, v.total, 'Cliente', '')}</div></div>
+    </div>
     ${d ? `<div class="breakdown">
-      <div class="panel"><h3>Variación por cliente</h3><div class="sub">De mayor a menor impacto, en USD</div><div class="scroll">${breakdownTable(d.porCuenta, 'Cliente', d.hasQty)}</div></div>
-      <div class="panel"><h3>Variación por especie</h3><div class="sub">De mayor a menor impacto, en USD</div><div class="scroll">${breakdownTable(d.porEspecie, 'Especie', d.hasQty)}</div></div>
+      <div class="panel"><h3>Variación por cliente${filtered ? ' en ' + esc(filtroLabel()) : ''}</h3><div class="sub">De mayor a menor impacto, en USD</div><div class="scroll">${breakdownTable(d.porCuenta, 'Cliente', d.hasQty)}</div></div>
+      <div class="panel"><h3>Variación por especie${filtered ? ' en ' + esc(filtroLabel()) : ''}</h3><div class="sub">De mayor a menor impacto, en USD</div><div class="scroll">${breakdownTable(d.porEspecie, 'Especie', d.hasQty)}</div></div>
     </div>` : ''}
     ${historial.length ? `<details class="hist"><summary>Historial de informes (${historial.length})</summary>
       <table><thead><tr><th class="nosort">Fecha</th><th class="nosort num">Total USD</th><th class="nosort num">Variación</th><th class="nosort">Archivo</th></tr></thead><tbody>
@@ -1001,8 +1097,10 @@ function renderSummary() {
 // Línea de la tenencia total en el tiempo, con detalle al pasar el cursor
 function drawChart() {
   const box = $('#chart'); if (!box) return;
-  const pts = historial.filter(h => typeof h.total === 'number');
-  if (pts.length < 2) { box.innerHTML = '<div class="note">El gráfico de evolución aparece a partir del segundo informe de tenencias.</div>'; return; }
+  const pick = h => filtro.activo ? h.porEspecie?.[filtro.activo] ?? (h.porEspecie ? 0 : undefined)
+    : filtro.tipo ? h.porTipo?.[filtro.tipo] ?? (h.porTipo ? 0 : undefined) : h.total;
+  const pts = historial.map(h => ({ ...h, total: pick(h) })).filter(h => typeof h.total === 'number');
+  if (pts.length < 2) { box.innerHTML = `<div class="note">El gráfico de evolución${filtro.tipo || filtro.activo ? ' de ' + esc(filtroLabel()) : ''} aparece a partir del segundo informe de tenencias.</div>`; return; }
   const W = Math.max(box.clientWidth, 260), H = 220, m = { t: 14, r: 16, b: 26, l: 52 };
   const t = pts.map(p => { const [y, mo, d] = p.fecha.split('-').map(Number); return new Date(y, mo - 1, d).getTime(); });
   const t0 = t[0], t1 = t[t.length - 1] === t0 ? t0 + 864e5 : t[t.length - 1];
