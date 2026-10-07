@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Panel WM</title>
+<title>Panel WM Micaela Graciano</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600&display=swap">
@@ -45,6 +45,7 @@
   .logo { width: 40px; height: 40px; border-radius: 9px; display: grid; place-items: center; color: #fff;
     background: linear-gradient(135deg, var(--logo-a), var(--logo-b)); font: 600 15px/1 var(--font-display); letter-spacing: -.02em; flex: none; }
   .brand h1 { margin: 0; font: 600 24px/1.1 var(--font-display); letter-spacing: -.01em; }
+  .brand h1 span { font-weight: 500; color: var(--muted); }
   .brand .date { color: var(--muted); font-size: 12.5px; margin-top: 4px; }
   .sync { display: inline-flex; align-items: center; gap: 7px; padding: 6px 12px; border: 1px solid var(--border); border-radius: 999px;
     background: var(--panel); font-size: 12px; color: var(--muted); white-space: nowrap; }
@@ -115,6 +116,13 @@
   .x:hover { color: var(--danger); border-color: var(--danger); }
   .empty { padding: 48px 20px; text-align: center; color: var(--muted); display: flex; flex-direction: column; gap: 12px; align-items: center; }
   .empty .btn { font-weight: 500; }
+  .stat.info { font-size: 12px; }
+  td.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  th.num { text-align: right; }
+  td.cell { white-space: nowrap; }
+  tr.group-start td { border-top: 2px solid var(--border); }
+  td.muted { color: var(--muted); }
+  table.hold { min-width: 0; }
   [hidden] { display: none !important; }
 
   /* Diálogos */
@@ -157,7 +165,7 @@
     <div class="brand">
       <div class="logo" aria-hidden="true">WM</div>
       <div>
-        <h1>Panel WM</h1>
+        <h1>Panel WM <span>Micaela Graciano</span></h1>
         <div class="date" id="today"></div>
       </div>
     </div>
@@ -171,7 +179,7 @@
     <div class="actions">
       <button class="btn danger" id="btnSinCuenta">Eliminar sin cuenta</button>
       <button class="btn" id="btnExport">Exportar Excel</button>
-      <label class="btn" for="fileInput">Importar Excel</label>
+      <label class="btn" for="fileInput" id="btnImport">Importar Excel</label>
       <input id="fileInput" type="file" accept=".xlsx,.xls,.csv" hidden>
       <button class="btn primary" id="btnNew">+ Nueva cuenta</button>
     </div>
@@ -271,6 +279,9 @@ const DEFAULT_CONFIG = {
   ],
 };
 const MAIN = 'wm3';
+const HOLD_TAB = 'fwd';           // la pestaña FWD muestra las tenencias cargadas por Excel
+const HOLD_CHUNK = 400;           // filas por documento en la base de datos
+const LOCAL_HOLD = 'panel-wm-tenencias-v1';
 const LOCAL_KEY = 'panel-wm-cuentas-v1';
 const LOCAL_CFG = 'panel-wm-config-v1';
 const FIELDS = ['cuenta', 'nombre', 'telefono', 'email', 'ultimoContacto', 'accion', 'notas', 'pestanas', 'creado'];
@@ -302,6 +313,10 @@ let soloContactar = false;
 let loading = true;
 let col = null, cfgRef = null;
 let pending = 0, syncError = false;
+// Tenencias: columnas tal como vienen en el Excel; cada fila guarda sus valores como {c0, c1, …}
+let tenencias = { columns: [], cuentaCol: -1, nombreCol: -1, rows: [], updatedAt: '', fileName: '' };
+let holdSort = { key: 'cuenta', dir: 1 };
+let tenCol = null, tenMetaRef = null, tenChunks = new Map(), tenMeta = null;
 
 const $ = s => document.querySelector(s);
 const norm = s => String(s ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim();
@@ -312,9 +327,11 @@ const isoLocal = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDa
 const today = () => isoLocal(new Date());
 const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
 const slug = s => normHeader(s).replace(/ /g, '-').slice(0, 40) || uid();
+const plural = (n, uno, varios) => `${n} ${n === 1 ? uno : varios}`;
 const fmtDate = d => { if (!d) return ''; const [y, m, day] = d.split('-'); return `${day}/${m}/${y}`; };
 const tabLabel = id => id === MAIN ? config.principal : (config.tabs.find(t => t.id === id)?.label ?? '');
-const validTags = c => (c.pestanas || []).filter(id => config.tabs.some(t => t.id === id));
+const validTags = c => (c.pestanas || []).filter(id => id !== HOLD_TAB && config.tabs.some(t => t.id === id));
+const tagTabs = () => config.tabs.filter(t => t.id !== HOLD_TAB);
 
 function toast(msg) {
   const t = $('#toast'); t.textContent = msg; t.classList.add('show');
@@ -349,6 +366,7 @@ function saveLocal() {
   try {
     localStorage.setItem(LOCAL_KEY, JSON.stringify(cuentas));
     localStorage.setItem(LOCAL_CFG, JSON.stringify(config));
+    localStorage.setItem(LOCAL_HOLD, JSON.stringify(tenencias));
   } catch { toast('No se pudo guardar en este navegador'); }
 }
 async function write(fn) {
@@ -398,6 +416,7 @@ async function initStorage() {
   if (!db) {
     try { cuentas = JSON.parse(localStorage.getItem(LOCAL_KEY)) || []; } catch { cuentas = []; }
     try { config = { ...structuredClone(DEFAULT_CONFIG), ...(JSON.parse(localStorage.getItem(LOCAL_CFG)) || {}) }; } catch {}
+    try { tenencias = JSON.parse(localStorage.getItem(LOCAL_HOLD)) || tenencias; } catch {}
     loading = false; setSync(); render(); return;
   }
   col = db.collection('cuentas');
@@ -407,10 +426,46 @@ async function initStorage() {
     if (tab !== MAIN && !config.tabs.some(t => t.id === tab)) tab = MAIN;
     render();
   }, () => { syncError = true; setSync(); });
+  tenCol = db.collection('tenencias');
+  tenMetaRef = db.doc('tenencias_meta/actual');
+  tenMetaRef.onSnapshot(s => { tenMeta = s.exists ? structuredClone(s.data()) : null; assembleTenencias(); },
+    () => { syncError = true; setSync(); });
+  tenCol.onSnapshot(snap => {
+    tenChunks = new Map(snap.docs.map(d => [d.id, d.data().rows || []]));
+    assembleTenencias();
+  }, () => { syncError = true; setSync(); });
   col.onSnapshot(snap => {
     cuentas = snap.docs.map(d => ({ id: d.id, ...structuredClone(d.data()) }));
     loading = false; setSync(); render();
   }, () => { syncError = true; loading = false; setSync(); render(); });
+}
+
+// Junta los bloques de filas de tenencias que indica el documento "tenencias_meta/actual"
+function assembleTenencias() {
+  if (!tenMeta) { tenencias = { columns: [], cuentaCol: -1, nombreCol: -1, rows: [], updatedAt: '', fileName: '' }; render(); return; }
+  const rows = [];
+  for (let i = 0; i < tenMeta.chunks; i++) {
+    const part = tenChunks.get('parte-' + i);
+    if (!part) return; // todavía no llegó todo; se vuelve a armar en el próximo aviso
+    rows.push(...part);
+  }
+  tenencias = { ...tenMeta, rows: rows.map(structuredClone) };
+  render();
+}
+async function saveTenencias(next) {
+  tenencias = next;
+  if (!tenCol) { saveLocal(); return; }
+  const chunks = [];
+  for (let i = 0; i < next.rows.length; i += HOLD_CHUNK) chunks.push(next.rows.slice(i, i + HOLD_CHUNK));
+  const old = [...tenChunks.keys()];
+  let done = 0;
+  for (let i = 0; i < chunks.length; i++) {
+    await write(() => tenCol.doc('parte-' + i).set({ rows: chunks[i] }));
+    toast(`Guardando tenencias ${Math.min(++done * HOLD_CHUNK, next.rows.length)} de ${next.rows.length}…`);
+  }
+  const { rows, ...meta } = next;
+  await write(() => tenMetaRef.set({ ...meta, chunks: chunks.length }));
+  for (const id of old) if (Number(id.split('-')[1]) >= chunks.length) await write(() => tenCol.doc(id).delete());
 }
 
 // ---------- Render ----------
@@ -438,9 +493,16 @@ function render() {
 
   const allTabs = [{ id: MAIN, label: config.principal }, ...config.tabs];
   $('#tabs').innerHTML = allTabs.map(t => {
-    const n = t.id === MAIN ? cuentas.length : cuentas.filter(c => (c.pestanas || []).includes(t.id)).length;
+    const n = t.id === MAIN ? cuentas.length : t.id === HOLD_TAB ? holdCuentas().size : cuentas.filter(c => (c.pestanas || []).includes(t.id)).length;
     return `<button class="tab ${t.id === tab ? 'active' : ''}" data-tab="${esc(t.id)}">${esc(t.label)}<span class="n">${n}</span></button>`;
   }).join('') + `<button class="tab edit" id="btnTabs" title="Editar pestañas" aria-label="Editar pestañas">+</button>`;
+
+  const hold = tab === HOLD_TAB;
+  $('#btnSinCuenta').hidden = hold;
+  $('#btnNew').hidden = hold;
+  $('#btnImport').textContent = hold ? 'Importar tenencias' : 'Importar Excel';
+  $('table').classList.toggle('hold', hold);
+  if (hold) { renderTenencias(); restoreFocus(focus); return; }
 
   const base = currentRows();
   const late = base.filter(c => alarma(c).late).length;
@@ -480,10 +542,96 @@ function render() {
     </tr>`;
   }).join('');
 
+  restoreFocus(focus);
+}
+function restoreFocus(focus) {
   if (focus) {
     const el = document.querySelector(`tr[data-id="${focus.id}"] [data-field="${focus.field}"]`);
     if (el) { el.value = focus.value; el.focus(); try { if (focus.sel != null) el.setSelectionRange(focus.sel, focus.sel); } catch {} }
   }
+}
+
+// ---------- Tenencias (pestaña FWD) ----------
+const holdCuenta = r => String(r['c' + tenencias.cuentaCol] ?? '').trim();
+function holdCuentas() { return new Set(tenencias.rows.map(holdCuenta).filter(Boolean)); }
+function holdNombre(r) {
+  const fromFile = tenencias.nombreCol >= 0 ? String(r['c' + tenencias.nombreCol] ?? '').trim() : '';
+  if (fromFile) return fromFile;
+  const k = norm(holdCuenta(r));
+  return cuentas.find(c => norm(c.cuenta) === k)?.nombre || '';
+}
+// Columnas a mostrar: N° de cuenta, Nombre y después el resto del archivo en su orden
+function holdColumns() {
+  const rest = tenencias.columns.map((label, i) => ({ key: 'c' + i, label, i }))
+    .filter(c => c.i !== tenencias.cuentaCol && c.i !== tenencias.nombreCol);
+  const isNum = c => tenencias.rows.some(r => typeof r[c.key] === 'number') && tenencias.rows.every(r => r[c.key] === '' || r[c.key] == null || typeof r[c.key] === 'number');
+  return [{ key: 'cuenta', label: 'N° de cuenta' }, { key: 'nombre', label: 'Nombre' }, ...rest.map(c => ({ ...c, num: isNum(c) }))];
+}
+const holdVal = (r, k) => k === 'cuenta' ? holdCuenta(r) : k === 'nombre' ? holdNombre(r) : r[k];
+function fmtNum(v) {
+  const a = Math.abs(v);
+  return v.toLocaleString('es-AR', { maximumFractionDigits: a >= 1000 ? 2 : a >= 1 ? 4 : 6 });
+}
+function holdRows() {
+  const qn = norm($('#qNombre').value);
+  const qc = norm($('#qCuenta').value).replace(/\s/g, '');
+  return tenencias.rows
+    .filter(r => !qn || norm(holdNombre(r)).includes(qn))
+    .filter(r => !qc || norm(holdCuenta(r)).replace(/\s/g, '').includes(qc));
+}
+function holdCompare(a, b) {
+  const k = holdSort.key;
+  const va = holdVal(a, k), vb = holdVal(b, k);
+  let res;
+  if (typeof va === 'number' && typeof vb === 'number') res = va - vb;
+  else {
+    const sa = norm(va), sb = norm(vb);
+    if (!sa && sb) return 1;
+    if (sa && !sb) return -1;
+    res = sa.localeCompare(sb, 'es', { numeric: true });
+  }
+  return res * holdSort.dir || holdCuenta(a).localeCompare(holdCuenta(b), 'es', { numeric: true });
+}
+function renderTenencias() {
+  const base = holdRows();
+  const nCuentas = new Set(base.map(holdCuenta)).size;
+  const fuera = [...holdCuentas()].filter(k => !cuentas.some(c => norm(c.cuenta) === norm(k))).length;
+  $('#stats').innerHTML = tenencias.rows.length ? `
+    <span class="stat"><b>${nCuentas}</b>cuentas con tenencias</span>
+    <span class="stat"><b>${base.length}</b>posiciones</span>
+    <span class="stat info">Actualizado ${fmtDate(tenencias.updatedAt)}${tenencias.fileName ? ` · ${esc(tenencias.fileName)}` : ''}</span>
+    ${fuera ? `<span class="stat info" title="Cuentas del archivo de tenencias que no están cargadas en ${esc(config.principal)}">${fuera} sin cargar en ${esc(config.principal)}</span>` : ''}` : '';
+
+  const cols = holdColumns();
+  $('#headRow').innerHTML = cols.map(c =>
+    `<th class="${c.num ? 'num' : ''} ${holdSort.key === c.key ? 'sorted' : ''}" data-hsort="${c.key}">${esc(c.label)}<span class="ar">${holdSort.key === c.key ? (holdSort.dir > 0 ? '↑' : '↓') : '↕'}</span></th>`).join('');
+
+  const rows = base.sort(holdCompare);
+  const empty = $('#empty');
+  empty.hidden = rows.length > 0;
+  if (!rows.length) {
+    $('#headRow').innerHTML = tenencias.rows.length ? $('#headRow').innerHTML : '';
+    empty.innerHTML = loading ? 'Cargando…' : tenencias.rows.length ? 'No hay tenencias que coincidan con la búsqueda.'
+      : `<div>Todavía no cargaste tenencias.</div>
+         <div>Tocá <b>Importar tenencias</b> y elegí el Excel. Necesita una columna con el <b>N° de cuenta</b>;
+         el resto de las columnas (especie, cantidad, precio, valuación…) se muestran tal como vienen en el archivo.</div>
+         <div>Cada vez que importes, el archivo nuevo reemplaza las tenencias anteriores.</div>`;
+  }
+  let prev = null;
+  const grouped = holdSort.key === 'cuenta' || holdSort.key === 'nombre';
+  $('#tbody').innerHTML = rows.map(r => {
+    const k = holdCuenta(r);
+    const first = k !== prev; prev = k;
+    const cells = cols.map(c => {
+      if (grouped && !first && (c.key === 'cuenta' || c.key === 'nombre')) return '<td></td>';
+      const v = holdVal(r, c.key);
+      if (typeof v === 'number') return `<td class="num">${fmtNum(v)}</td>`;
+      if (c.key === 'cuenta') return `<td class="c-num">${esc(v)}</td>`;
+      if (c.key === 'nombre') return `<td>${v ? esc(v) : '<span class="muted">—</span>'}</td>`;
+      return `<td class="cell">${esc(v)}</td>`;
+    }).join('');
+    return `<tr class="${grouped && first ? 'group-start' : ''}">${cells}</tr>`;
+  }).join('');
 }
 
 // ---------- Eventos de la tabla ----------
@@ -498,6 +646,12 @@ $('#stats').addEventListener('click', e => {
   soloContactar = !soloContactar; render();
 });
 $('#headRow').addEventListener('click', e => {
+  const hth = e.target.closest('[data-hsort]');
+  if (hth) {
+    const k = hth.dataset.hsort;
+    holdSort = holdSort.key === k ? { key: k, dir: -holdSort.dir } : { key: k, dir: 1 };
+    return render();
+  }
   const th = e.target.closest('[data-sort]'); if (!th) return;
   const k = th.dataset.sort;
   sort = sort.key === k ? { key: k, dir: -sort.dir } : { key: k, dir: 1 };
@@ -554,7 +708,7 @@ function confirmAsk(title, text, yes) {
 const form = $('#form');
 let editingId = null;
 function tabChecks(selected) {
-  return config.tabs.map(t => `<label class="check"><input type="checkbox" value="${esc(t.id)}" ${selected.includes(t.id) ? 'checked' : ''}>${esc(t.label)}</label>`).join('');
+  return tagTabs().map(t => `<label class="check"><input type="checkbox" value="${esc(t.id)}" ${selected.includes(t.id) ? 'checked' : ''}>${esc(t.label)}</label>`).join('');
 }
 function openDialog(c) {
   editingId = c ? c.id : null;
@@ -607,7 +761,7 @@ $('#tagsForm').addEventListener('submit', async () => {
 let draftTabs = [];
 function renderTabRows() {
   $('#tabRows').innerHTML = [{ id: MAIN, label: config.principal, main: true }, ...draftTabs].map((t, i) => {
-    const n = t.main ? cuentas.length : cuentas.filter(c => (c.pestanas || []).includes(t.id)).length;
+    const n = t.main ? cuentas.length : t.id === HOLD_TAB ? holdCuentas().size : cuentas.filter(c => (c.pestanas || []).includes(t.id)).length;
     return `<div class="tab-row" data-i="${i - 1}">
       <input id="tabname-${esc(t.id)}" value="${esc(t.label)}" aria-label="Nombre de la pestaña">
       <span class="count">${n} cuentas</span>
@@ -698,6 +852,7 @@ function downloadTemplate() {
   }], HEADERS, 'plantilla_panel_wm.xlsx');
 }
 $('#btnExport').addEventListener('click', async () => {
+  if (tab === HOLD_TAB) return exportTenencias();
   const rows = currentRows().filter(c => !soloContactar || alarma(c).late).sort(compare);
   if (!rows.length) return toast('No hay cuentas para exportar en esta vista');
   const data = rows.map(c => ({
@@ -708,6 +863,15 @@ $('#btnExport').addEventListener('click', async () => {
   const name = `${slug(tabLabel(tab))}_${today()}.xlsx`;
   if (await downloadBook(data, [...HEADERS, 'Alarma'], name)) toast(`Exportadas ${rows.length} cuentas de ${tabLabel(tab)}`);
 });
+
+async function exportTenencias() {
+  const rows = holdRows().sort(holdCompare);
+  if (!rows.length) return toast('No hay tenencias para exportar');
+  const cols = holdColumns();
+  const data = rows.map(r => Object.fromEntries(cols.map(c => [c.label, holdVal(r, c.key) ?? ''])));
+  if (await downloadBook(data, cols.map(c => c.label), `tenencias_${slug(tabLabel(HOLD_TAB))}_${today()}.xlsx`))
+    toast(`Exportadas ${rows.length} posiciones`);
+}
 
 function parseDate(v) {
   if (v === '' || v == null) return '';
@@ -740,6 +904,7 @@ function parseTabs(v, created) {
 $('#fileInput').addEventListener('change', async e => {
   const file = e.target.files[0]; if (!file) return;
   e.target.value = '';
+  if (tab === HOLD_TAB) return importTenencias(file);
   let raw;
   try {
     const wb = XLSX.read(await file.arrayBuffer());
@@ -787,6 +952,59 @@ $('#fileInput').addEventListener('change', async e => {
     toast(`Importación lista: ${added} nuevas, ${updated} actualizadas${created.length ? ` · pestañas nuevas: ${created.join(', ')}` : ''}`);
   } catch { /* write() ya avisó */ }
 });
+
+// Lee el Excel de tenencias: busca la fila de títulos (la que tiene la columna de cuenta),
+// guarda todas las columnas tal cual y completa la cuenta en filas agrupadas.
+async function importTenencias(file) {
+  let grid;
+  try {
+    const wb = XLSX.read(await file.arrayBuffer(), { cellDates: true });
+    grid = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1, defval: '', raw: true, blankrows: false });
+  } catch { return toast('No se pudo leer el archivo. Tiene que ser un Excel (.xlsx o .xls) o un CSV.'); }
+  const cuentaAliases = EXCEL_FIELDS.find(f => f.key === 'cuenta').aliases;
+  const nombreAliases = EXCEL_FIELDS.find(f => f.key === 'nombre').aliases;
+  const hi = grid.slice(0, 20).findIndex(row => row.some(h => cuentaAliases.includes(normHeader(h))));
+  if (hi < 0) return toast('No encontré una columna de N° de cuenta (por ejemplo "N° de cuenta", "Cuenta" o "Comitente") en las primeras filas');
+
+  const header = grid[hi].map((h, i) => String(h ?? '').trim() || `Columna ${i + 1}`);
+  const used = header.map((_, i) => grid.slice(hi + 1).some(row => row[i] !== '' && row[i] != null));
+  const keep = header.map((_, i) => i).filter(i => used[i] || cuentaAliases.includes(normHeader(header[i])));
+  const columns = keep.map(i => header[i]);
+  const cuentaCol = columns.findIndex(h => cuentaAliases.includes(normHeader(h)));
+  const nombreCol = columns.findIndex(h => nombreAliases.includes(normHeader(h)));
+
+  const cellValue = v => {
+    if (v instanceof Date && !isNaN(v)) return fmtDate(isoLocal(new Date(v.getTime() + 12 * 36e5)));
+    if (typeof v === 'number') return v;
+    return String(v ?? '').trim();
+  };
+  const rows = [];
+  let lastCuenta = '', lastNombre = '';
+  for (const raw of grid.slice(hi + 1)) {
+    const vals = keep.map(i => cellValue(raw[i]));
+    if (vals.every(v => v === '')) continue;
+    if (vals.some(v => typeof v === 'string' && /^(sub)?total/.test(normHeader(v)))) continue; // filas de totales
+    if (vals[cuentaCol] === '' || vals[cuentaCol] == null) {
+      if (!lastCuenta) continue;
+      vals[cuentaCol] = lastCuenta;
+      if (nombreCol >= 0 && vals[nombreCol] === '') vals[nombreCol] = lastNombre;
+    }
+    vals[cuentaCol] = String(vals[cuentaCol]).trim();
+    lastCuenta = vals[cuentaCol];
+    if (nombreCol >= 0) lastNombre = vals[nombreCol];
+    rows.push(Object.fromEntries(vals.map((v, i) => ['c' + i, v])));
+  }
+  if (!rows.length) return toast('El archivo no tiene filas de tenencias debajo de los títulos');
+
+  const nCuentas = new Set(rows.map(r => r['c' + cuentaCol])).size;
+  if (tenencias.rows.length && !await confirmAsk('Reemplazar tenencias',
+    `Se van a reemplazar las tenencias actuales (${plural(tenencias.rows.length, 'posición', 'posiciones')}) por las del archivo "${file.name}": ${plural(rows.length, 'posición', 'posiciones')} de ${plural(nCuentas, 'cuenta', 'cuentas')}.`, 'Reemplazar')) return;
+  try {
+    await saveTenencias({ columns, cuentaCol, nombreCol, rows, updatedAt: today(), fileName: file.name });
+    render();
+    toast(`Tenencias cargadas: ${plural(rows.length, 'posición', 'posiciones')} de ${plural(nCuentas, 'cuenta', 'cuentas')}`);
+  } catch { /* write() ya avisó */ }
+}
 
 // ---------- Inicio ----------
 {

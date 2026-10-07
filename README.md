@@ -1,4 +1,4 @@
-# Panel WM
+# Panel WM Micaela Graciano
 
 Panel para registrar tu base de cuentas, en un solo archivo (`index.html`).
 
@@ -20,6 +20,16 @@ Panel para registrar tu base de cuentas, en un solo archivo (`index.html`).
 - **Buscar** por nombre o por N° de cuenta. **Ordenar** tocando el título de cada columna.
 - **×** en WM3 elimina la cuenta; en otra pestaña solo la quita de esa pestaña.
 - **Eliminar sin cuenta** borra los registros que no tienen N° de cuenta (en la pestaña que estás viendo).
+
+## Tenencias (pestaña FWD)
+
+La pestaña **FWD** muestra las tenencias de tus clientes. Tocá **Importar tenencias** estando en FWD y elegí el Excel.
+
+- Necesita una columna con el N° de cuenta (`N° de cuenta`, `Cuenta`, `Comitente`…). Puede haber filas de título arriba.
+- El resto de las columnas (especie, cantidad, precio, valuación, moneda…) se muestran tal como vienen en el archivo.
+- Si la cuenta aparece solo en la primera fila de cada cliente, se completa en las filas siguientes. Las filas de "Total" se ignoran.
+- El nombre sale del archivo, o si no hay columna de nombre, de la cuenta cargada en WM3.
+- Cada importación **reemplaza** las tenencias anteriores (te pide confirmación).
 
 ## Importar desde Excel
 
