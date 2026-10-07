@@ -585,7 +585,7 @@ function assemble(k) {
       if (!part) return; // todavía no llegó todo; se vuelve a armar en el próximo aviso
       rows.push(...part);
     }
-    ds = { ...EMPTY_DS(), ...meta, rows: rows.map(structuredClone) };
+    ds = { ...EMPTY_DS(), ...meta, rows: rows.map(r => structuredClone(r)) };
   }
   if (k === 'ing') ingresos = meta ? { ...EMPTY_ING(), ...ds } : EMPTY_ING();
   else if (k === 'cur') tenencias = ds; else tenPrev = ds;
