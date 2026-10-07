@@ -3,106 +3,185 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>CRM Clientes</title>
+<title>Panel WM</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600&display=swap">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <style>
-  /* Layout: barra fija con buscador y acciones, pestañas por estado, tabla ordenable */
+  /* Layout: encabezado con marca y estado, pestañas por cartera, barra de resumen y acciones, tabla editable en línea */
   :root {
-    --bg: #f4f6f6; --panel: #ffffff; --text: #18242a; --muted: #5f6e74;
-    --border: #dfe5e6; --accent: #0f766e; --accent-soft: #e3f2f0; --on-accent: #ffffff;
-    --danger: #c2410c; --star: #d97706;
-    --activo: #15803d; --prospecto: #0f766e; --inactivo: #94a3a8;
-    --overlay: rgba(12, 20, 24, .45);
+    --bg: #efeee9; --panel: #fbfaf7; --soft: #e5e3dc; --text: #1f2a24; --muted: #6a716b;
+    --border: #dcd9d0; --accent: #2d4a3c; --on-accent: #ffffff; --accent-soft: #dde7df;
+    --late: #b0412d; --late-bg: #f4d8d1; --ok: #2f6b45; --ok-bg: #dcebdf;
+    --danger: #a5432f; --danger-soft: #ecdcd6; --overlay: rgba(20, 28, 22, .42);
+    --logo-a: #2f5a3f; --logo-b: #8c6b2c;
+    --font-display: "Fraunces", Georgia, "Times New Roman", serif;
+    --font-body: "DM Sans", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   }
   @media (prefers-color-scheme: dark) {
     :root:not([data-theme="light"]) {
-      --bg: #101719; --panel: #172124; --text: #e4ecee; --muted: #93a4a9;
-      --border: #28363a; --accent: #2dd4bf; --accent-soft: #15302e; --on-accent: #062522;
-      --danger: #fb923c; --star: #fbbf24;
-      --activo: #4ade80; --prospecto: #2dd4bf; --inactivo: #66777c;
-      --overlay: rgba(0, 0, 0, .6);
+      --bg: #141815; --panel: #1b201c; --soft: #272d28; --text: #e5e9e4; --muted: #99a29a;
+      --border: #2f3730; --accent: #8fc1a2; --on-accent: #10241a; --accent-soft: #24352b;
+      --late: #f2a493; --late-bg: #4a2620; --ok: #8fd3a5; --ok-bg: #1f3a2a;
+      --danger: #f0a08f; --danger-soft: #3d2420; --overlay: rgba(0, 0, 0, .6);
       color-scheme: dark;
     }
   }
   :root[data-theme="dark"] {
-    --bg: #101719; --panel: #172124; --text: #e4ecee; --muted: #93a4a9;
-    --border: #28363a; --accent: #2dd4bf; --accent-soft: #15302e; --on-accent: #062522;
-    --danger: #fb923c; --star: #fbbf24;
-    --activo: #4ade80; --prospecto: #2dd4bf; --inactivo: #66777c;
-    --overlay: rgba(0, 0, 0, .6);
+    --bg: #141815; --panel: #1b201c; --soft: #272d28; --text: #e5e9e4; --muted: #99a29a;
+    --border: #2f3730; --accent: #8fc1a2; --on-accent: #10241a; --accent-soft: #24352b;
+    --late: #f2a493; --late-bg: #4a2620; --ok: #8fd3a5; --ok-bg: #1f3a2a;
+    --danger: #f0a08f; --danger-soft: #3d2420; --overlay: rgba(0, 0, 0, .6);
     color-scheme: dark;
   }
   * { box-sizing: border-box; }
-  body { margin: 0; font: 14px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; background: var(--bg); color: var(--text); }
-  header { background: var(--panel); border-bottom: 1px solid var(--border); padding: 14px 20px; display: flex; flex-wrap: wrap; gap: 12px; align-items: center; position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; }
-  header h1 { font-size: 18px; margin: 0 12px 0 0; }
-  #search { flex: 1 1 260px; padding: 9px 12px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg); color: var(--text); font-size: 14px; }
-  .actions { display: flex; flex-wrap: wrap; gap: 8px; }
-  button, .btn { font: inherit; padding: 8px 12px; border-radius: 8px; border: 1px solid var(--border); background: var(--panel); color: var(--text); cursor: pointer; white-space: nowrap; }
-  button:hover, .btn:hover { border-color: var(--accent); }
-  .primary { background: var(--accent); color: var(--on-accent); border-color: var(--accent); }
-  .danger { color: var(--danger); }
-  main { padding: 16px 20px 40px; max-width: 1300px; margin: 0 auto; }
-  .tabs { display: flex; gap: 4px; flex-wrap: wrap; border-bottom: 1px solid var(--border); margin-bottom: 12px; }
-  .tab { border: none; border-bottom: 2px solid transparent; border-radius: 0; background: none; padding: 10px 14px; color: var(--muted); }
-  .tab.active { color: var(--accent); border-bottom-color: var(--accent); font-weight: 600; }
-  .tab .count { background: var(--accent-soft); color: var(--accent); border-radius: 10px; padding: 1px 7px; font-size: 12px; margin-left: 4px; }
-  .table-wrap { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; overflow-x: auto; }
-  table { width: 100%; border-collapse: collapse; }
-  th, td { padding: 9px 12px; text-align: left; border-bottom: 1px solid var(--border); vertical-align: middle; }
-  th { font-size: 12px; text-transform: uppercase; letter-spacing: .03em; color: var(--muted); cursor: pointer; user-select: none; white-space: nowrap; }
-  th.nosort { cursor: default; }
-  th .arrow { opacity: .8; }
-  tr:last-child td { border-bottom: none; }
-  tbody tr:hover { background: var(--accent-soft); }
-  td.name { font-weight: 600; }
-  td .sub { color: var(--muted); font-size: 12px; font-weight: 400; }
-  .star { background: none; border: none; font-size: 18px; padding: 2px 6px; color: var(--inactivo); }
-  .star.on { color: var(--star); }
-  select.estado { padding: 4px 6px; border-radius: 6px; border: 1px solid var(--border); background: var(--panel); color: var(--text); font: inherit; }
-  .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; }
-  .row-actions, td.estado-cell { white-space: nowrap; }
-  .row-actions button { padding: 4px 8px; font-size: 12px; }
-  .empty { padding: 40px; text-align: center; color: var(--muted); }
-  .overdue { color: var(--danger); font-weight: 600; }
-  dialog { border: 1px solid var(--border); border-radius: 12px; padding: 0; width: min(560px, calc(100vw - 32px)); background: var(--panel); color: var(--text); }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.45 var(--font-body); }
+  .wrap { max-width: 1440px; margin: 0 auto; padding-inline: 28px; padding-block: 22px 48px; display: flex; flex-direction: column; gap: 18px; }
+
+  /* Encabezado */
+  .top { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+  .brand { display: flex; align-items: center; gap: 12px; }
+  .logo { width: 40px; height: 40px; border-radius: 9px; display: grid; place-items: center; color: #fff;
+    background: linear-gradient(135deg, var(--logo-a), var(--logo-b)); font: 600 15px/1 var(--font-display); letter-spacing: -.02em; flex: none; }
+  .brand h1 { margin: 0; font: 600 24px/1.1 var(--font-display); letter-spacing: -.01em; }
+  .brand .date { color: var(--muted); font-size: 12.5px; margin-top: 4px; }
+  .sync { display: inline-flex; align-items: center; gap: 7px; padding: 6px 12px; border: 1px solid var(--border); border-radius: 999px;
+    background: var(--panel); font-size: 12px; color: var(--muted); white-space: nowrap; }
+  .sync::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--ok); }
+  .sync.busy::before { background: var(--muted); }
+  .sync.error::before { background: var(--late); }
+
+  /* Pestañas */
+  .tabs { display: flex; gap: 2px; border-bottom: 1px solid var(--border); overflow-x: auto; scrollbar-width: thin; }
+  .tab { flex: none; border: none; background: none; font: 500 13.5px var(--font-body); color: var(--muted); padding: 9px 10px 10px;
+    border-bottom: 2px solid transparent; margin-bottom: -1px; cursor: pointer; display: inline-flex; align-items: center; gap: 7px; }
+  .tab:hover { color: var(--text); }
+  .tab.active { color: var(--text); border-bottom-color: var(--accent); }
+  .tab .n { font-size: 11px; font-weight: 600; background: var(--soft); color: var(--muted); padding: 1px 6px; border-radius: 5px; font-variant-numeric: tabular-nums; }
+  .tab.active .n { background: var(--accent-soft); color: var(--accent); }
+  .tab.edit { color: var(--muted); font-size: 18px; padding-inline: 12px; }
+
+  /* Barra de resumen y acciones */
+  .bar { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; justify-content: space-between; }
+  .stats, .actions, .searches { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+  .stat { display: inline-flex; align-items: baseline; gap: 7px; padding: 8px 12px; background: var(--panel); border: 1px solid var(--border);
+    border-radius: 9px; font-size: 12px; color: var(--muted); font-family: var(--font-body); cursor: default; }
+  .stat b { font: 600 18px/1 var(--font-display); color: var(--text); font-variant-numeric: tabular-nums; }
+  button.stat { cursor: pointer; }
+  button.stat:hover { border-color: var(--late); }
+  button.stat.on { border-color: var(--late); background: var(--late-bg); color: var(--late); }
+  button.stat.on b { color: var(--late); }
+  .btn { font: 600 13px var(--font-body); padding: 9px 14px; border-radius: 8px; border: 1px solid transparent; background: var(--soft); color: var(--text);
+    cursor: pointer; white-space: nowrap; display: inline-flex; align-items: center; gap: 6px; }
+  .btn:hover { filter: brightness(.97); }
+  .btn.primary { background: var(--accent); color: var(--on-accent); }
+  .btn.danger { background: var(--danger-soft); color: var(--danger); }
+  .btn.ghost { background: transparent; border-color: var(--border); }
+  .search { flex: 0 1 330px; min-width: 0; padding: 10px 16px; border: 1px solid var(--border); border-radius: 999px; background: var(--panel);
+    color: var(--text); font: 13.5px var(--font-body); }
+  .search::placeholder, .inline::placeholder { color: var(--muted); }
+
+  /* Tabla */
+  .table-wrap { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; min-width: 860px; }
+  thead th { background: var(--soft); text-align: left; font: 600 11px var(--font-body); letter-spacing: .07em; text-transform: uppercase; color: var(--muted);
+    padding: 14px 16px; white-space: nowrap; cursor: pointer; user-select: none; }
+  thead th.nosort { cursor: default; }
+  thead th .ar { opacity: .45; margin-left: 3px; }
+  thead th.sorted .ar { opacity: 1; color: var(--text); }
+  td { padding: 10px 16px; border-top: 1px solid var(--border); vertical-align: middle; }
+  tbody tr:hover { background: color-mix(in srgb, var(--soft) 45%, transparent); }
+  .c-num { width: 150px; }
+  td.c-num { font-variant-numeric: tabular-nums; font-size: 14.5px; }
+  .c-name { width: 22%; }
+  .c-date { width: 190px; }
+  .c-alarm { width: 230px; }
+  .c-x { width: 56px; text-align: right; }
+  .name { background: none; border: none; padding: 0; font: 500 14.5px var(--font-body); color: var(--text); cursor: pointer; text-align: left; }
+  .name:hover { text-decoration: underline; text-underline-offset: 3px; }
+  .chips { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 5px; }
+  .chip { font: 500 11px var(--font-body); padding: 2px 7px; border-radius: 5px; background: var(--accent-soft); color: var(--accent); border: none; cursor: pointer; }
+  .chip.add { background: transparent; color: var(--muted); border: 1px dashed var(--border); opacity: .7; }
+  tr:hover .chip.add, .chip.add:focus-visible { opacity: 1; }
+  .inline { width: 100%; border: 1px solid transparent; background: transparent; color: var(--text); font: 14px var(--font-body); padding: 7px 8px; border-radius: 6px; }
+  .inline:hover { border-color: var(--border); }
+  .inline:focus { border-color: var(--accent); background: var(--bg); outline: none; }
+  input[type="date"].inline { font-variant-numeric: tabular-nums; max-width: 170px; }
+  .pill { display: inline-block; border: none; font: 600 12px var(--font-body); padding: 6px 12px; border-radius: 999px; cursor: pointer; white-space: nowrap; }
+  .pill.late { background: var(--late-bg); color: var(--late); }
+  .pill.ok { background: var(--ok-bg); color: var(--ok); }
+  .x { width: 32px; height: 32px; border-radius: 7px; border: 1px solid var(--border); background: var(--panel); color: var(--muted); font-size: 16px; cursor: pointer; line-height: 1; }
+  .x:hover { color: var(--danger); border-color: var(--danger); }
+  .empty { padding: 48px 20px; text-align: center; color: var(--muted); display: flex; flex-direction: column; gap: 12px; align-items: center; }
+  .empty .btn { font-weight: 500; }
+  [hidden] { display: none !important; }
+
+  /* Diálogos */
+  dialog { border: 1px solid var(--border); border-radius: 14px; padding: 0; width: min(560px, calc(100vw - 32px)); background: var(--panel); color: var(--text); }
   dialog::backdrop { background: var(--overlay); }
-  button:focus-visible, select:focus-visible, input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
-  .confirm p { margin: 0 0 4px; }
-  dialog form { padding: 20px; }
-  dialog h2 { margin: 0 0 14px; font-size: 17px; }
+  dialog form { padding: 22px; display: flex; flex-direction: column; gap: 14px; }
+  dialog h2 { margin: 0; font: 600 19px var(--font-display); }
+  dialog p { margin: 0; color: var(--muted); }
   .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
   .grid .full { grid-column: 1 / -1; }
-  label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--muted); }
-  label.check { flex-direction: row; align-items: center; gap: 8px; font-size: 14px; color: var(--text); }
-  input, textarea, dialog select { font: inherit; padding: 8px 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg); color: var(--text); }
+  label { display: flex; flex-direction: column; gap: 5px; font-size: 12px; color: var(--muted); }
+  dialog input:not([type="checkbox"]), dialog textarea { font: 14px var(--font-body); padding: 9px 11px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg); color: var(--text); }
   textarea { min-height: 70px; resize: vertical; }
-  .dialog-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; }
-  #toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: var(--text); color: var(--bg); padding: 10px 16px; border-radius: 8px; opacity: 0; transition: opacity .2s; pointer-events: none; }
+  .checks { display: flex; flex-wrap: wrap; gap: 8px; }
+  .check { flex-direction: row; align-items: center; gap: 7px; font-size: 13.5px; color: var(--text); padding: 7px 11px; border: 1px solid var(--border); border-radius: 8px; cursor: pointer; }
+  .check:has(input:checked) { border-color: var(--accent); background: var(--accent-soft); }
+  .tab-rows { display: flex; flex-direction: column; gap: 8px; }
+  .tab-row { display: flex; gap: 8px; align-items: center; }
+  .tab-row input { flex: 1; min-width: 0; }
+  .tab-row .count { color: var(--muted); font-size: 12px; width: 70px; text-align: right; font-variant-numeric: tabular-nums; }
+  .dialog-actions { display: flex; justify-content: flex-end; gap: 8px; flex-wrap: wrap; }
+  .setting { display: flex; flex-direction: row; align-items: center; gap: 8px; font-size: 13.5px; color: var(--text); }
+  .setting input { width: 70px; }
+
+  #toast { position: fixed; bottom: calc(20px + env(safe-area-inset-bottom, 0px)); left: 50%; transform: translateX(-50%); background: var(--text); color: var(--bg);
+    padding: 10px 16px; border-radius: 9px; opacity: 0; transition: opacity .2s; pointer-events: none; max-width: calc(100vw - 32px); font-size: 13.5px; }
   #toast.show { opacity: 1; }
-  @media (max-width: 640px) {
-    header, main { padding-left: 16px; padding-right: 16px; }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  @media (prefers-reduced-motion: reduce) { #toast { transition: none; } }
+  @media (max-width: 700px) {
+    .wrap { padding-inline: 16px; }
+    .search { flex: 1 1 100%; }
     .grid { grid-template-columns: 1fr; }
-    header { position: static; }
   }
 </style>
 </head>
 <body>
-<header>
-  <h1>CRM Clientes</h1>
-  <input id="search" type="search" placeholder="Buscar por nombre…" autocomplete="off">
-  <div class="actions">
-    <button class="primary" id="btnNew">+ Nuevo cliente</button>
-    <label class="btn" style="flex-direction:row;color:var(--text);font-size:14px">Importar Excel
-      <input id="fileInput" type="file" accept=".xlsx,.xls,.csv" hidden>
-    </label>
-    <button id="btnExport">Exportar Excel</button>
-    <button id="btnTemplate">Descargar plantilla</button>
-  </div>
-</header>
+<div class="wrap">
+  <header class="top">
+    <div class="brand">
+      <div class="logo" aria-hidden="true">WM</div>
+      <div>
+        <h1>Panel WM</h1>
+        <div class="date" id="today"></div>
+      </div>
+    </div>
+    <span class="sync busy" id="sync">Cargando…</span>
+  </header>
 
-<main>
-  <nav class="tabs" id="tabs"></nav>
+  <nav class="tabs" id="tabs" aria-label="Pestañas"></nav>
+
+  <div class="bar">
+    <div class="stats" id="stats"></div>
+    <div class="actions">
+      <button class="btn danger" id="btnSinCuenta">Eliminar sin cuenta</button>
+      <button class="btn" id="btnExport">Exportar Excel</button>
+      <label class="btn" for="fileInput">Importar Excel</label>
+      <input id="fileInput" type="file" accept=".xlsx,.xls,.csv" hidden>
+      <button class="btn primary" id="btnNew">+ Nueva cuenta</button>
+    </div>
+  </div>
+
+  <div class="searches">
+    <input class="search" id="qNombre" type="search" placeholder="Buscar por nombre…" autocomplete="off">
+    <input class="search" id="qCuenta" type="search" placeholder="Buscar por N° de cuenta…" autocomplete="off" inputmode="numeric">
+  </div>
+
   <div class="table-wrap">
     <table>
       <thead><tr id="headRow"></tr></thead>
@@ -110,201 +189,313 @@
     </table>
     <div class="empty" id="empty" hidden></div>
   </div>
-</main>
+</div>
 
+<!-- Alta / edición de cuenta -->
 <dialog id="dlg">
   <form method="dialog" id="form">
-    <h2 id="dlgTitle">Nuevo cliente</h2>
+    <h2 id="dlgTitle">Nueva cuenta</h2>
     <div class="grid">
-      <label class="full">Nombre *<input name="nombre" required></label>
-      <label>Empresa<input name="empresa"></label>
-      <label>Teléfono<input name="telefono"></label>
-      <label>Email<input name="email" type="email"></label>
-      <label>Estado
-        <select name="estado">
-          <option value="activo">Cliente activo</option>
-          <option value="prospecto">Prospecto</option>
-          <option value="inactivo">Inactivo</option>
-        </select>
-      </label>
-      <label class="check full"><input type="checkbox" name="operar"> Tengo que operarle a este cliente</label>
-      <label>Qué operar<input name="operacion" placeholder="Ej: renovar póliza, enviar cotización"></label>
-      <label>Próximo contacto<input name="proximo" type="date"></label>
-      <label class="full">Notas<textarea name="notas"></textarea></label>
+      <label>N° de cuenta<input id="f-cuenta" name="cuenta" inputmode="numeric"></label>
+      <label>Nombre *<input id="f-nombre" name="nombre" required></label>
+      <label>Teléfono<input id="f-telefono" name="telefono"></label>
+      <label>Email<input id="f-email" name="email" type="email"></label>
+      <label>Última vez contactado<input id="f-ultimo" name="ultimoContacto" type="date"></label>
+      <label class="full">Acción / comentarios<input id="f-accion" name="accion" placeholder="Ej: Revisar cartera y emitir diagnóstico"></label>
+      <label class="full">Notas<textarea id="f-notas" name="notas"></textarea></label>
+      <div class="full"><label>Pestañas</label><div class="checks" id="formTabs"></div></div>
     </div>
     <div class="dialog-actions">
-      <button type="button" id="btnCancel">Cancelar</button>
-      <button type="submit" class="primary">Guardar</button>
+      <button type="button" class="btn ghost" id="btnCancel">Cancelar</button>
+      <button type="submit" class="btn primary">Guardar</button>
     </div>
   </form>
 </dialog>
 
+<!-- Asignar pestañas a una cuenta -->
+<dialog id="tagsDlg">
+  <form method="dialog" id="tagsForm">
+    <h2 id="tagsTitle">Pestañas</h2>
+    <p>Elegí en qué pestañas aparece esta cuenta. En <span id="tagsMain"></span> aparece siempre.</p>
+    <div class="checks" id="tagsChecks"></div>
+    <div class="dialog-actions">
+      <button type="button" class="btn ghost" id="tagsCancel">Cancelar</button>
+      <button type="submit" class="btn primary">Guardar</button>
+    </div>
+  </form>
+</dialog>
+
+<!-- Editar pestañas -->
+<dialog id="tabsDlg">
+  <form method="dialog" id="tabsForm">
+    <h2>Editar pestañas</h2>
+    <p>Renombrá, agregá o quitá pestañas. Quitar una pestaña no borra las cuentas.</p>
+    <div class="tab-rows" id="tabRows"></div>
+    <div class="tab-row">
+      <input id="newTabName" placeholder="Nombre de la nueva pestaña">
+      <button type="button" class="btn" id="addTab">Agregar</button>
+    </div>
+    <label class="setting">Alarma de contacto después de <input id="diasAlarma" type="number" min="1" max="365"> días</label>
+    <div class="dialog-actions">
+      <button type="button" class="btn ghost" id="tabsCancel">Cancelar</button>
+      <button type="submit" class="btn primary">Guardar</button>
+    </div>
+  </form>
+</dialog>
+
+<!-- Confirmación -->
 <dialog id="confirmDlg">
-  <form method="dialog" class="confirm">
-    <h2>Borrar cliente</h2>
+  <form method="dialog">
+    <h2 id="confirmTitle"></h2>
     <p id="confirmText"></p>
     <div class="dialog-actions">
-      <button value="no">Cancelar</button>
-      <button value="si" class="primary" id="confirmYes">Borrar</button>
+      <button value="no" class="btn ghost">Cancelar</button>
+      <button value="si" class="btn danger" id="confirmYes"></button>
     </div>
   </form>
 </dialog>
 
-<div id="toast"></div>
+<div id="toast" role="status"></div>
 
 <script>
-const STORAGE_KEY = 'crm-clientes-v1';
-const ESTADOS = { activo: 'Cliente activo', prospecto: 'Prospecto', inactivo: 'Inactivo' };
-const TABS = [
-  { id: 'todos', label: 'Todos', filter: () => true },
-  { id: 'activo', label: 'Clientes activos', filter: c => c.estado === 'activo' },
-  { id: 'prospecto', label: 'Prospectos', filter: c => c.estado === 'prospecto' },
-  { id: 'inactivo', label: 'Inactivos', filter: c => c.estado === 'inactivo' },
-  { id: 'operar', label: '★ Para operar', filter: c => c.operar },
-];
+const DEFAULT_CONFIG = {
+  principal: 'WM3',
+  dias: 21,
+  tabs: [
+    { id: 'sgr', label: 'SGR' },
+    { id: 'prospects', label: 'Prospects' },
+    { id: 'tareas', label: 'Tareas pendientes' },
+    { id: 'fal', label: 'FAL' },
+    { id: 'notas', label: 'Notas Estructuradas' },
+    { id: 'fwd', label: 'FWD' },
+  ],
+};
+const MAIN = 'wm3';
+const LOCAL_KEY = 'panel-wm-cuentas-v1';
+const LOCAL_CFG = 'panel-wm-config-v1';
+const FIELDS = ['cuenta', 'nombre', 'telefono', 'email', 'ultimoContacto', 'accion', 'notas', 'pestanas', 'creado'];
 const COLUMNS = [
-  { key: 'operar', label: '★' },
-  { key: 'nombre', label: 'Nombre' },
-  { key: 'telefono', label: 'Teléfono' },
-  { key: 'email', label: 'Email' },
-  { key: 'estado', label: 'Estado' },
-  { key: 'operacion', label: 'Qué operar' },
-  { key: 'proximo', label: 'Próx. contacto' },
-  { key: 'creado', label: 'Alta' },
-  { key: null, label: '' },
+  { key: 'cuenta', label: 'N° de cuenta', cls: 'c-num' },
+  { key: 'nombre', label: 'Nombre', cls: 'c-name' },
+  { key: 'ultimoContacto', label: 'Última vez contactado', cls: 'c-date' },
+  { key: 'accion', label: 'Acción / comentarios' },
+  { key: 'alarma', label: 'Alarma', cls: 'c-alarm' },
+  { key: null, label: '', cls: 'c-x' },
 ];
-// Encabezados del Excel (plantilla / exportación) y alias aceptados al importar
+// Columnas del Excel y nombres alternativos aceptados al importar
 const EXCEL_FIELDS = [
-  { key: 'nombre', header: 'Nombre', aliases: ['nombre', 'name', 'cliente', 'nombre y apellido', 'razon social'] },
-  { key: 'empresa', header: 'Empresa', aliases: ['empresa', 'compania', 'company'] },
+  { key: 'cuenta', header: 'N° de cuenta', aliases: ['n de cuenta', 'no de cuenta', 'nro de cuenta', 'nro cuenta', 'numero de cuenta', 'num cuenta', 'n cuenta', 'cuenta', 'comitente', 'nro comitente', 'numero comitente'] },
+  { key: 'nombre', header: 'Nombre', aliases: ['nombre', 'cliente', 'nombre y apellido', 'apellido y nombre', 'razon social', 'titular', 'name'] },
   { key: 'telefono', header: 'Teléfono', aliases: ['telefono', 'tel', 'celular', 'movil', 'whatsapp', 'phone'] },
-  { key: 'email', header: 'Email', aliases: ['email', 'e-mail', 'mail', 'correo', 'correo electronico'] },
-  { key: 'estado', header: 'Estado', aliases: ['estado', 'tipo', 'status'] },
-  { key: 'operar', header: 'Para operar', aliases: ['para operar', 'operar', 'a operar'] },
-  { key: 'operacion', header: 'Qué operar', aliases: ['que operar', 'operacion', 'tarea'] },
-  { key: 'proximo', header: 'Próximo contacto', aliases: ['proximo contacto', 'proximo', 'fecha contacto', 'seguimiento'] },
-  { key: 'notas', header: 'Notas', aliases: ['notas', 'observaciones', 'comentarios', 'nota'] },
+  { key: 'email', header: 'Email', aliases: ['email', 'e mail', 'mail', 'correo', 'correo electronico'] },
+  { key: 'ultimoContacto', header: 'Última vez contactado', aliases: ['ultima vez contactado', 'ultimo contacto', 'fecha ultimo contacto', 'fecha de contacto', 'fecha contacto', 'contactado'] },
+  { key: 'accion', header: 'Acción / comentarios', aliases: ['accion comentarios', 'accion', 'acciones', 'comentarios', 'comentario', 'observaciones', 'tarea'] },
+  { key: 'pestanas', header: 'Pestañas', aliases: ['pestanas', 'pestana', 'etiquetas', 'categorias', 'categoria', 'productos'] },
+  { key: 'notas', header: 'Notas', aliases: ['notas', 'nota'] },
 ];
 
-let clientes = [];
-let tab = 'todos';
+let cuentas = [];
+let config = structuredClone(DEFAULT_CONFIG);
+let tab = MAIN;
 let sort = { key: 'nombre', dir: 1 };
-let editingId = null;
+let soloContactar = false;
+let loading = true;
+let col = null, cfgRef = null;
+let pending = 0, syncError = false;
 
 const $ = s => document.querySelector(s);
 const norm = s => String(s ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim();
+const normHeader = s => norm(s).replace(/[^a-z0-9 ]/g, ' ').replace(/\s+/g, ' ').trim();
 const esc = s => String(s ?? '').replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
-const today = () => new Date().toISOString().slice(0, 10);
+const pad = n => String(n).padStart(2, '0');
+const isoLocal = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+const today = () => isoLocal(new Date());
 const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+const slug = s => normHeader(s).replace(/ /g, '-').slice(0, 40) || uid();
+const fmtDate = d => { if (!d) return ''; const [y, m, day] = d.split('-'); return `${day}/${m}/${y}`; };
+const tabLabel = id => id === MAIN ? config.principal : (config.tabs.find(t => t.id === id)?.label ?? '');
+const validTags = c => (c.pestanas || []).filter(id => config.tabs.some(t => t.id === id));
+
+function toast(msg) {
+  const t = $('#toast'); t.textContent = msg; t.classList.add('show');
+  clearTimeout(toast.timer); toast.timer = setTimeout(() => t.classList.remove('show'), 2800);
+}
+
+function daysSince(iso) {
+  if (!iso) return null;
+  const [y, m, d] = iso.split('-').map(Number);
+  const now = new Date(); now.setHours(0, 0, 0, 0);
+  return Math.round((now - new Date(y, m - 1, d)) / 864e5);
+}
+function alarma(c) {
+  const d = daysSince(c.ultimoContacto);
+  if (d === null) return { late: true, sortVal: 1e9, text: 'Contactar · sin registro' };
+  if (d < 0) return { late: false, sortVal: d, text: `Agendado · en ${-d} ${-d === 1 ? 'día' : 'días'}` };
+  if (d > config.dias) return { late: true, sortVal: d, text: `Contactar · hace ${d} días` };
+  return { late: false, sortVal: d, text: d === 0 ? 'Al día · hoy' : d === 1 ? 'Al día · ayer' : `Al día · hace ${d} días` };
+}
 
 // ---------- Guardado ----------
-// Publicado en claude.ai: base de datos de la página (colección "clientes", un documento por cliente).
+// Publicado en claude.ai: base de datos de la página (colección "cuentas" y documento "config/panel").
 // Abierto como archivo suelto: se guarda en este navegador.
-let col = null;
-const FIELDS = ['nombre', 'empresa', 'telefono', 'email', 'estado', 'operar', 'operacion', 'proximo', 'notas', 'creado'];
-const clean = c => Object.fromEntries(FIELDS.map(k => [k, k === 'operar' ? !!c[k] : (c[k] ?? '')]));
+const clean = c => Object.fromEntries(FIELDS.map(k => [k, k === 'pestanas' ? [...(c.pestanas || [])] : (c[k] ?? '')]));
 
+function setSync() {
+  const el = $('#sync');
+  el.className = 'sync' + (syncError ? ' error' : (pending || loading) ? ' busy' : '');
+  el.textContent = syncError ? 'Sin conexión' : loading ? 'Cargando…' : pending ? 'Guardando…' : col ? 'Sincronizado' : 'Guardado en este navegador';
+}
 function saveLocal() {
-  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(clientes)); }
-  catch { toast('No se pudo guardar en el navegador'); }
+  try {
+    localStorage.setItem(LOCAL_KEY, JSON.stringify(cuentas));
+    localStorage.setItem(LOCAL_CFG, JSON.stringify(config));
+  } catch { toast('No se pudo guardar en este navegador'); }
 }
-async function saveCliente(c) {
-  if (!col) return saveLocal();
-  try { await col.doc(c.id).set(clean(c)); }
-  catch (e) { toast(e.code === 'quota_exceeded' ? 'Se llenó el espacio de la base de datos' : 'No se pudo guardar. Revisá tu conexión.'); throw e; }
+async function write(fn) {
+  pending++; setSync();
+  try {
+    try { await fn(); }
+    catch (e) {
+      if (e?.code !== 'unavailable' && e?.code !== 'resource_exhausted') throw e;
+      await new Promise(r => setTimeout(r, 800 + Math.random() * 800));
+      await fn();
+    }
+    syncError = false;
+  } catch (e) {
+    syncError = true;
+    toast(e?.code === 'quota_exceeded' ? 'Se llenó el espacio de la base de datos.' : 'No se pudo guardar. Revisá tu conexión y recargá la página.');
+    throw e;
+  } finally { pending--; setSync(); }
 }
-async function deleteCliente(id) {
-  clientes = clientes.filter(x => x.id !== id);
+function saveCuenta(c) {
+  if (!col) { saveLocal(); return Promise.resolve(); }
+  return write(() => col.doc(c.id).set(clean(c)));
+}
+function deleteCuenta(id) {
+  cuentas = cuentas.filter(x => x.id !== id);
+  if (!col) { saveLocal(); return Promise.resolve(); }
+  return write(() => col.doc(id).delete());
+}
+function saveConfig() {
+  if (!cfgRef) { saveLocal(); return Promise.resolve(); }
+  return write(() => cfgRef.set(structuredClone(config)));
+}
+// Escribe muchas cuentas de a 3 a la vez, mostrando el avance
+async function saveMany(list, verbo) {
   if (!col) { saveLocal(); return; }
-  await col.doc(id).delete();
+  let done = 0, i = 0;
+  const worker = async () => {
+    while (i < list.length) {
+      const c = list[i++];
+      await saveCuenta(c);
+      if (++done % 10 === 0 || done === list.length) toast(`${verbo} ${done} de ${list.length}…`);
+    }
+  };
+  await Promise.all([worker(), worker(), worker()]);
 }
 async function initStorage() {
   const db = window.claude?.use ? await window.claude.use('db') : null;
   if (!db) {
-    try { clientes = JSON.parse(localStorage.getItem(STORAGE_KEY)) || []; } catch { clientes = []; }
-    loading = false; render(); return;
+    try { cuentas = JSON.parse(localStorage.getItem(LOCAL_KEY)) || []; } catch { cuentas = []; }
+    try { config = { ...structuredClone(DEFAULT_CONFIG), ...(JSON.parse(localStorage.getItem(LOCAL_CFG)) || {}) }; } catch {}
+    loading = false; setSync(); render(); return;
   }
-  col = db.collection('clientes');
+  col = db.collection('cuentas');
+  cfgRef = db.doc('config/panel');
+  cfgRef.onSnapshot(s => {
+    if (s.exists) config = { ...structuredClone(DEFAULT_CONFIG), ...structuredClone(s.data()) };
+    if (tab !== MAIN && !config.tabs.some(t => t.id === tab)) tab = MAIN;
+    render();
+  }, () => { syncError = true; setSync(); });
   col.onSnapshot(snap => {
-    clientes = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-    loading = false; render();
-  }, () => { loading = false; toast('Se perdió la conexión con la base de datos. Recargá la página.'); });
-}
-let loading = true;
-function toast(msg) {
-  const t = $('#toast'); t.textContent = msg; t.classList.add('show');
-  clearTimeout(toast.timer); toast.timer = setTimeout(() => t.classList.remove('show'), 2600);
-}
-function fmtDate(d) {
-  if (!d) return '';
-  const [y, m, day] = d.split('-');
-  return `${day}/${m}/${y}`;
+    cuentas = snap.docs.map(d => ({ id: d.id, ...structuredClone(d.data()) }));
+    loading = false; setSync(); render();
+  }, () => { syncError = true; loading = false; setSync(); render(); });
 }
 
 // ---------- Render ----------
-function render() {
-  const q = norm($('#search').value);
-  $('#tabs').innerHTML = TABS.map(t =>
-    `<button class="tab ${t.id === tab ? 'active' : ''}" data-tab="${t.id}">${t.label}<span class="count">${clientes.filter(t.filter).length}</span></button>`
-  ).join('');
-
-  $('#headRow').innerHTML = COLUMNS.map(c => {
-    if (!c.key) return `<th class="nosort"></th>`;
-    const arrow = sort.key === c.key ? `<span class="arrow">${sort.dir > 0 ? '▲' : '▼'}</span>` : '';
-    return `<th data-sort="${c.key}">${c.label} ${arrow}</th>`;
-  }).join('');
-
-  const currentTab = TABS.find(t => t.id === tab);
-  const rows = clientes
-    .filter(currentTab.filter)
-    .filter(c => !q || norm(c.nombre).includes(q) || norm(c.empresa).includes(q))
-    .sort(compare);
-
-  const empty = $('#empty');
-  if (!rows.length) {
-    empty.hidden = false;
-    empty.textContent = loading ? 'Cargando tus clientes…' : clientes.length
-      ? 'No hay clientes que coincidan.'
-      : 'Todavía no cargaste clientes. Usá "+ Nuevo cliente" o "Importar Excel" (podés bajar la plantilla primero).';
-  } else empty.hidden = true;
-
-  const t = today();
-  $('#tbody').innerHTML = rows.map(c => `
-    <tr data-id="${c.id}">
-      <td><button class="star ${c.operar ? 'on' : ''}" data-act="star" title="Marcar para operar">${c.operar ? '★' : '☆'}</button></td>
-      <td class="name">${esc(c.nombre)}${c.empresa ? `<div class="sub">${esc(c.empresa)}</div>` : ''}</td>
-      <td>${esc(c.telefono)}</td>
-      <td>${esc(c.email)}</td>
-      <td class="estado-cell"><span class="dot" style="background:var(--${c.estado})"></span>
-        <select class="estado" data-act="estado">${Object.entries(ESTADOS).map(([k, v]) =>
-          `<option value="${k}" ${k === c.estado ? 'selected' : ''}>${v}</option>`).join('')}</select></td>
-      <td>${esc(c.operacion)}</td>
-      <td class="${c.proximo && c.proximo < t ? 'overdue' : ''}">${fmtDate(c.proximo)}</td>
-      <td>${fmtDate(c.creado)}</td>
-      <td class="row-actions">
-        <button data-act="edit">Editar</button>
-        <button data-act="del" class="danger">Borrar</button>
-      </td>
-    </tr>`).join('');
+function currentRows() {
+  const qn = norm($('#qNombre').value);
+  const qc = norm($('#qCuenta').value).replace(/\s/g, '');
+  return cuentas
+    .filter(c => tab === MAIN || (c.pestanas || []).includes(tab))
+    .filter(c => !qn || norm(c.nombre).includes(qn))
+    .filter(c => !qc || norm(c.cuenta).replace(/\s/g, '').includes(qc));
 }
-
 function compare(a, b) {
   const k = sort.key;
-  let va = a[k], vb = b[k];
-  if (k === 'operar') { va = a.operar ? 0 : 1; vb = b.operar ? 0 : 1; }
-  else if (k === 'estado') { va = ESTADOS[a.estado]; vb = ESTADOS[b.estado]; }
-  va = norm(va); vb = norm(vb);
-  // Los vacíos siempre al final
-  if (!va && vb) return 1;
+  if (k === 'alarma') return (alarma(a).sortVal - alarma(b).sortVal) * -sort.dir || norm(a.nombre).localeCompare(norm(b.nombre), 'es');
+  const va = norm(a[k]), vb = norm(b[k]);
+  if (!va && vb) return 1;   // vacíos siempre al final
   if (va && !vb) return -1;
   return va.localeCompare(vb, 'es', { numeric: true }) * sort.dir || norm(a.nombre).localeCompare(norm(b.nombre), 'es');
 }
 
-// ---------- Eventos ----------
-$('#search').addEventListener('input', render);
+function render() {
+  // Conserva lo que se está escribiendo en una celda si llega una actualización
+  const ae = document.activeElement;
+  const focus = ae?.dataset?.field && ae.closest('tr') ? { id: ae.closest('tr').dataset.id, field: ae.dataset.field, value: ae.value, sel: ae.selectionStart } : null;
+
+  const allTabs = [{ id: MAIN, label: config.principal }, ...config.tabs];
+  $('#tabs').innerHTML = allTabs.map(t => {
+    const n = t.id === MAIN ? cuentas.length : cuentas.filter(c => (c.pestanas || []).includes(t.id)).length;
+    return `<button class="tab ${t.id === tab ? 'active' : ''}" data-tab="${esc(t.id)}">${esc(t.label)}<span class="n">${n}</span></button>`;
+  }).join('') + `<button class="tab edit" id="btnTabs" title="Editar pestañas" aria-label="Editar pestañas">+</button>`;
+
+  const base = currentRows();
+  const late = base.filter(c => alarma(c).late).length;
+  $('#stats').innerHTML = `
+    <span class="stat"><b>${base.length}</b>cuentas cargadas</span>
+    <button class="stat ${soloContactar ? 'on' : ''}" id="btnLate" title="${soloContactar ? 'Ver todas' : 'Ver solo las que hay que contactar'}"><b>${late}</b>para contactar (+${config.dias} días)</button>`;
+
+  $('#headRow').innerHTML = COLUMNS.map(c => c.key
+    ? `<th class="${c.cls || ''} ${sort.key === c.key ? 'sorted' : ''}" data-sort="${c.key}">${c.label}<span class="ar">${sort.key === c.key ? (sort.dir > 0 ? '↑' : '↓') : '↕'}</span></th>`
+    : `<th class="nosort ${c.cls}"></th>`).join('');
+
+  const rows = base.filter(c => !soloContactar || alarma(c).late).sort(compare);
+  const empty = $('#empty');
+  empty.hidden = rows.length > 0;
+  if (!rows.length) {
+    if (loading) empty.innerHTML = 'Cargando tus cuentas…';
+    else if (!cuentas.length) empty.innerHTML = `<div>Todavía no cargaste cuentas. Agregá una con <b>+ Nueva cuenta</b> o subí tu Excel con <b>Importar Excel</b>.</div>
+      <div>El Excel necesita una columna <b>Nombre</b> y, si querés, <b>N° de cuenta</b>, <b>Última vez contactado</b> y <b>Acción / comentarios</b>.</div>
+      <button class="btn ghost" id="btnTemplate">Descargar plantilla de Excel</button>`;
+    else if (tab !== MAIN && !base.length && !$('#qNombre').value && !$('#qCuenta').value)
+      empty.innerHTML = `<div>No hay cuentas en <b>${esc(tabLabel(tab))}</b>.</div><div>Para sumar una, tocá <b>+ pestaña</b> debajo de su nombre en ${esc(config.principal)}, o importá un Excel estando en esta pestaña.</div>`;
+    else empty.innerHTML = 'No hay cuentas que coincidan con la búsqueda.';
+  }
+
+  $('#tbody').innerHTML = rows.map(c => {
+    const a = alarma(c);
+    const chips = validTags(c).filter(id => id !== tab)
+      .map(id => `<button class="chip" data-act="tags">${esc(tabLabel(id))}</button>`).join('');
+    return `<tr data-id="${c.id}">
+      <td class="c-num">${esc(c.cuenta)}</td>
+      <td class="c-name"><button class="name" data-act="edit">${esc(c.nombre)}</button>
+        <div class="chips">${chips}<button class="chip add" data-act="tags">+ pestaña</button></div></td>
+      <td class="c-date"><input class="inline" type="date" data-field="ultimoContacto" value="${esc(c.ultimoContacto)}" aria-label="Última vez contactado"></td>
+      <td><input class="inline" data-field="accion" value="${esc(c.accion)}" placeholder="Agregar acción…" aria-label="Acción / comentarios"></td>
+      <td class="c-alarm"><button class="pill ${a.late ? 'late' : 'ok'}" data-act="hoy" title="Marcar contactado hoy">${a.text}</button></td>
+      <td class="c-x"><button class="x" data-act="remove" title="${tab === MAIN ? 'Eliminar cuenta' : 'Quitar de ' + esc(tabLabel(tab))}" aria-label="Eliminar">×</button></td>
+    </tr>`;
+  }).join('');
+
+  if (focus) {
+    const el = document.querySelector(`tr[data-id="${focus.id}"] [data-field="${focus.field}"]`);
+    if (el) { el.value = focus.value; el.focus(); try { if (focus.sel != null) el.setSelectionRange(focus.sel, focus.sel); } catch {} }
+  }
+}
+
+// ---------- Eventos de la tabla ----------
+['#qNombre', '#qCuenta'].forEach(s => $(s).addEventListener('input', render));
 $('#tabs').addEventListener('click', e => {
+  if (e.target.closest('#btnTabs')) return openTabsDialog();
   const b = e.target.closest('[data-tab]'); if (!b) return;
   tab = b.dataset.tab; render();
+});
+$('#stats').addEventListener('click', e => {
+  if (!e.target.closest('#btnLate')) return;
+  soloContactar = !soloContactar; render();
 });
 $('#headRow').addEventListener('click', e => {
   const th = e.target.closest('[data-sort]'); if (!th) return;
@@ -312,177 +503,297 @@ $('#headRow').addEventListener('click', e => {
   sort = sort.key === k ? { key: k, dir: -sort.dir } : { key: k, dir: 1 };
   render();
 });
-$('#tbody').addEventListener('click', e => {
-  const btn = e.target.closest('[data-act]'); if (!btn || btn.tagName === 'SELECT') return;
-  const c = clientes.find(x => x.id === btn.closest('tr').dataset.id);
-  if (btn.dataset.act === 'star') { c.operar = !c.operar; render(); saveCliente(c); }
-  if (btn.dataset.act === 'edit') openDialog(c);
-  if (btn.dataset.act === 'del') {
-    $('#confirmText').textContent = `¿Borrar a ${c.nombre}? No se puede deshacer.`;
-    const dlg = $('#confirmDlg');
-    dlg.returnValue = '';
-    dlg.onclose = async () => {
-      if (dlg.returnValue !== 'si') return;
-      await deleteCliente(c.id); render(); toast('Cliente borrado');
-    };
-    dlg.showModal();
+$('#empty').addEventListener('click', e => { if (e.target.closest('#btnTemplate')) downloadTemplate(); });
+
+const findRow = el => cuentas.find(x => x.id === el.closest('tr')?.dataset.id);
+$('#tbody').addEventListener('click', async e => {
+  const btn = e.target.closest('[data-act]'); if (!btn) return;
+  const c = findRow(btn); if (!c) return;
+  const act = btn.dataset.act;
+  if (act === 'edit') openDialog(c);
+  if (act === 'tags') openTagsDialog(c);
+  if (act === 'hoy') {
+    c.ultimoContacto = today(); render(); await saveCuenta(c);
+    toast(`${c.nombre}: contactado hoy`);
+  }
+  if (act === 'remove') {
+    if (tab !== MAIN) {
+      c.pestanas = (c.pestanas || []).filter(id => id !== tab); render(); await saveCuenta(c);
+      return toast(`${c.nombre} se quitó de ${tabLabel(tab)}`);
+    }
+    if (await confirmAsk('Eliminar cuenta', `¿Eliminar a ${c.nombre}${c.cuenta ? ` (cuenta ${c.cuenta})` : ''}? Se borra de todas las pestañas y no se puede deshacer.`, 'Eliminar')) {
+      await deleteCuenta(c.id); render(); toast('Cuenta eliminada');
+    }
   }
 });
-$('#tbody').addEventListener('change', e => {
-  if (e.target.dataset.act !== 'estado') return;
-  const c = clientes.find(x => x.id === e.target.closest('tr').dataset.id);
-  c.estado = e.target.value; render(); saveCliente(c);
-  toast(`${c.nombre} → ${ESTADOS[c.estado]}`);
+$('#tbody').addEventListener('change', async e => {
+  const f = e.target.dataset.field; if (!f) return;
+  const c = findRow(e.target); if (!c) return;
+  const v = e.target.value.trim();
+  if ((c[f] ?? '') === v) return;
+  c[f] = v;
+  if (f === 'ultimoContacto') render();
+  await saveCuenta(c);
 });
+$('#tbody').addEventListener('keydown', e => {
+  if (e.key === 'Enter' && e.target.dataset.field) e.target.blur();
+});
+
+// ---------- Confirmación ----------
+function confirmAsk(title, text, yes) {
+  const dlg = $('#confirmDlg');
+  $('#confirmTitle').textContent = title;
+  $('#confirmText').textContent = text;
+  $('#confirmYes').textContent = yes;
+  dlg.returnValue = '';
+  dlg.showModal();
+  return new Promise(res => dlg.addEventListener('close', () => res(dlg.returnValue === 'si'), { once: true }));
+}
 
 // ---------- Alta / edición ----------
 const form = $('#form');
+let editingId = null;
+function tabChecks(selected) {
+  return config.tabs.map(t => `<label class="check"><input type="checkbox" value="${esc(t.id)}" ${selected.includes(t.id) ? 'checked' : ''}>${esc(t.label)}</label>`).join('');
+}
 function openDialog(c) {
   editingId = c ? c.id : null;
-  $('#dlgTitle').textContent = c ? 'Editar cliente' : 'Nuevo cliente';
+  $('#dlgTitle').textContent = c ? 'Editar cuenta' : 'Nueva cuenta';
   form.reset();
-  const data = c || { estado: tab === 'prospecto' || tab === 'inactivo' ? tab : 'activo', operar: tab === 'operar' };
-  for (const el of form.elements) {
-    if (!el.name) continue;
-    if (el.type === 'checkbox') el.checked = !!data[el.name];
-    else el.value = data[el.name] ?? '';
-  }
+  const data = c || { pestanas: tab === MAIN ? [] : [tab] };
+  for (const el of form.elements) if (el.name) el.value = data[el.name] ?? '';
+  $('#formTabs').innerHTML = tabChecks(data.pestanas || []);
   $('#dlg').showModal();
-  form.elements.nombre.focus();
+  (c ? $('#f-accion') : $('#f-cuenta')).focus();
 }
 $('#btnNew').addEventListener('click', () => openDialog(null));
 $('#btnCancel').addEventListener('click', () => $('#dlg').close());
 form.addEventListener('submit', async () => {
   const data = {};
-  for (const el of form.elements) {
-    if (!el.name) continue;
-    data[el.name] = el.type === 'checkbox' ? el.checked : el.value.trim();
-  }
-  const wasEditing = editingId;
+  for (const el of form.elements) if (el.name) data[el.name] = el.value.trim();
+  data.pestanas = [...$('#formTabs').querySelectorAll('input:checked')].map(i => i.value);
+  const editing = editingId;
   let c;
-  if (wasEditing) { c = clientes.find(x => x.id === wasEditing); Object.assign(c, data); }
-  else { c = { id: uid(), creado: today(), ...data }; clientes.push(c); }
+  if (editing) {
+    c = cuentas.find(x => x.id === editing);
+    // Conserva pestañas que ya no existen en la configuración
+    data.pestanas = [...data.pestanas, ...(c.pestanas || []).filter(id => !config.tabs.some(t => t.id === id))];
+    Object.assign(c, data);
+  } else { c = { id: uid(), creado: today(), ...data }; cuentas.push(c); }
   render();
-  await saveCliente(c);
-  toast(wasEditing ? 'Cliente actualizado' : 'Cliente agregado');
+  await saveCuenta(c);
+  toast(editing ? 'Cuenta actualizada' : 'Cuenta agregada');
+});
+
+// ---------- Pestañas de una cuenta ----------
+let tagsFor = null;
+function openTagsDialog(c) {
+  tagsFor = c.id;
+  $('#tagsTitle').textContent = c.nombre;
+  $('#tagsMain').textContent = config.principal;
+  $('#tagsChecks').innerHTML = tabChecks(c.pestanas || []);
+  $('#tagsDlg').showModal();
+}
+$('#tagsCancel').addEventListener('click', () => $('#tagsDlg').close());
+$('#tagsForm').addEventListener('submit', async () => {
+  const c = cuentas.find(x => x.id === tagsFor); if (!c) return;
+  const chosen = [...$('#tagsChecks').querySelectorAll('input:checked')].map(i => i.value);
+  c.pestanas = [...chosen, ...(c.pestanas || []).filter(id => !config.tabs.some(t => t.id === id))];
+  render(); await saveCuenta(c);
+  toast('Pestañas actualizadas');
+});
+
+// ---------- Editar pestañas ----------
+let draftTabs = [];
+function renderTabRows() {
+  $('#tabRows').innerHTML = [{ id: MAIN, label: config.principal, main: true }, ...draftTabs].map((t, i) => {
+    const n = t.main ? cuentas.length : cuentas.filter(c => (c.pestanas || []).includes(t.id)).length;
+    return `<div class="tab-row" data-i="${i - 1}">
+      <input id="tabname-${esc(t.id)}" value="${esc(t.label)}" aria-label="Nombre de la pestaña">
+      <span class="count">${n} cuentas</span>
+      ${t.main ? '<span class="btn ghost" style="visibility:hidden">Quitar</span>' : '<button type="button" class="btn danger" data-del>Quitar</button>'}
+    </div>`;
+  }).join('');
+}
+function readTabRows() {
+  const inputs = [...$('#tabRows').querySelectorAll('input')];
+  return { principal: inputs[0].value.trim() || 'WM3', tabs: draftTabs.map((t, i) => ({ ...t, label: inputs[i + 1].value.trim() || t.label })) };
+}
+function openTabsDialog() {
+  draftTabs = structuredClone(config.tabs);
+  renderTabRows();
+  $('#newTabName').value = '';
+  $('#diasAlarma').value = config.dias;
+  $('#tabsDlg').showModal();
+}
+$('#tabRows').addEventListener('click', e => {
+  if (!e.target.closest('[data-del]')) return;
+  const r = readTabRows(); draftTabs = r.tabs;
+  draftTabs.splice(Number(e.target.closest('.tab-row').dataset.i), 1);
+  renderTabRows();
+  $('#tabRows').querySelector('input').value = r.principal;
+});
+function addDraftTab() {
+  const name = $('#newTabName').value.trim(); if (!name) return;
+  const r = readTabRows(); draftTabs = r.tabs;
+  let id = slug(name);
+  while (id === MAIN || draftTabs.some(t => t.id === id)) id += '-' + Math.random().toString(36).slice(2, 4);
+  draftTabs.push({ id, label: name });
+  renderTabRows();
+  $('#tabRows').querySelector('input').value = r.principal;
+  $('#newTabName').value = ''; $('#newTabName').focus();
+}
+$('#addTab').addEventListener('click', addDraftTab);
+$('#newTabName').addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); addDraftTab(); } });
+$('#tabsCancel').addEventListener('click', () => $('#tabsDlg').close());
+$('#tabsForm').addEventListener('submit', async () => {
+  if ($('#newTabName').value.trim()) addDraftTab();
+  const r = readTabRows();
+  const dias = Math.max(1, Math.min(365, parseInt($('#diasAlarma').value, 10) || config.dias));
+  config = { ...config, principal: r.principal, tabs: r.tabs, dias };
+  if (tab !== MAIN && !config.tabs.some(t => t.id === tab)) tab = MAIN;
+  render(); await saveConfig();
+  toast('Pestañas guardadas');
+});
+
+// ---------- Eliminar sin cuenta ----------
+$('#btnSinCuenta').addEventListener('click', async () => {
+  const list = currentRows().filter(c => !String(c.cuenta ?? '').trim());
+  if (!list.length) return toast('No hay cuentas sin número en esta vista');
+  const where = tab === MAIN ? '' : ` de ${tabLabel(tab)}`;
+  if (!await confirmAsk('Eliminar sin cuenta', `Se van a eliminar ${list.length} ${list.length === 1 ? 'registro' : 'registros'}${where} que no tienen N° de cuenta. Se borran de todas las pestañas y no se puede deshacer.`, `Eliminar ${list.length}`)) return;
+  const ids = new Set(list.map(c => c.id));
+  if (!col) { cuentas = cuentas.filter(c => !ids.has(c.id)); saveLocal(); render(); }
+  else {
+    cuentas = cuentas.filter(c => !ids.has(c.id)); render();
+    let i = 0;
+    const worker = async () => { while (i < list.length) await write(() => col.doc(list[i++].id).delete()); };
+    await Promise.all([worker(), worker(), worker()]);
+  }
+  toast(`Se eliminaron ${list.length} registros sin cuenta`);
 });
 
 // ---------- Excel ----------
-function toRow(c) {
-  return {
-    'Nombre': c.nombre, 'Empresa': c.empresa, 'Teléfono': c.telefono, 'Email': c.email,
-    'Estado': ESTADOS[c.estado], 'Para operar': c.operar ? 'Sí' : 'No', 'Qué operar': c.operacion,
-    'Próximo contacto': fmtDate(c.proximo), 'Notas': c.notas, 'Alta': fmtDate(c.creado),
-  };
-}
-async function downloadSheet(rows, filename, headers) {
+async function downloadBook(rows, headers, filename) {
   const ws = XLSX.utils.json_to_sheet(rows, { header: headers });
-  ws['!cols'] = headers.map(h => ({ wch: Math.max(h.length + 2, 16) }));
+  ws['!cols'] = headers.map(h => ({ wch: h.startsWith('Acción') ? 45 : Math.max(h.length + 2, 16) }));
   const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, 'Clientes');
+  XLSX.utils.book_append_sheet(wb, ws, 'Cuentas');
   const dl = window.claude?.use ? await window.claude.use('downloads') : null;
   if (!dl) { XLSX.writeFile(wb, filename); return true; }
   try {
     await dl.save({ filename, data: new Uint8Array(XLSX.write(wb, { type: 'array', bookType: 'xlsx' })) });
     return true;
   } catch (e) {
-    if (e.code !== 'declined') toast('No se pudo descargar el archivo');
+    if (e?.code !== 'declined') toast('No se pudo descargar el archivo');
     return false;
   }
 }
-$('#btnTemplate').addEventListener('click', () => {
-  const headers = EXCEL_FIELDS.map(f => f.header);
-  downloadSheet([{
-    'Nombre': 'Juan Pérez', 'Empresa': 'Ejemplo SA', 'Teléfono': '11 5555-5555', 'Email': 'juan@ejemplo.com',
-    'Estado': 'Prospecto', 'Para operar': 'Sí', 'Qué operar': 'Enviar cotización',
-    'Próximo contacto': '15/10/2026', 'Notas': 'Borrá esta fila de ejemplo',
-  }], 'plantilla_clientes.xlsx', headers);
-});
+const HEADERS = EXCEL_FIELDS.map(f => f.header);
+function downloadTemplate() {
+  downloadBook([{
+    'N° de cuenta': '33359', 'Nombre': 'Ejemplo Pérez', 'Teléfono': '11 5555-5555', 'Email': 'ejemplo@mail.com',
+    'Última vez contactado': '11/09/2026', 'Acción / comentarios': 'Revisar cartera', 'Pestañas': 'SGR, Prospects',
+    'Notas': 'Borrá esta fila de ejemplo',
+  }], HEADERS, 'plantilla_panel_wm.xlsx');
+}
 $('#btnExport').addEventListener('click', async () => {
-  if (!clientes.length) return toast('No hay clientes para exportar');
-  const currentTab = TABS.find(t => t.id === tab);
-  const rows = clientes.filter(currentTab.filter).sort(compare).map(toRow);
-  if (await downloadSheet(rows, `clientes_${tab}_${today()}.xlsx`, [...EXCEL_FIELDS.map(f => f.header), 'Alta'])) toast(`Exportados ${rows.length} clientes (${currentTab.label})`);
+  const rows = currentRows().filter(c => !soloContactar || alarma(c).late).sort(compare);
+  if (!rows.length) return toast('No hay cuentas para exportar en esta vista');
+  const data = rows.map(c => ({
+    'N° de cuenta': c.cuenta, 'Nombre': c.nombre, 'Teléfono': c.telefono, 'Email': c.email,
+    'Última vez contactado': fmtDate(c.ultimoContacto), 'Acción / comentarios': c.accion,
+    'Pestañas': validTags(c).map(tabLabel).join(', '), 'Notas': c.notas, 'Alarma': alarma(c).text,
+  }));
+  const name = `${slug(tabLabel(tab))}_${today()}.xlsx`;
+  if (await downloadBook(data, [...HEADERS, 'Alarma'], name)) toast(`Exportadas ${rows.length} cuentas de ${tabLabel(tab)}`);
 });
 
-function parseEstado(v) {
-  const s = norm(v);
-  if (s.includes('prosp')) return 'prospecto';
-  if (s.includes('inact')) return 'inactivo';
-  return 'activo';
-}
-function parseBool(v) {
-  return ['si', 'x', 'true', '1', 'yes', 'verdadero', '★'].includes(norm(v));
-}
 function parseDate(v) {
-  if (!v) return '';
-  if (v instanceof Date && !isNaN(v)) {
-    return `${v.getFullYear()}-${String(v.getMonth() + 1).padStart(2, '0')}-${String(v.getDate()).padStart(2, '0')}`;
+  if (v === '' || v == null) return '';
+  if (typeof v === 'number') {
+    const p = XLSX.SSF.parse_date_code(v);
+    return p ? `${p.y}-${pad(p.m)}-${pad(p.d)}` : '';
   }
   const s = String(v).trim();
-  let m = s.match(/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{2,4})$/); // dd/mm/aaaa
-  if (m) {
-    const y = m[3].length === 2 ? '20' + m[3] : m[3];
-    return `${y}-${m[2].padStart(2, '0')}-${m[1].padStart(2, '0')}`;
+  let m = s.match(/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{2,4})/); // dd/mm/aaaa
+  if (m) return `${m[3].length === 2 ? '20' + m[3] : m[3]}-${pad(m[2])}-${pad(m[1])}`;
+  m = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+  return m ? `${m[1]}-${pad(m[2])}-${pad(m[3])}` : '';
+}
+// Convierte "SGR, FAL" en ids de pestañas; crea las que no existen
+function parseTabs(v, created) {
+  const ids = [];
+  for (const part of String(v ?? '').split(/[,;\/|]/).map(s => s.trim()).filter(Boolean)) {
+    if (normHeader(part) === normHeader(config.principal)) continue;
+    let t = config.tabs.find(t => normHeader(t.label) === normHeader(part) || t.id === slug(part));
+    if (!t) {
+      let id = slug(part);
+      while (id === MAIN || config.tabs.some(x => x.id === id)) id += '-' + Math.random().toString(36).slice(2, 4);
+      t = { id, label: part }; config.tabs.push(t); created.push(part);
+    }
+    if (!ids.includes(t.id)) ids.push(t.id);
   }
-  m = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
-  return m ? `${m[1]}-${m[2]}-${m[3]}` : '';
+  return ids;
 }
 
 $('#fileInput').addEventListener('change', async e => {
   const file = e.target.files[0]; if (!file) return;
   e.target.value = '';
+  let raw;
   try {
-    const wb = XLSX.read(await file.arrayBuffer(), { cellDates: true });
-    const raw = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { defval: '' });
-    if (!raw.length) return toast('El archivo está vacío');
+    const wb = XLSX.read(await file.arrayBuffer());
+    raw = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { defval: '', raw: true });
+  } catch { return toast('No se pudo leer el archivo. Tiene que ser un Excel (.xlsx o .xls) o un CSV.'); }
+  if (!raw.length) return toast('El archivo no tiene filas');
 
-    // Mapear encabezados del archivo a campos del CRM
-    const map = {};
-    for (const h of Object.keys(raw[0])) {
-      const f = EXCEL_FIELDS.find(f => f.aliases.includes(norm(h)));
-      if (f && !map[f.key]) map[f.key] = h;
-    }
-    if (!map.nombre) return toast('No encontré una columna "Nombre" en el archivo');
-
-    let added = 0, updated = 0;
-    const toWrite = [];
-    for (const r of raw) {
-      const get = k => map[k] ? String(r[map[k]] instanceof Date ? '' : r[map[k]]).trim() : '';
-      const nombre = get('nombre');
-      if (!nombre) continue;
-      const data = { nombre };
-      for (const k of ['empresa', 'telefono', 'email', 'operacion', 'notas']) if (map[k]) data[k] = get(k);
-      if (map.estado) data.estado = parseEstado(r[map.estado]);
-      if (map.operar) data.operar = parseBool(r[map.operar]);
-      if (map.proximo) data.proximo = parseDate(r[map.proximo]);
-
-      // Si ya existe (mismo email, o mismo nombre y teléfono) se actualiza en vez de duplicar
-      const existing = clientes.find(c =>
-        (data.email && norm(c.email) === norm(data.email)) ||
-        (norm(c.nombre) === norm(nombre) && norm(c.telefono) === norm(data.telefono)));
-      if (existing) { Object.assign(existing, data); if (!toWrite.includes(existing)) toWrite.push(existing); updated++; }
-      else {
-        const c = { id: uid(), creado: today(), empresa: '', telefono: '', email: '', estado: 'activo',
-          operar: false, operacion: '', proximo: '', notas: '', ...data };
-        clientes.push(c); toWrite.push(c);
-        added++;
-      }
-    }
-    render();
-    if (col) {
-      for (let i = 0; i < toWrite.length; i++) {
-        if (i % 10 === 0) toast(`Guardando ${i + 1} de ${toWrite.length}…`);
-        await saveCliente(toWrite[i]);
-      }
-    } else saveLocal();
-    toast(`Importación lista: ${added} nuevos, ${updated} actualizados`);
-  } catch (err) {
-    console.error(err);
-    toast('No se pudo leer el archivo. ¿Es un Excel o CSV válido?');
+  const map = {};
+  for (const h of Object.keys(raw[0])) {
+    const f = EXCEL_FIELDS.find(f => f.aliases.includes(normHeader(h)));
+    if (f && !map[f.key]) map[f.key] = h;
   }
+  if (!map.nombre && !map.cuenta) return toast('No encontré columnas "Nombre" ni "N° de cuenta" en la primera fila del archivo');
+
+  const created = [];
+  const toWrite = [];
+  let added = 0, updated = 0;
+  for (const r of raw) {
+    const get = k => map[k] ? String(r[map[k]] ?? '').trim() : '';
+    const nombre = get('nombre'), cuenta = get('cuenta');
+    if (!nombre && !cuenta) continue;
+    const data = {};
+    for (const k of ['cuenta', 'nombre', 'telefono', 'email', 'accion', 'notas']) if (map[k] && get(k)) data[k] = get(k);
+    if (map.ultimoContacto && r[map.ultimoContacto] !== '') data.ultimoContacto = parseDate(r[map.ultimoContacto]);
+    let tags = map.pestanas ? parseTabs(r[map.pestanas], created) : [];
+    if (tab !== MAIN && !tags.includes(tab)) tags.push(tab);
+
+    // Si ya existe (mismo N° de cuenta, o mismo nombre cuando no hay número) se actualiza en vez de duplicar
+    const existing = cuentas.find(c => cuenta
+      ? norm(c.cuenta) === norm(cuenta)
+      : !c.cuenta && norm(c.nombre) === norm(nombre));
+    if (existing) {
+      Object.assign(existing, data);
+      existing.pestanas = [...new Set([...(existing.pestanas || []), ...tags])];
+      if (!toWrite.includes(existing)) { toWrite.push(existing); updated++; }
+    } else {
+      const c = { id: uid(), creado: today(), cuenta: '', nombre: '', telefono: '', email: '', ultimoContacto: '', accion: '', notas: '', ...data, pestanas: tags };
+      cuentas.push(c); toWrite.push(c); added++;
+    }
+  }
+  render();
+  try {
+    if (created.length) await saveConfig();
+    await saveMany(toWrite, 'Guardando');
+    toast(`Importación lista: ${added} nuevas, ${updated} actualizadas${created.length ? ` · pestañas nuevas: ${created.join(', ')}` : ''}`);
+  } catch { /* write() ya avisó */ }
 });
 
+// ---------- Inicio ----------
+{
+  const s = new Date().toLocaleDateString('es-AR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+  $('#today').textContent = s.charAt(0).toUpperCase() + s.slice(1);
+}
+setSync();
 render();
 initStorage();
 </script>

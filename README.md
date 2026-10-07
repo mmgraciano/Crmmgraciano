@@ -1,31 +1,31 @@
-# CRM Clientes
+# Panel WM
 
-CRM simple para registrar tu base de clientes, en un solo archivo (`index.html`). No necesita servidor ni instalación.
+Panel para registrar tu base de cuentas, en un solo archivo (`index.html`).
 
-## Cómo usarlo
+## Cómo abrirlo
 
-- **Recomendado:** abrí la versión publicada en claude.ai: https://claude.ai/artifact/MRNV6HsmrXEA3EfA43gzYs
-  Ahí los clientes se guardan en una base de datos de tu cuenta y los ves desde la compu o el celular.
-- **Sin internet / archivo suelto:** descargá `index.html` y abrilo con doble clic en Chrome, Edge o Firefox.
-  En ese modo los datos quedan solo en ese navegador; usá **Exportar Excel** como respaldo.
+- **Recomendado:** https://claude.ai/artifact/MRNV6HsmrXEA3EfA43gzYs (abrilo en una pestaña del navegador y guardalo en favoritos).
+  Las cuentas se guardan en una base de datos de tu cuenta de Claude y las ves desde la compu o el celular.
+- **Archivo suelto:** descargá `index.html` y abrilo con doble clic. En ese modo los datos quedan solo en ese navegador.
 
-## Funciones
+## Cómo funciona
 
-- **Pestañas:** Todos, Clientes activos, Prospectos, Inactivos y ★ Para operar.
-- **Mover entre pestañas:** cambiá el estado desde la lista desplegable de cada fila, o tocá la ★ para marcar que le tenés que operar.
-- **Buscar** por nombre (o empresa) en la barra de arriba.
-- **Ordenar** tocando el título de cualquier columna (otro toque invierte el orden).
-- **Alta manual** con "+ Nuevo cliente", y editar o borrar desde cada fila.
-- **Próximo contacto:** si la fecha ya pasó, aparece en rojo.
+- **WM3** muestra todas las cuentas. Las demás pestañas (SGR, Prospects, Tareas pendientes, FAL, Notas Estructuradas, FWD)
+  muestran solo las cuentas asignadas a cada una. Una cuenta puede estar en varias pestañas.
+- **Asignar pestañas:** tocá **+ pestaña** debajo del nombre de la cuenta, o marcalas al editarla.
+- **Agregar, renombrar o quitar pestañas:** botón **+** al final de las pestañas. Ahí también se cambian los días de la alarma.
+- **Alarma:** se pone en rojo cuando pasaron más de 21 días desde el último contacto (o si no hay fecha).
+  Tocá la alarma para marcar que la contactaste hoy. El recuadro **para contactar** filtra solo esas cuentas.
+- **Edición en la tabla:** la fecha de último contacto y la acción/comentarios se editan directo en la fila.
+- **Buscar** por nombre o por N° de cuenta. **Ordenar** tocando el título de cada columna.
+- **×** en WM3 elimina la cuenta; en otra pestaña solo la quita de esa pestaña.
+- **Eliminar sin cuenta** borra los registros que no tienen N° de cuenta (en la pestaña que estás viendo).
 
-## Cargar desde Excel
+## Importar desde Excel
 
-1. Tocá **Descargar plantilla** y completala (una fila por cliente). También sirve tu propio Excel o CSV:
-   solo necesita una columna `Nombre`; se reconocen además `Empresa`, `Teléfono`, `Email`/`Correo`, `Estado`,
-   `Para operar` (Sí/No o X), `Qué operar`, `Próximo contacto` y `Notas`.
-2. Tocá **Importar Excel** y elegí el archivo.
+El archivo necesita una columna `Nombre` o `N° de cuenta`. También reconoce `Última vez contactado`, `Acción / comentarios`,
+`Teléfono`, `Email`, `Notas` y `Pestañas` (por ejemplo `SGR, FAL`; si una pestaña no existe, se crea).
 
-En `Estado`, cualquier valor que contenga "prospecto" o "inactivo" va a esa pestaña; el resto queda como cliente activo.
-Si un cliente ya existe (mismo email, o mismo nombre y teléfono) se actualiza en vez de duplicarse.
-
-**Exportar Excel** descarga la pestaña en la que estás, con el orden actual.
+- Si importás estando en una pestaña (por ejemplo SGR), las cuentas importadas también quedan en esa pestaña.
+- Si una cuenta ya existe (mismo N° de cuenta) se actualiza en vez de duplicarse.
+- **Exportar Excel** descarga la pestaña que estás viendo; ese archivo sirve como plantilla para volver a importar.
