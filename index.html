@@ -198,6 +198,7 @@
   .meta-note b { color: var(--text); }
   .copy td.acum { color: var(--muted); }
   .copy tr.corte td { border-bottom: 2px solid var(--accent); }
+  .copy tr.tot td { background: var(--soft); }
   @media (max-width: 900px) { .meta-row { grid-template-columns: 1fr; } }
   #incomeTop .panel table { min-width: 0; }
   .panel thead th { position: sticky; top: 0; z-index: 1; padding: 10px 12px; }
@@ -1572,6 +1573,23 @@ function metaPanel() {
           <td class="num"><b>${fmtUSD(e.mes)}</b></td><td class="num acum">${fmtUSD(e.acum)} · ${pct(e.acum)}%</td>
           ${actual ? `<td class="num">${a ? fmtUSD(a) : '<span class="muted">—</span>'}</td><td class="num ${falta ? 'neg' : 'pos'}">${falta ? fmtUSD(falta) : 'Repetido ✓'}</td>` : ''}</tr>`; }).join('')}
       </tbody></table></div>`;
+    // Mes en curso: quiénes facturan este mes y en el mes anterior no, y de dónde sale el total del mes
+    if (actual && base) {
+      const refBy = new Map(factClientes(base).map(e => [e.key, e]));
+      const delMes = factClientes(actual);
+      const totMes = delMes.reduce((a, e) => a + e.total, 0);
+      const nuevos = delMes.filter(e => !((refBy.get(e.key)?.total || 0) > 0.005) && Math.abs(e.total) >= 0.005).sort((a, b) => b.total - a.total);
+      const enLista = show.reduce((a, e) => a + (actBy.get(e.key)?.total || 0), 0);
+      const totNuevos = nuevos.reduce((a, e) => a + e.total, 0);
+      const otros = totMes - enLista - totNuevos;
+      const mesAct = MESES[Number(actual.desde.slice(5, 7)) - 1], mesAnt = MESES[Number(base.desde.slice(5, 7)) - 1];
+      copy += `<h3 style="padding-top:14px">Facturan en ${esc(mesAct)} y en ${esc(mesAnt)} no</h3>
+        <div class="meta-note">${cap(mesAct)} va en <b>USD ${fmt0(totMes)}</b>: USD ${fmt0(enLista)} de los comitentes de la lista de arriba${Math.abs(otros) >= 0.5 ? `, USD ${fmt0(otros)} de otros que también facturaron en ${esc(mesAnt)}` : ''} y <b>USD ${fmt0(totNuevos)}</b> de ${plural(nuevos.length, 'comitente que', 'comitentes que')} en ${esc(mesAnt)} no facturaron.</div>
+        ${nuevos.length ? `<div class="scroll"><table class="copy"><thead><tr><th class="nosort">Comitente</th><th class="nosort num">${esc(cap(mesAct))} USD</th><th class="nosort num">% del mes</th></tr></thead><tbody>
+          ${nuevos.map(e => `<tr><td>${esc(e.nombre)} <span class="chip">Nuevo este mes</span>${e.cuenta ? `<div class="acct">${esc(e.cuenta)}</div>` : ''}</td><td class="num"><b>${fmtUSD(e.total)}</b></td><td class="num acum">${totMes ? Math.round(e.total / totMes * 100) : 0}%</td></tr>`).join('')}
+          <tr class="tot"><td><b>Total nuevos</b></td><td class="num"><b>${fmtUSD(totNuevos)}</b></td><td class="num acum">${totMes ? Math.round(totNuevos / totMes * 100) : 0}%</td></tr>
+        </tbody></table></div>` : `<div class="meta-note">Por ahora todos los que facturan en ${esc(mesAct)} también facturaron en ${esc(mesAnt)}.</div>`}`;
+    }
   }
   return `<div class="panel meta"><h3>Meta de facturación</h3>
     <div class="sub"><label class="meta-edit">Meta mensual: USD <input id="metaMes" type="number" min="1" step="500" value="${meta}"></label>

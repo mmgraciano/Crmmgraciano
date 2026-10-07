@@ -61,7 +61,8 @@ La pestaña **Facturación** muestra lo que factura cada cliente por categoría 
 - **Separada por mes:** si el Excel trae una columna de fecha o mes, se guarda un período por cada mes automáticamente.
 - **Meta de facturación** (USD 10.000 por mes y objetivo de USD 60.000 de julio a diciembre, ambos editables): lo facturado contra el objetivo y cuánto hace falta por mes en lo que queda, el promedio por mes, el mes anterior y el mes en curso.
   **Para copiar este mes** lista los comitentes que más facturaron el mes anterior, con el acumulado hasta llegar a la meta,
-  lo que facturó cada uno este mes y cuánto le falta para repetir.
+  lo que facturó cada uno este mes y cuánto le falta para repetir. Abajo, **Facturan este mes y el mes anterior no** marca a los
+  comitentes nuevos del mes y desglosa el total del mes (lista + otros del mes anterior + nuevos).
   Cada período queda guardado; si subís otra vez el mismo período, se reemplaza.
 - Arriba se elige el **período** y con cuál **comparar** (por defecto, el anterior). Si los períodos tienen distinto largo,
   se comparan por ritmo mensual.
