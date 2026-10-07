@@ -6,29 +6,41 @@
 <title>CRM Clientes</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <style>
+  /* Layout: barra fija con buscador y acciones, pestañas por estado, tabla ordenable */
   :root {
-    --bg: #f5f6f8; --panel: #ffffff; --text: #1d2330; --muted: #6b7280;
-    --border: #e3e6eb; --accent: #2563eb; --accent-soft: #e8efff;
-    --danger: #dc2626; --star: #f59e0b;
-    --activo: #16a34a; --prospecto: #2563eb; --inactivo: #9ca3af;
+    --bg: #f4f6f6; --panel: #ffffff; --text: #18242a; --muted: #5f6e74;
+    --border: #dfe5e6; --accent: #0f766e; --accent-soft: #e3f2f0; --on-accent: #ffffff;
+    --danger: #c2410c; --star: #d97706;
+    --activo: #15803d; --prospecto: #0f766e; --inactivo: #94a3a8;
+    --overlay: rgba(12, 20, 24, .45);
   }
   @media (prefers-color-scheme: dark) {
-    :root {
-      --bg: #12151b; --panel: #1b1f27; --text: #e6e8ec; --muted: #9aa3b2;
-      --border: #2c323d; --accent: #60a5fa; --accent-soft: #1e2a40;
-      --danger: #f87171; --star: #fbbf24;
-      --activo: #4ade80; --prospecto: #60a5fa; --inactivo: #6b7280;
+    :root:not([data-theme="light"]) {
+      --bg: #101719; --panel: #172124; --text: #e4ecee; --muted: #93a4a9;
+      --border: #28363a; --accent: #2dd4bf; --accent-soft: #15302e; --on-accent: #062522;
+      --danger: #fb923c; --star: #fbbf24;
+      --activo: #4ade80; --prospecto: #2dd4bf; --inactivo: #66777c;
+      --overlay: rgba(0, 0, 0, .6);
+      color-scheme: dark;
     }
+  }
+  :root[data-theme="dark"] {
+    --bg: #101719; --panel: #172124; --text: #e4ecee; --muted: #93a4a9;
+    --border: #28363a; --accent: #2dd4bf; --accent-soft: #15302e; --on-accent: #062522;
+    --danger: #fb923c; --star: #fbbf24;
+    --activo: #4ade80; --prospecto: #2dd4bf; --inactivo: #66777c;
+    --overlay: rgba(0, 0, 0, .6);
+    color-scheme: dark;
   }
   * { box-sizing: border-box; }
   body { margin: 0; font: 14px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; background: var(--bg); color: var(--text); }
-  header { background: var(--panel); border-bottom: 1px solid var(--border); padding: 14px 20px; display: flex; flex-wrap: wrap; gap: 12px; align-items: center; position: sticky; top: 0; z-index: 5; }
+  header { background: var(--panel); border-bottom: 1px solid var(--border); padding: 14px 20px; display: flex; flex-wrap: wrap; gap: 12px; align-items: center; position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; }
   header h1 { font-size: 18px; margin: 0 12px 0 0; }
   #search { flex: 1 1 260px; padding: 9px 12px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg); color: var(--text); font-size: 14px; }
   .actions { display: flex; flex-wrap: wrap; gap: 8px; }
   button, .btn { font: inherit; padding: 8px 12px; border-radius: 8px; border: 1px solid var(--border); background: var(--panel); color: var(--text); cursor: pointer; white-space: nowrap; }
   button:hover, .btn:hover { border-color: var(--accent); }
-  .primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+  .primary { background: var(--accent); color: var(--on-accent); border-color: var(--accent); }
   .danger { color: var(--danger); }
   main { padding: 16px 20px 40px; max-width: 1300px; margin: 0 auto; }
   .tabs { display: flex; gap: 4px; flex-wrap: wrap; border-bottom: 1px solid var(--border); margin-bottom: 12px; }
@@ -54,7 +66,9 @@
   .empty { padding: 40px; text-align: center; color: var(--muted); }
   .overdue { color: var(--danger); font-weight: 600; }
   dialog { border: 1px solid var(--border); border-radius: 12px; padding: 0; width: min(560px, calc(100vw - 32px)); background: var(--panel); color: var(--text); }
-  dialog::backdrop { background: rgba(0,0,0,.4); }
+  dialog::backdrop { background: var(--overlay); }
+  button:focus-visible, select:focus-visible, input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+  .confirm p { margin: 0 0 4px; }
   dialog form { padding: 20px; }
   dialog h2 { margin: 0 0 14px; font-size: 17px; }
   .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
@@ -125,6 +139,17 @@
   </form>
 </dialog>
 
+<dialog id="confirmDlg">
+  <form method="dialog" class="confirm">
+    <h2>Borrar cliente</h2>
+    <p id="confirmText"></p>
+    <div class="dialog-actions">
+      <button value="no">Cancelar</button>
+      <button value="si" class="primary" id="confirmYes">Borrar</button>
+    </div>
+  </form>
+</dialog>
+
 <div id="toast"></div>
 
 <script>
@@ -161,7 +186,7 @@ const EXCEL_FIELDS = [
   { key: 'notas', header: 'Notas', aliases: ['notas', 'observaciones', 'comentarios', 'nota'] },
 ];
 
-let clientes = load();
+let clientes = [];
 let tab = 'todos';
 let sort = { key: 'nombre', dir: 1 };
 let editingId = null;
@@ -172,13 +197,40 @@ const esc = s => String(s ?? '').replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<':
 const today = () => new Date().toISOString().slice(0, 10);
 const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
 
-function load() {
-  try { return JSON.parse(localStorage.getItem(STORAGE_KEY)) || []; } catch { return []; }
-}
-function save() {
+// ---------- Guardado ----------
+// Publicado en claude.ai: base de datos de la página (colección "clientes", un documento por cliente).
+// Abierto como archivo suelto: se guarda en este navegador.
+let col = null;
+const FIELDS = ['nombre', 'empresa', 'telefono', 'email', 'estado', 'operar', 'operacion', 'proximo', 'notas', 'creado'];
+const clean = c => Object.fromEntries(FIELDS.map(k => [k, k === 'operar' ? !!c[k] : (c[k] ?? '')]));
+
+function saveLocal() {
   try { localStorage.setItem(STORAGE_KEY, JSON.stringify(clientes)); }
   catch { toast('No se pudo guardar en el navegador'); }
 }
+async function saveCliente(c) {
+  if (!col) return saveLocal();
+  try { await col.doc(c.id).set(clean(c)); }
+  catch (e) { toast(e.code === 'quota_exceeded' ? 'Se llenó el espacio de la base de datos' : 'No se pudo guardar. Revisá tu conexión.'); throw e; }
+}
+async function deleteCliente(id) {
+  clientes = clientes.filter(x => x.id !== id);
+  if (!col) { saveLocal(); return; }
+  await col.doc(id).delete();
+}
+async function initStorage() {
+  const db = window.claude?.use ? await window.claude.use('db') : null;
+  if (!db) {
+    try { clientes = JSON.parse(localStorage.getItem(STORAGE_KEY)) || []; } catch { clientes = []; }
+    loading = false; render(); return;
+  }
+  col = db.collection('clientes');
+  col.onSnapshot(snap => {
+    clientes = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    loading = false; render();
+  }, () => { loading = false; toast('Se perdió la conexión con la base de datos. Recargá la página.'); });
+}
+let loading = true;
 function toast(msg) {
   const t = $('#toast'); t.textContent = msg; t.classList.add('show');
   clearTimeout(toast.timer); toast.timer = setTimeout(() => t.classList.remove('show'), 2600);
@@ -211,7 +263,7 @@ function render() {
   const empty = $('#empty');
   if (!rows.length) {
     empty.hidden = false;
-    empty.textContent = clientes.length
+    empty.textContent = loading ? 'Cargando tus clientes…' : clientes.length
       ? 'No hay clientes que coincidan.'
       : 'Todavía no cargaste clientes. Usá "+ Nuevo cliente" o "Importar Excel" (podés bajar la plantilla primero).';
   } else empty.hidden = true;
@@ -222,7 +274,7 @@ function render() {
       <td><button class="star ${c.operar ? 'on' : ''}" data-act="star" title="Marcar para operar">${c.operar ? '★' : '☆'}</button></td>
       <td class="name">${esc(c.nombre)}${c.empresa ? `<div class="sub">${esc(c.empresa)}</div>` : ''}</td>
       <td>${esc(c.telefono)}</td>
-      <td>${c.email ? `<a href="mailto:${esc(c.email)}">${esc(c.email)}</a>` : ''}</td>
+      <td>${esc(c.email)}</td>
       <td class="estado-cell"><span class="dot" style="background:var(--${c.estado})"></span>
         <select class="estado" data-act="estado">${Object.entries(ESTADOS).map(([k, v]) =>
           `<option value="${k}" ${k === c.estado ? 'selected' : ''}>${v}</option>`).join('')}</select></td>
@@ -263,16 +315,23 @@ $('#headRow').addEventListener('click', e => {
 $('#tbody').addEventListener('click', e => {
   const btn = e.target.closest('[data-act]'); if (!btn || btn.tagName === 'SELECT') return;
   const c = clientes.find(x => x.id === btn.closest('tr').dataset.id);
-  if (btn.dataset.act === 'star') { c.operar = !c.operar; save(); render(); }
+  if (btn.dataset.act === 'star') { c.operar = !c.operar; render(); saveCliente(c); }
   if (btn.dataset.act === 'edit') openDialog(c);
-  if (btn.dataset.act === 'del' && confirm(`¿Borrar a ${c.nombre}?`)) {
-    clientes = clientes.filter(x => x.id !== c.id); save(); render(); toast('Cliente borrado');
+  if (btn.dataset.act === 'del') {
+    $('#confirmText').textContent = `¿Borrar a ${c.nombre}? No se puede deshacer.`;
+    const dlg = $('#confirmDlg');
+    dlg.returnValue = '';
+    dlg.onclose = async () => {
+      if (dlg.returnValue !== 'si') return;
+      await deleteCliente(c.id); render(); toast('Cliente borrado');
+    };
+    dlg.showModal();
   }
 });
 $('#tbody').addEventListener('change', e => {
   if (e.target.dataset.act !== 'estado') return;
   const c = clientes.find(x => x.id === e.target.closest('tr').dataset.id);
-  c.estado = e.target.value; save(); render();
+  c.estado = e.target.value; render(); saveCliente(c);
   toast(`${c.nombre} → ${ESTADOS[c.estado]}`);
 });
 
@@ -293,16 +352,19 @@ function openDialog(c) {
 }
 $('#btnNew').addEventListener('click', () => openDialog(null));
 $('#btnCancel').addEventListener('click', () => $('#dlg').close());
-form.addEventListener('submit', () => {
+form.addEventListener('submit', async () => {
   const data = {};
   for (const el of form.elements) {
     if (!el.name) continue;
     data[el.name] = el.type === 'checkbox' ? el.checked : el.value.trim();
   }
-  if (editingId) Object.assign(clientes.find(x => x.id === editingId), data);
-  else clientes.push({ id: uid(), creado: today(), ...data });
-  save(); render();
-  toast(editingId ? 'Cliente actualizado' : 'Cliente agregado');
+  const wasEditing = editingId;
+  let c;
+  if (wasEditing) { c = clientes.find(x => x.id === wasEditing); Object.assign(c, data); }
+  else { c = { id: uid(), creado: today(), ...data }; clientes.push(c); }
+  render();
+  await saveCliente(c);
+  toast(wasEditing ? 'Cliente actualizado' : 'Cliente agregado');
 });
 
 // ---------- Excel ----------
@@ -313,12 +375,20 @@ function toRow(c) {
     'Próximo contacto': fmtDate(c.proximo), 'Notas': c.notas, 'Alta': fmtDate(c.creado),
   };
 }
-function downloadSheet(rows, filename, headers) {
+async function downloadSheet(rows, filename, headers) {
   const ws = XLSX.utils.json_to_sheet(rows, { header: headers });
   ws['!cols'] = headers.map(h => ({ wch: Math.max(h.length + 2, 16) }));
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, 'Clientes');
-  XLSX.writeFile(wb, filename);
+  const dl = window.claude?.use ? await window.claude.use('downloads') : null;
+  if (!dl) { XLSX.writeFile(wb, filename); return true; }
+  try {
+    await dl.save({ filename, data: new Uint8Array(XLSX.write(wb, { type: 'array', bookType: 'xlsx' })) });
+    return true;
+  } catch (e) {
+    if (e.code !== 'declined') toast('No se pudo descargar el archivo');
+    return false;
+  }
 }
 $('#btnTemplate').addEventListener('click', () => {
   const headers = EXCEL_FIELDS.map(f => f.header);
@@ -328,12 +398,11 @@ $('#btnTemplate').addEventListener('click', () => {
     'Próximo contacto': '15/10/2026', 'Notas': 'Borrá esta fila de ejemplo',
   }], 'plantilla_clientes.xlsx', headers);
 });
-$('#btnExport').addEventListener('click', () => {
+$('#btnExport').addEventListener('click', async () => {
   if (!clientes.length) return toast('No hay clientes para exportar');
   const currentTab = TABS.find(t => t.id === tab);
   const rows = clientes.filter(currentTab.filter).sort(compare).map(toRow);
-  downloadSheet(rows, `clientes_${tab}_${today()}.xlsx`, [...EXCEL_FIELDS.map(f => f.header), 'Alta']);
-  toast(`Exportados ${rows.length} clientes (${currentTab.label})`);
+  if (await downloadSheet(rows, `clientes_${tab}_${today()}.xlsx`, [...EXCEL_FIELDS.map(f => f.header), 'Alta'])) toast(`Exportados ${rows.length} clientes (${currentTab.label})`);
 });
 
 function parseEstado(v) {
@@ -377,6 +446,7 @@ $('#fileInput').addEventListener('change', async e => {
     if (!map.nombre) return toast('No encontré una columna "Nombre" en el archivo');
 
     let added = 0, updated = 0;
+    const toWrite = [];
     for (const r of raw) {
       const get = k => map[k] ? String(r[map[k]] instanceof Date ? '' : r[map[k]]).trim() : '';
       const nombre = get('nombre');
@@ -391,14 +461,21 @@ $('#fileInput').addEventListener('change', async e => {
       const existing = clientes.find(c =>
         (data.email && norm(c.email) === norm(data.email)) ||
         (norm(c.nombre) === norm(nombre) && norm(c.telefono) === norm(data.telefono)));
-      if (existing) { Object.assign(existing, data); updated++; }
+      if (existing) { Object.assign(existing, data); if (!toWrite.includes(existing)) toWrite.push(existing); updated++; }
       else {
-        clientes.push({ id: uid(), creado: today(), empresa: '', telefono: '', email: '', estado: 'activo',
-          operar: false, operacion: '', proximo: '', notas: '', ...data });
+        const c = { id: uid(), creado: today(), empresa: '', telefono: '', email: '', estado: 'activo',
+          operar: false, operacion: '', proximo: '', notas: '', ...data };
+        clientes.push(c); toWrite.push(c);
         added++;
       }
     }
-    save(); render();
+    render();
+    if (col) {
+      for (let i = 0; i < toWrite.length; i++) {
+        if (i % 10 === 0) toast(`Guardando ${i + 1} de ${toWrite.length}…`);
+        await saveCliente(toWrite[i]);
+      }
+    } else saveLocal();
     toast(`Importación lista: ${added} nuevos, ${updated} actualizados`);
   } catch (err) {
     console.error(err);
@@ -407,6 +484,7 @@ $('#fileInput').addEventListener('change', async e => {
 });
 
 render();
+initStorage();
 </script>
 </body>
 </html>

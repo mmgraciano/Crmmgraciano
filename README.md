@@ -4,11 +4,10 @@ CRM simple para registrar tu base de clientes, en un solo archivo (`index.html`)
 
 ## Cómo usarlo
 
-- **Opción rápida:** descargá `index.html` y abrilo con doble clic en Chrome, Edge o Firefox.
-- **Online:** activá GitHub Pages en este repo (Settings → Pages → rama principal) y entrá desde cualquier dispositivo.
-
-> Los datos se guardan en el navegador donde lo uses (localStorage). Usá **Exportar Excel** seguido como respaldo,
-> y para pasar tus datos a otra computadora: exportás en una e importás en la otra.
+- **Recomendado:** abrí la versión publicada en claude.ai: https://claude.ai/artifact/MRNV6HsmrXEA3EfA43gzYs
+  Ahí los clientes se guardan en una base de datos de tu cuenta y los ves desde la compu o el celular.
+- **Sin internet / archivo suelto:** descargá `index.html` y abrilo con doble clic en Chrome, Edge o Firefox.
+  En ese modo los datos quedan solo en ese navegador; usá **Exportar Excel** como respaldo.
 
 ## Funciones
 
