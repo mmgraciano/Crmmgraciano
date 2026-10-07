@@ -152,6 +152,8 @@
   .panel .sub { padding: 0 16px 10px; color: var(--muted); font-size: 12.5px; }
   .panel .scroll { overflow: auto; max-height: 460px; border-top: 1px solid var(--border); }
   .panel table { min-width: 520px; }
+  #incomeTop .scroll { max-height: none; }
+  #incomeTop .panel table { min-width: 0; }
   .panel thead th { position: sticky; top: 0; z-index: 1; padding: 10px 12px; }
   .panel td { padding: 8px 12px; }
   .filters { display: flex; flex-wrap: wrap; gap: 10px; align-items: flex-end; }
@@ -241,6 +243,7 @@
   </div>
 
   <section id="summary" hidden></section>
+  <section id="incomeTop" class="breakdown" hidden></section>
 
   <div class="table-wrap" id="tableWrap">
     <table>
@@ -324,6 +327,24 @@
   </form>
 </dialog>
 
+<!-- Período de facturación -->
+<dialog id="perDlg">
+  <form method="dialog" id="perForm">
+    <h2>¿Qué período cubre este archivo?</h2>
+    <p id="perFile"></p>
+    <div class="grid">
+      <label>Desde<input id="p-desde" type="date" required></label>
+      <label>Hasta<input id="p-hasta" type="date" required></label>
+    </div>
+    <div class="checks" id="perQuick"></div>
+    <p id="perHint"></p>
+    <div class="dialog-actions">
+      <button type="button" class="btn ghost" id="perCancel">Cancelar</button>
+      <button type="submit" class="btn primary">Guardar facturación</button>
+    </div>
+  </form>
+</dialog>
+
 <!-- Confirmación -->
 <dialog id="confirmDlg">
   <form method="dialog">
@@ -340,7 +361,7 @@
 
 <script>
 const DEFAULT_CONFIG = {
-  v: 3,
+  v: 4,
   principal: 'WM3',
   dias: 21,
   umbral: 10000,
@@ -348,7 +369,7 @@ const DEFAULT_CONFIG = {
   tabs: [
     { id: 'total', label: 'Tenencia total' },
     { id: 'fwd', label: 'Tenencias' },
-    { id: 'ingresos', label: 'Ingresos' },
+    { id: 'ingresos', label: 'Facturación' },
     { id: 'sgr', label: 'SGR' },
     { id: 'prospects', label: 'Prospects' },
     { id: 'tareas', label: 'Tareas pendientes' },
@@ -360,7 +381,7 @@ const DEFAULT_CONFIG = {
 };
 const MAIN = 'wm3';
 const HOLD_TAB = 'fwd';           // pestaña "Tenencias": el detalle cargado por Excel (antes se llamaba FWD)
-const INCOME_TAB = 'ingresos';    // ingresos por cliente y categoría
+const INCOME_TAB = 'ingresos';    // facturación por cliente, por período
 const SUMMARY_TAB = 'total';      // resumen de la tenencia total y su variación
 const ZERO_TAB = 'cero';          // clientes sin tenencia
 const LOW_TAB = 'menos10k';       // clientes con menos del umbral en USD
@@ -408,13 +429,13 @@ const EMPTY_DS = () => ({ columns: [], cuentaCol: -1, nombreCol: -1, rows: [], u
 let tenPrev = EMPTY_DS();         // informe anterior, para calcular la variación
 let historial = [];               // [{fecha, total, tc, fileName}] un registro por informe
 // Dos juegos de tenencias en la base: el actual y el anterior, cada uno en bloques de filas
-const DS = { cur: { coll: 'tenencias', meta: 'actual' }, prev: { coll: 'tenencias_prev', meta: 'anterior' }, ing: { coll: 'ingresos', meta: 'ingresos' } };
-const dsState = { cur: { meta: null, chunks: new Map() }, prev: { meta: null, chunks: new Map() }, ing: { meta: null, chunks: new Map() } };
-// Ingresos: filas {cuenta, nombre, cat, usd} agrupadas por cliente y categoría
-const EMPTY_ING = () => ({ rows: [], cats: [], fileName: '', updatedAt: '' });
-let ingresos = EMPTY_ING();
+const DS = { cur: { coll: 'tenencias', meta: 'actual' }, prev: { coll: 'tenencias_prev', meta: 'anterior' } };
+const dsState = { cur: { meta: null, chunks: new Map() }, prev: { meta: null, chunks: new Map() } };
+// Facturación: un documento por período {desde, hasta, fileName, cargado, cats, rows: [{cuenta, nombre, cat, usd}]}
+let periodos = [];
+let selPer = '', cmpPer = 'auto';   // período elegido y con cuál se compara ('auto' = el anterior, '' = ninguno)
 let ingSort = { key: 'total', dir: -1 };
-const LOCAL_ING = 'panel-wm-ingresos-v1';
+const LOCAL_FACT = 'panel-wm-facturacion-v1';
 let tenDb = null;
 
 const $ = s => document.querySelector(s);
@@ -448,6 +469,11 @@ function migrateConfig(c) {
     const at = c.tabs.findIndex(t => t.id === SUMMARY_TAB) + 1;
     c.tabs.splice(at, 0, fwd || { id: HOLD_TAB, label: 'Tenencias' }, { id: INCOME_TAB, label: 'Ingresos' });
     c.v = 3;
+  }
+  if (c.v < 4) {
+    const ing = c.tabs.find(t => t.id === INCOME_TAB);
+    if (ing && ing.label === 'Ingresos') ing.label = 'Facturación';
+    c.v = 4;
   }
   return c;
 }
@@ -488,7 +514,7 @@ function saveLocal() {
     localStorage.setItem(LOCAL_HOLD, JSON.stringify(tenencias));
     localStorage.setItem(LOCAL_PREV, JSON.stringify(tenPrev));
     localStorage.setItem(LOCAL_HIST, JSON.stringify(historial));
-    localStorage.setItem(LOCAL_ING, JSON.stringify(ingresos));
+    localStorage.setItem(LOCAL_FACT, JSON.stringify(periodos));
   } catch { toast('No se pudo guardar en este navegador'); }
 }
 async function write(fn) {
@@ -541,7 +567,7 @@ async function initStorage() {
     try { tenencias = JSON.parse(localStorage.getItem(LOCAL_HOLD)) || tenencias; } catch {}
     try { tenPrev = JSON.parse(localStorage.getItem(LOCAL_PREV)) || tenPrev; } catch {}
     try { historial = JSON.parse(localStorage.getItem(LOCAL_HIST)) || []; } catch {}
-    try { ingresos = JSON.parse(localStorage.getItem(LOCAL_ING)) || ingresos; } catch {}
+    try { periodos = JSON.parse(localStorage.getItem(LOCAL_FACT)) || []; } catch {}
     loading = false; setSync(); render(); return;
   }
   tenDb = db;
@@ -556,7 +582,7 @@ async function initStorage() {
   db.collection('tenencias_meta').onSnapshot(snap => {
     const m = new Map(snap.docs.map(d => [d.id, structuredClone(d.data())]));
     for (const k of Object.keys(DS)) dsState[k].meta = m.get(DS[k].meta) || null;
-    assemble('cur'); assemble('prev'); assemble('ing');
+    assemble('cur'); assemble('prev');
   }, fail);
   for (const k of Object.keys(DS)) {
     db.collection(DS[k].coll).onSnapshot(snap => {
@@ -564,6 +590,10 @@ async function initStorage() {
       assemble(k);
     }, fail);
   }
+  db.collection('facturacion').onSnapshot(snap => {
+    periodos = snap.docs.map(d => structuredClone(d.data()));
+    render();
+  }, fail);
   db.collection('tenencias_hist').onSnapshot(snap => {
     historial = snap.docs.map(d => structuredClone(d.data())).sort((a, b) => a.fecha.localeCompare(b.fecha));
     render();
@@ -587,12 +617,11 @@ function assemble(k) {
     }
     ds = { ...EMPTY_DS(), ...meta, rows: rows.map(r => structuredClone(r)) };
   }
-  if (k === 'ing') ingresos = meta ? { ...EMPTY_ING(), ...ds } : EMPTY_ING();
-  else if (k === 'cur') tenencias = ds; else tenPrev = ds;
+  if (k === 'cur') tenencias = ds; else tenPrev = ds;
   render();
 }
 async function saveDataset(k, next) {
-  if (k === 'ing') ingresos = next; else if (k === 'cur') tenencias = next; else tenPrev = next;
+  if (k === 'cur') tenencias = next; else tenPrev = next;
   if (!tenDb) { saveLocal(); return; }
   const coll = tenDb.collection(DS[k].coll);
   const chunks = [];
@@ -774,7 +803,7 @@ function render() {
 
   const allTabs = [{ id: MAIN, label: config.principal }, ...config.tabs];
   $('#tabs').innerHTML = allTabs.map(t => {
-    const n = t.id === SUMMARY_TAB ? null : t.id === HOLD_TAB ? holdCuentas().size : t.id === INCOME_TAB ? ingClientes().length : cuentas.filter(c => inTab(c, t.id)).length;
+    const n = t.id === SUMMARY_TAB ? null : t.id === HOLD_TAB ? holdCuentas().size : t.id === INCOME_TAB ? factClientes(periodoSel()).length : cuentas.filter(c => inTab(c, t.id)).length;
     return `<button class="tab ${t.id === tab ? 'active' : ''}" data-tab="${esc(t.id)}">${esc(t.label)}${n === null ? '' : `<span class="n">${n}</span>`}</button>`;
   }).join('') + `<button class="tab edit" id="btnTabs" title="Editar pestañas" aria-label="Editar pestañas">+</button>`;
 
@@ -783,12 +812,13 @@ function render() {
   $('#btnNew').hidden = hold || summary || income;
   $('#btnAjustes').hidden = !(hold || summary);
   $('#btnImport').hidden = summary;
-  $('#btnImport').textContent = hold ? 'Importar tenencias' : income ? 'Importar ingresos' : 'Importar Excel';
+  $('#btnImport').textContent = hold ? 'Importar tenencias' : income ? 'Importar facturación' : 'Importar Excel';
+  $('#incomeTop').hidden = !income;
   $('#summary').hidden = !summary;
   $('#tableWrap').hidden = summary;
   $('#searches').hidden = summary;
   $('table').classList.toggle('hold', hold || income);
-  if (!hold) $('#holdFilters').innerHTML = '';
+  if (!hold && !income) $('#holdFilters').innerHTML = '';
   if (summary) { renderSummary(); return; }
   if (income) { renderIngresos(); return; }
   if (hold) { renderTenencias(); restoreFocus(focus); return; }
@@ -1211,38 +1241,127 @@ $('#stats').addEventListener('click', e => {
   tab = b.dataset.goto; render();
 });
 
-// ---------- Ingresos ----------
+// ---------- Facturación ----------
 const findCuenta = (cuenta, nombre) => cuenta
   ? cuentas.find(c => norm(c.cuenta) === norm(cuenta))
   : cuentas.find(c => norm(c.nombre) === norm(nombre));
+const perId = p => p.desde + '_' + p.hasta;
+const isoDate = iso => { const [y, m, d] = iso.split('-').map(Number); return new Date(y, m - 1, d); };
+const diasPer = p => Math.round((isoDate(p.hasta) - isoDate(p.desde)) / 864e5) + 1;
+const MES_DIAS = 30.4375;
+const lastDay = iso => { const d = isoDate(iso); return new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate(); };
+const MESES = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
+const cap = t => t.charAt(0).toUpperCase() + t.slice(1);
+// Mes en curso sin terminar: empieza el 1 y termina antes de fin de mes
+const esMesParcial = p => p.desde.endsWith('-01') && p.desde.slice(0, 7) === p.hasta.slice(0, 7) && Number(p.hasta.slice(8)) < lastDay(p.hasta);
+function perLabel(p) {
+  const [y, m] = p.desde.split('-').map(Number);
+  if (p.desde.endsWith('-01') && p.desde.slice(0, 7) === p.hasta.slice(0, 7)) {
+    const base = cap(MESES[m - 1]) + ' ' + y;
+    return esMesParcial(p) ? `${base} (al ${fmtDate(p.hasta).slice(0, 5)})` : base;
+  }
+  return `${fmtDate(p.desde)} al ${fmtDate(p.hasta)}`;
+}
+const sortedPer = () => periodos.slice().sort((a, b) => b.hasta.localeCompare(a.hasta) || b.desde.localeCompare(a.desde));
+function periodoSel() {
+  const list = sortedPer();
+  return list.find(p => perId(p) === selPer) || list[0] || null;
+}
+// Período para comparar: el elegido, o el último que termina antes de que empiece el actual
+function periodoCmp(cur) {
+  if (!cur || cmpPer === '') return null;
+  const list = sortedPer().filter(p => perId(p) !== perId(cur));
+  if (cmpPer !== 'auto') return list.find(p => perId(p) === cmpPer) || null;
+  return list.find(p => p.hasta < cur.desde) || list.find(p => p.hasta < cur.hasta) || null;
+}
 // Una fila por cliente con el total de cada categoría
-function ingClientes() {
+function factClientes(per) {
+  if (!per) return [];
   const by = new Map();
-  for (const r of ingresos.rows) {
+  for (const r of per.rows) {
     const c = findCuenta(r.cuenta, r.nombre);
     const key = c ? 'id:' + c.id : 'n:' + norm(r.nombre);
-    const e = by.get(key) || { cuenta: c?.cuenta || r.cuenta || '', nombre: c?.nombre || r.nombre, enPanel: !!c, cats: {}, total: 0 };
+    const e = by.get(key) || { key, cuenta: c?.cuenta || r.cuenta || '', nombre: c?.nombre || r.nombre, enPanel: !!c, cats: {}, total: 0 };
     e.cats[r.cat] = (e.cats[r.cat] || 0) + r.usd; e.total += r.usd;
     by.set(key, e);
   }
   return [...by.values()];
 }
+const esMesCompleto = p => p.desde.endsWith('-01') && p.desde.slice(0, 7) === p.hasta.slice(0, 7) && Number(p.hasta.slice(8)) === lastDay(p.hasta);
+// Facturación mensual al ritmo del período: un mes completo es su total; el mes en curso, su proyección al cierre
+const ritmo = (total, per) => esMesCompleto(per) ? total
+  : esMesParcial(per) ? total / Number(per.hasta.slice(8)) * lastDay(per.hasta)
+  : total / diasPer(per) * MES_DIAS;
+const money2 = v => Math.abs(v) < 0.005 ? '<span class="muted">—</span>' : v.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
 function renderIngresos() {
-  const all = ingClientes();
+  const per = periodoSel();
+  const cmp = periodoCmp(per);
+  const full = !!per && esMesCompleto(per), partial = !!per && esMesParcial(per);
+  const list = sortedPer();
+  $('#holdFilters').innerHTML = list.length ? `<div class="filters">
+    <label>Período<br><select id="fPer" class="on">${list.map(p => `<option value="${esc(perId(p))}" ${per && perId(p) === perId(per) ? 'selected' : ''}>${esc(perLabel(p))}</option>`).join('')}</select></label>
+    <label>Comparar con<br><select id="fCmp"><option value="auto" ${cmpPer === 'auto' ? 'selected' : ''}>Período anterior${cmp && cmpPer === 'auto' ? ' (' + esc(perLabel(cmp)) + ')' : ''}</option>
+      <option value="" ${cmpPer === '' ? 'selected' : ''}>No comparar</option>
+      ${list.filter(p => per && perId(p) !== perId(per)).map(p => `<option value="${esc(perId(p))}" ${cmpPer === perId(p) ? 'selected' : ''}>${esc(perLabel(p))}</option>`).join('')}</select></label>
+  </div>` : '';
+
+  const all = factClientes(per);
+  const prevBy = new Map(factClientes(cmp).map(e => [e.key, e]));
+  // Períodos de distinto largo se comparan por ritmo mensual; iguales, por total
+  const porRitmo = cmp && Math.abs(diasPer(per) - diasPer(cmp)) > 3;
+  const cmpVal = (e, p) => porRitmo ? ritmo(e, p) : e;
   const qn = norm($('#qNombre').value), qc = norm($('#qCuenta').value).replace(/\s/g, '');
   const rows = all.filter(e => (!qn || norm(e.nombre).includes(qn)) && (!qc || norm(e.cuenta).includes(qc)));
-  const cats = ingresos.cats;
-  const tot = rows.reduce((a, e) => a + e.total, 0);
+  const cats = per?.cats || [];
+  const tot = all.reduce((a, e) => a + e.total, 0);
+  const totPrev = cmp ? factClientes(cmp).reduce((a, e) => a + e.total, 0) : 0;
   const fuera = all.filter(e => !e.enPanel).length;
-  const fmt2 = v => v.toLocaleString('es-AR', { maximumFractionDigits: 0 });
-  $('#stats').innerHTML = ingresos.rows.length ? `
-    <span class="stat"><b>${fmt2(tot)}</b>USD de ingresos</span>
-    ${cats.map(c => `<span class="stat"><b>${fmt2(rows.reduce((a, e) => a + (e.cats[c] || 0), 0))}</b>${esc(c)}</span>`).join('')}
-    <span class="stat info">${esc(ingresos.fileName)} · cargado ${fmtDate(ingresos.updatedAt)}</span>
+  const fmt0 = v => v.toLocaleString('es-AR', { maximumFractionDigits: 0 });
+
+  let cmpStats = '';
+  if (cmp) {
+    const a = cmpVal(tot, per), b = cmpVal(totPrev, cmp), dd = a - b;
+    cmpStats = `<span class="stat ${dd >= 0 ? '' : ''}" title="${porRitmo ? 'Comparación por ritmo mensual, porque los períodos tienen distinto largo' : 'Comparación de totales'}">
+      <b class="${signCls(dd)}">${fmtSigned(dd)}</b>${porRitmo ? 'USD/mes' : 'USD'} vs ${esc(perLabel(cmp))} (${fmtPct(dd, b)})</span>`;
+    if (partial) {
+      const proy = tot / Number(per.hasta.slice(8)) * lastDay(per.hasta);
+      cmpStats += `<span class="stat"><b>${totPrev ? Math.round(tot / totPrev * 100) : 0}%</b>de lo facturado en ${esc(perLabel(cmp))}</span>
+        <span class="stat"><b>${fmt0(proy)}</b>USD de proyección al cierre del mes</span>`;
+    }
+  }
+  $('#stats').innerHTML = per ? `
+    <span class="stat"><b>${fmt0(tot)}</b>USD facturados</span>
+    ${partial || full ? '' : `<span class="stat" title="Facturación del período llevada a un mes"><b>${fmt0(ritmo(tot, per))}</b>USD por mes en promedio</span>`}
+    ${cmpStats}
+    ${cats.map(c => `<span class="stat"><b>${fmt0(all.reduce((a, e) => a + (e.cats[c] || 0), 0))}</b>${esc(c)}</span>`).join('')}
     ${fuera ? `<button class="stat info" id="btnAddIng" title="Agregarlos a ${esc(config.principal)} (sin N° de cuenta)">${fuera} no están en ${esc(config.principal)} · Agregar</button>` : ''}` : '';
-  const cols = [{ key: 'cuenta', label: 'N° de cuenta' }, { key: 'nombre', label: 'Cliente' }, ...cats.map(c => ({ key: 'cat:' + c, label: c, num: true })), { key: 'total', label: 'Total USD', num: true }];
+
+  // Top 10 y períodos cargados
+  const top = all.slice().sort((a, b) => b.total - a.total).slice(0, 10);
+  const top10 = top.reduce((a, e) => a + e.total, 0);
+  $('#incomeTop').innerHTML = per ? `
+    <div class="panel"><h3>Top 10 clientes por facturación</h3>
+      <div class="sub">${esc(perLabel(per))} · concentran el ${tot ? Math.round(top10 / tot * 100) : 0}% de lo facturado</div>
+      <div class="scroll">${shareTable(top.map((e, i) => [`${i + 1}. ${e.nombre}`, e.total, e.cuenta]), tot, 'Cliente', '')}</div></div>
+    <div class="panel"><h3>Períodos cargados</h3><div class="sub">Facturación total y promedio por mes de cada archivo</div>
+      <div class="scroll"><table><thead><tr><th class="nosort">Período</th><th class="nosort num">Total USD</th><th class="nosort num">Por mes</th><th class="nosort">Archivo</th><th class="nosort"></th></tr></thead><tbody>
+      ${list.map(p => { const t = p.rows.reduce((a, r) => a + r.usd, 0);
+        return `<tr class="pick" data-per="${esc(perId(p))}" title="Ver este período"><td>${esc(perLabel(p))}</td><td class="num">${fmt0(t)}</td><td class="num">${fmt0(ritmo(t, p))}</td>
+          <td class="muted">${esc(p.fileName)}</td><td class="c-x"><button class="x" data-delper="${esc(perId(p))}" title="Quitar este período" aria-label="Quitar período">×</button></td></tr>`; }).join('')}
+      </tbody></table></div>
+      ${list.length < 2 ? '<div class="sub" style="padding-top:10px">Para comparar mes contra mes, subí la facturación de cada mes por separado (por ejemplo, septiembre completo y octubre a la fecha).</div>' : ''}</div>` : '';
+
+  const cols = [{ key: 'cuenta', label: 'N° de cuenta' }, { key: 'nombre', label: 'Cliente' }, ...cats.map(c => ({ key: 'cat:' + c, label: c, num: true })),
+    { key: 'total', label: 'Total USD', num: true }, ...(full ? [] : [{ key: 'mes', label: partial ? 'Proyección del mes' : 'Por mes', num: true }]),
+    ...(cmp ? [{ key: 'ant', label: porRitmo ? 'Anterior por mes' : 'Anterior', num: true }, { key: 'var', label: 'Variación', num: true }, { key: 'pct', label: '%', num: true }] : [])];
   $('#headRow').innerHTML = cols.map(c => `<th class="${c.num ? 'num' : ''} ${ingSort.key === c.key ? 'sorted' : ''}" data-isort="${esc(c.key)}">${esc(c.label)}<span class="ar">${ingSort.key === c.key ? (ingSort.dir > 0 ? '↑' : '↓') : '↕'}</span></th>`).join('');
-  const val = (e, k) => k === 'total' ? e.total : k.startsWith('cat:') ? (e.cats[k.slice(4)] || 0) : e[k];
+  const calc = e => {
+    const pe = prevBy.get(e.key);
+    const a = cmp ? cmpVal(e.total, per) : 0, b = pe ? cmpVal(pe.total, cmp) : 0;
+    return { mes: ritmo(e.total, per), ant: b, var: a - b, pct: b ? (a - b) / b : null };
+  };
+  const val = (e, k) => k === 'total' ? e.total : k.startsWith('cat:') ? (e.cats[k.slice(4)] || 0) : ['mes', 'ant', 'var'].includes(k) ? calc(e)[k] : k === 'pct' ? (calc(e).pct ?? -Infinity) : e[k];
   rows.sort((a, b) => {
     const va = val(a, ingSort.key), vb = val(b, ingSort.key);
     const res = typeof va === 'number' ? va - vb : norm(va).localeCompare(norm(vb), 'es', { numeric: true });
@@ -1250,15 +1369,32 @@ function renderIngresos() {
   });
   const empty = $('#empty');
   empty.hidden = rows.length > 0;
-  if (!rows.length) empty.innerHTML = loading ? 'Cargando…' : ingresos.rows.length ? 'No hay clientes que coincidan con la búsqueda.'
-    : `<div>Todavía no cargaste ingresos.</div><div>Tocá <b>Importar ingresos</b> y elegí el Excel. Necesita una columna con el cliente, otra con la categoría (por ejemplo ACDI u OPERACIONES) y otra con el monto en USD.</div><div>Cada importación reemplaza la anterior.</div>`;
-  const money = v => Math.abs(v) < 0.005 ? '<span class="muted">—</span>' : v.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-  $('#tbody').innerHTML = rows.map(e => `<tr>
+  if (!rows.length) empty.innerHTML = loading ? 'Cargando…' : per ? 'No hay clientes que coincidan con la búsqueda.'
+    : `<div>Todavía no cargaste tu facturación.</div><div>Tocá <b>Importar facturación</b> y elegí el Excel. Necesita una columna con el cliente, otra con la categoría (por ejemplo ACDI u OPERACIONES) y otra con el monto en USD.</div><div>Después elegís qué período cubre el archivo.</div>`;
+  $('#tbody').innerHTML = rows.map(e => { const c = calc(e); return `<tr>
     <td class="c-num">${esc(e.cuenta) || '<span class="muted">—</span>'}</td>
     <td>${esc(e.nombre)}${e.enPanel ? '' : ` <span class="chip add" style="opacity:1">no está en ${esc(config.principal)}</span>`}</td>
-    ${cats.map(c => `<td class="num">${money(e.cats[c] || 0)}</td>`).join('')}
-    <td class="num"><b>${money(e.total)}</b></td></tr>`).join('');
+    ${cats.map(k => `<td class="num">${money2(e.cats[k] || 0)}</td>`).join('')}
+    <td class="num"><b>${money2(e.total)}</b></td>${full ? '' : `<td class="num">${money2(c.mes)}</td>`}
+    ${cmp ? `<td class="num">${money2(c.ant)}</td><td class="num ${signCls(c.var)}">${fmtSigned(c.var)}</td><td class="num ${signCls(c.var)}">${c.pct === null ? 'nuevo' : fmtPct(c.var, c.ant)}</td>` : ''}</tr>`; }).join('');
 }
+document.addEventListener('change', e => {
+  if (e.target.id === 'fPer') { selPer = e.target.value; render(); }
+  if (e.target.id === 'fCmp') { cmpPer = e.target.value; render(); }
+});
+$('#incomeTop').addEventListener('click', async e => {
+  const del = e.target.closest('[data-delper]');
+  if (del) {
+    const p = periodos.find(x => perId(x) === del.dataset.delper); if (!p) return;
+    if (!await confirmAsk('Quitar período', `¿Quitar la facturación de ${perLabel(p)} (${p.fileName})? No se puede deshacer.`, 'Quitar')) return;
+    periodos = periodos.filter(x => x !== p); render();
+    if (tenDb) await write(() => tenDb.doc('facturacion/' + perId(p)).delete()); else saveLocal();
+    return toast('Período quitado');
+  }
+  const row = e.target.closest('[data-per]');
+  if (row) { selPer = row.dataset.per; render(); }
+});
+
 async function importIngresos(file) {
   let grid;
   try {
@@ -1284,26 +1420,76 @@ async function importIngresos(file) {
     const usd = toNumber(row[amtCol]);
     if (!nombre && !cuenta) continue;
     if (/^(sub)?total/.test(normHeader(nombre)) || isNaN(usd)) continue;
-    const cat = catCol >= 0 ? String(row[catCol] ?? '').trim() || 'Otros' : 'Ingresos';
+    const cat = catCol >= 0 ? String(row[catCol] ?? '').trim() || 'Otros' : 'Facturación';
     const k = norm(cuenta || nombre) + '|' + cat;
     const e = agg.get(k) || { cuenta, nombre, cat, usd: 0 };
     e.usd += usd; agg.set(k, e);
   }
   const rows = [...agg.values()].filter(e => Math.abs(e.usd) >= 0.005).map(e => ({ ...e, usd: Math.round(e.usd * 100) / 100 }));
-  if (!rows.length) return toast('El archivo no tiene ingresos debajo de los títulos');
-  const cats = [...new Set(rows.map(r => r.cat))].sort((a, b) => rows.filter(r => r.cat === b).reduce((s, r) => s + r.usd, 0) - rows.filter(r => r.cat === a).reduce((s, r) => s + r.usd, 0));
-  if (ingresos.rows.length && !await confirmAsk('Reemplazar ingresos', `Se van a reemplazar los ingresos cargados (${ingresos.fileName}) por los del archivo "${file.name}".`, 'Reemplazar')) return;
-  try {
-    await saveDataset('ing', { rows, cats, fileName: file.name, updatedAt: today() });
-    render();
-    toast(`Ingresos cargados: ${plural(new Set(rows.map(r => norm(r.cuenta || r.nombre))).size, 'cliente', 'clientes')}`);
-  } catch {}
+  if (!rows.length) return toast('El archivo no tiene facturación debajo de los títulos');
+  const sum = c => rows.filter(r => r.cat === c).reduce((s, r) => s + r.usd, 0);
+  const cats = [...new Set(rows.map(r => r.cat))].sort((a, b) => sum(b) - sum(a));
+  openPerDialog({ rows, cats, fileName: file.name });
 }
+
+// Elegir el período del archivo antes de guardarlo
+let perPending = null;
+function openPerDialog(data) {
+  perPending = data;
+  const t = new Date();
+  const first = isoLocal(new Date(t.getFullYear(), t.getMonth(), 1));
+  const prevFirst = isoLocal(new Date(t.getFullYear(), t.getMonth() - 1, 1)), prevLast = isoLocal(new Date(t.getFullYear(), t.getMonth(), 0));
+  $('#perFile').textContent = `${data.fileName} · ${plural(new Set(data.rows.map(r => norm(r.cuenta || r.nombre))).size, 'cliente', 'clientes')} · USD ${fmtUSD(data.rows.reduce((a, r) => a + r.usd, 0))}`;
+  $('#p-desde').value = first; $('#p-hasta').value = today();
+  const quick = [
+    { label: `${cap(MESES[t.getMonth()])} a la fecha`, d: first, h: today() },
+    { label: `${cap(MESES[(t.getMonth() + 11) % 12])} completo`, d: prevFirst, h: prevLast },
+  ];
+  $('#perQuick').innerHTML = quick.map(q => `<button type="button" class="btn ghost" data-d="${q.d}" data-h="${q.h}">${esc(q.label)}</button>`).join('');
+  updatePerHint();
+  $('#perDlg').showModal();
+}
+function updatePerHint() {
+  const d = $('#p-desde').value, h = $('#p-hasta').value;
+  const ex = d && h && periodos.find(p => p.desde === d && p.hasta === h);
+  $('#perHint').textContent = !d || !h ? '' : h < d ? 'La fecha "hasta" tiene que ser posterior a "desde".'
+    : ex ? `Ya hay facturación cargada para ${perLabel(ex)} (${ex.fileName}); se va a reemplazar.` : `Período: ${perLabel({ desde: d, hasta: h })} (${plural(diasPer({ desde: d, hasta: h }), 'día', 'días')}).`;
+}
+$('#perQuick').addEventListener('click', e => {
+  const b = e.target.closest('[data-d]'); if (!b) return;
+  $('#p-desde').value = b.dataset.d; $('#p-hasta').value = b.dataset.h; updatePerHint();
+});
+['#p-desde', '#p-hasta'].forEach(sel => $(sel).addEventListener('input', updatePerHint));
+$('#perCancel').addEventListener('click', () => { perPending = null; $('#perDlg').close(); });
+$('#perForm').addEventListener('submit', async e => {
+  const desde = $('#p-desde').value, hasta = $('#p-hasta').value;
+  if (!desde || !hasta || hasta < desde) { e.preventDefault(); updatePerHint(); return; }
+  const doc = { desde, hasta, ...perPending, cargado: today() };
+  perPending = null;
+  periodos = [...periodos.filter(p => perId(p) !== perId(doc)), doc];
+  selPer = perId(doc); cmpPer = 'auto';
+  render();
+  try {
+    if (tenDb) await write(() => tenDb.doc('facturacion/' + perId(doc)).set(doc)); else saveLocal();
+    toast(`Facturación de ${perLabel(doc)} guardada`);
+  } catch {}
+});
+
 async function exportIngresos() {
-  const list = ingClientes().sort((a, b) => b.total - a.total);
-  if (!list.length) return toast('No hay ingresos para exportar');
-  const data = list.map(e => ({ 'N° de cuenta': e.cuenta, 'Cliente': e.nombre, ...Object.fromEntries(ingresos.cats.map(c => [c, Math.round((e.cats[c] || 0) * 100) / 100])), 'Total USD': Math.round(e.total * 100) / 100 }));
-  if (await downloadBook(data, ['N° de cuenta', 'Cliente', ...ingresos.cats, 'Total USD'], `ingresos_${today()}.xlsx`)) toast('Ingresos exportados');
+  const per = periodoSel(), cmp = periodoCmp(per);
+  const list = factClientes(per).sort((a, b) => b.total - a.total);
+  if (!list.length) return toast('No hay facturación para exportar');
+  const prevBy = new Map(factClientes(cmp).map(e => [e.key, e]));
+  const porRitmo = cmp && Math.abs(diasPer(per) - diasPer(cmp)) > 3;
+  const r2 = v => Math.round(v * 100) / 100;
+  const data = list.map(e => {
+    const pe = prevBy.get(e.key);
+    const a = cmp ? (porRitmo ? ritmo(e.total, per) : e.total) : 0, b = pe ? (porRitmo ? ritmo(pe.total, cmp) : pe.total) : 0;
+    return { 'N° de cuenta': e.cuenta, 'Cliente': e.nombre, ...Object.fromEntries(per.cats.map(c => [c, r2(e.cats[c] || 0)])), 'Total USD': r2(e.total), 'Por mes USD': r2(ritmo(e.total, per)),
+      ...(cmp ? { [porRitmo ? 'Anterior por mes USD' : 'Anterior USD']: r2(b), 'Variación USD': r2(a - b) } : {}) };
+  });
+  const headers = ['N° de cuenta', 'Cliente', ...per.cats, 'Total USD', 'Por mes USD', ...(cmp ? [porRitmo ? 'Anterior por mes USD' : 'Anterior USD', 'Variación USD'] : [])];
+  if (await downloadBook(data, headers, `facturacion_${perId(per)}.xlsx`)) toast('Facturación exportada');
 }
 $('#headRow').addEventListener('click', e => {
   const th = e.target.closest('[data-isort]'); if (!th) return;
@@ -1313,7 +1499,7 @@ $('#headRow').addEventListener('click', e => {
 });
 $('#stats').addEventListener('click', async e => {
   if (!e.target.closest('#btnAddIng')) return;
-  const nuevos = ingClientes().filter(x => !x.enPanel);
+  const nuevos = factClientes(periodoSel()).filter(x => !x.enPanel);
   if (!await confirmAsk('Agregar clientes', `Se van a agregar ${plural(nuevos.length, 'cliente', 'clientes')} a ${config.principal} con su nombre${nuevos.some(x => !x.cuenta) ? ' (sin N° de cuenta: completalo después editando cada uno)' : ''}.`, 'Agregar')) return;
   const list = nuevos.map(x => ({ id: uid(), creado: today(), cuenta: x.cuenta, nombre: x.nombre, telefono: '', email: '', ultimoContacto: '', accion: '', notas: '', pestanas: [] }));
   cuentas.push(...list); render();
@@ -1447,7 +1633,7 @@ $('#tagsForm').addEventListener('submit', async () => {
 let draftTabs = [];
 function renderTabRows() {
   $('#tabRows').innerHTML = [{ id: MAIN, label: config.principal, main: true }, ...draftTabs].map((t, i) => {
-    const n = t.main ? cuentas.length : t.id === SUMMARY_TAB ? null : t.id === HOLD_TAB ? holdCuentas().size : t.id === INCOME_TAB ? ingClientes().length : cuentas.filter(c => inTab(c, t.id)).length;
+    const n = t.main ? cuentas.length : t.id === SUMMARY_TAB ? null : t.id === HOLD_TAB ? holdCuentas().size : t.id === INCOME_TAB ? factClientes(periodoSel()).length : cuentas.filter(c => inTab(c, t.id)).length;
     return `<div class="tab-row" data-i="${i - 1}">
       <input id="tabname-${esc(t.id)}" value="${esc(t.label)}" aria-label="Nombre de la pestaña">
       <span class="count">${n === null ? '' : n + ' cuentas'}</span>

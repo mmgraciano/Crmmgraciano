@@ -50,10 +50,17 @@ Los mismos filtros están en la pestaña **Tenencias**.
 En **Ajustes de tenencia** se elige qué columna es la valuación, la moneda, la cantidad y la especie, y se carga el
 **tipo de cambio** para pasar a USD las posiciones en pesos. Si importás dos veces el mismo día, la segunda corrige a la primera.
 
-## Ingresos
+## Facturación
 
-La pestaña **Ingresos** muestra lo que generó cada cliente por categoría (por ejemplo ACDI, OPERACIONES, FUTUROS) y el total en USD.
-Tocá **Importar ingresos** estando en esa pestaña. Los clientes del archivo que no están en WM3 se pueden agregar con un clic.
+La pestaña **Facturación** muestra lo que factura cada cliente por categoría (ACDI, OPERACIONES, FUTUROS…).
+
+- Al tocar **Importar facturación** se elige qué período cubre el archivo (por ejemplo "Septiembre completo" u "Octubre a la fecha").
+  Cada período queda guardado; si subís otra vez el mismo período, se reemplaza.
+- Arriba se elige el **período** y con cuál **comparar** (por defecto, el anterior). Si los períodos tienen distinto largo,
+  se comparan por ritmo mensual.
+- En el mes en curso se ve cuánto llevás facturado contra el mes anterior y la **proyección al cierre**.
+- **Top 10 clientes por facturación** con barras y el peso de cada uno sobre el total.
+- Los clientes del archivo que no están en WM3 se pueden agregar con un clic.
 
 ## Pestañas automáticas
 
