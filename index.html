@@ -201,6 +201,15 @@
   .card .src a { color: var(--accent); text-decoration: none; overflow-wrap: anywhere; }
   .card .src a:hover { text-decoration: underline; }
   .card .go { align-self: flex-start; }
+  .venc-day td { background: var(--soft); font-weight: 600; font-size: 12.5px; letter-spacing: .02em; }
+  .venc-row { cursor: pointer; }
+  .venc-row:hover td { background: var(--accent-soft); }
+  .venc-row.past td { color: var(--muted); }
+  .venc-cl td { background: var(--bg); font-size: 12.5px; }
+  .venc-cl table { min-width: 0; }
+  .venc-cl td td, .venc-cl th { padding: 6px 10px; }
+  .tag { display: inline-block; font: 600 10.5px var(--font-body); letter-spacing: .05em; text-transform: uppercase; padding: 2px 6px; border-radius: 4px; background: var(--soft); color: var(--muted); margin-left: 6px; }
+  .tag.warn { background: var(--late-bg); color: var(--late); }
   details.hist { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 12px 16px; }
   details.hist summary { cursor: pointer; font-weight: 600; }
   details.hist table { min-width: 0; margin-top: 8px; }
@@ -479,6 +488,7 @@ const LOCAL_FACT = 'panel-wm-facturacion-v1';
 // Research: un documento por día en "research/AAAA-MM-DD", escrito por la tarea programada
 let research = [];
 let resSel = '', resFiltro = 'todas';
+let resView = 'alertas', vencMes = '', vencOpen = new Set();  // subpestaña de Research, mes elegido y filas abiertas
 const LOCAL_RES = 'panel-wm-research-v1';
 let tenDb = null;
 
@@ -1590,15 +1600,20 @@ function exposicion(al) {
 function renderResearch() {
   const el = $('#research');
   if (loading) { el.innerHTML = '<div class="empty">Cargando…</div>'; return; }
+  const nav = `<nav class="subtabs" id="resNav">
+    <button data-rv="alertas" class="${resView === 'alertas' ? 'on' : ''}">Alertas${research[0] ? `<span class="n">${(research[0].alertas || []).length}</span>` : ''}</button>
+    <button data-rv="venc" class="${resView === 'venc' ? 'on' : ''}">Vencimientos del mes<span class="n">${vencimientos(mesActual()).length}</span></button>
+  </nav>`;
+  if (resView === 'venc') { el.innerHTML = nav + renderVencimientos(); return; }
   if (!research.length) {
-    el.innerHTML = `<div class="panel"><div class="empty"><div>Todavía no hay research.</div>
+    el.innerHTML = nav + `<div class="panel"><div class="empty"><div>Todavía no hay research.</div>
       <div>Se genera solo los días hábiles a las 9:00: revisa las noticias oficiales sobre los activos de tu cartera y deja acá las alertas de compra y venta, con la explicación y las fuentes.</div></div></div>`;
     return;
   }
   const doc = research.find(x => x.fecha === resSel) || research[0];
   const alertas = (doc.alertas || []).filter(a => resFiltro === 'todas' || accionClase(a.accion) === resFiltro);
   const counts = k => (doc.alertas || []).filter(a => accionClase(a.accion) === k).length;
-  el.innerHTML = `
+  el.innerHTML = nav + `
     <div class="res-head">
       <div>
         <h2>Research del ${fmtDate(doc.fecha)}</h2>
@@ -1626,13 +1641,147 @@ function renderResearch() {
         ${enCartera && ex.f ? `<button class="btn ghost go" data-goact="${esc(ex.f.activo)}" data-gotipo="${esc(ex.f.tipo)}">Ver clientes con ${esc(a.activo || a.tipo)}</button>` : ''}
       </article>`; }).join('') : '<div class="empty">No hay alertas de este tipo.</div>'}</div>`;
 }
+// ---------- Vencimientos (a partir de las tenencias) ----------
+const MES_LETRA = { E: 1, F: 2, M: 3, A: 4, Y: 5, J: 6, L: 7, G: 8, S: 9, O: 10, N: 11, D: 12 };
+const MES_ABR = { ENE: 1, FEB: 2, MAR: 3, ABR: 4, MAY: 5, JUN: 6, JUL: 7, AGO: 8, SEP: 9, SET: 9, OCT: 10, NOV: 11, DIC: 12 };
+const validDate = (y, m, d) => m >= 1 && m <= 12 && d >= 1 && d <= new Date(y, m, 0).getDate();
+const iso3 = (y, m, d) => `${y}-${pad(m)}-${pad(d)}`;
+const year4 = y => y < 100 ? 2000 + y : y;
+// Año para fechas sin año (e-cheqs): el próximo vencimiento a partir de un mes atrás
+function inferYear(m, d) {
+  const now = new Date(); let y = now.getFullYear();
+  if (new Date(y, m - 1, d) < new Date(now.getFullYear(), now.getMonth() - 1, now.getDate())) y++;
+  return y;
+}
+const VENC_CONOCIDOS = { TX26: '2026-11-09' };
+const vencCache = new Map();
+// Fecha de vencimiento de una especie según su código o descripción. null si no vence (FCI, acciones, moneda)
+function vencimientoDe(especie, desc, tipo) {
+  const key = especie + '|' + desc;
+  if (vencCache.has(key)) return vencCache.get(key);
+  let out = null;
+  const pend = /pendiente/i.test(especie + ' ' + desc);
+  const t = norm(tipo);
+  if (/fondo|cedear|accion|^mon$/.test(t)) out = null;
+  else {
+    let m;
+    // Pagaré: #AAR 30 10 6 0001 → 30/10/2026
+    if ((m = especie.match(/^#[A-Z]{3}(\d{2})(\d{2})(\d)\d{4}/)) && validDate(2020 + +m[3], +m[2], +m[1])) out = { fecha: iso3(2020 + +m[3], +m[2], +m[1]) };
+    // E-cheq: *AAR 31 10 00033 → 31/10 (año inferido)
+    else if ((m = especie.match(/^\*[A-Z]{3}(\d{2})(\d{2})\d{5}/)) && validDate(inferYear(+m[2], +m[1]), +m[2], +m[1])) out = { fecha: iso3(inferYear(+m[2], +m[1]), +m[2], +m[1]) };
+    // Futuros y opciones: MAI.ROS/ABR27 → fin de abril 2027
+    else if ((m = (especie + ' ' + desc).match(/\/(ENE|FEB|MAR|ABR|MAY|JUN|JUL|AGO|SEP|SET|OCT|NOV|DIC)(\d{2})\b/i))) {
+      const y = 2000 + +m[2], mo = MES_ABR[m[1].toUpperCase()];
+      out = { fecha: iso3(y, mo, new Date(y, mo, 0).getDate()), aprox: true };
+    }
+    // Índices: RFX20102026 → 20/10/2026
+    else if ((m = especie.match(/[A-Z]+(\d{2})(\d{2})(\d{4})$/)) && validDate(+m[3], +m[2], +m[1])) out = { fecha: iso3(+m[3], +m[2], +m[1]) };
+    else {
+      // Fecha en la descripción (la última que aparezca): 16/10/26, 04-10-28, V27/09/29, 30/05/2030
+      const all = [...desc.matchAll(/(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})(?!\d)/g)];
+      const last = all[all.length - 1];
+      if (last && validDate(year4(+last[3]), +last[2], +last[1])) out = { fecha: iso3(year4(+last[3]), +last[2], +last[1]) };
+      // Títulos cuya descripción solo trae el año
+      else if (VENC_CONOCIDOS[especie]) out = { fecha: VENC_CONOCIDOS[especie] };
+      // LECAP / letras por ticker: S16O6, D30O6 → día, mes (letra) y año
+      else if ((m = especie.match(/^[A-Z](\d{2})([EFMAYJLGSOND])(\d)$/)) && validDate(2020 + +m[3], MES_LETRA[m[2]], +m[1])) out = { fecha: iso3(2020 + +m[3], MES_LETRA[m[2]], +m[1]) };
+    }
+  }
+  if (out && pend) out.pendiente = true;
+  vencCache.set(key, out);
+  return out;
+}
+const mesActual = () => today().slice(0, 7);
+// Vencimientos de un mes (AAAA-MM), o de los próximos 90 días ('90'), agrupados por fecha y especie
+function vencimientos(mes) {
+  if (!tenencias.rows.length) return [];
+  const cols = tenCols(tenencias);
+  const hs = tenencias.columns.map(normHeader);
+  const desc = cols.desc >= 0 ? cols.desc : hs.findIndex(h => /instrumento|descripcion/.test(h));
+  const hoy = today(), hasta90 = isoLocal(new Date(Date.now() + 90 * 864e5));
+  const by = new Map();
+  for (const r of tenencias.rows) {
+    const especie = rowEspecie(r, cols), tipo = rowTipo(r, cols);
+    const v = vencimientoDe(especie, desc >= 0 ? String(r['c' + desc] ?? '') : '', tipo);
+    if (!v) continue;
+    const enRango = mes === '90' ? v.fecha >= hoy && v.fecha <= hasta90 : mes === 'pend' ? !!v.pendiente : v.fecha.slice(0, 7) === mes;
+    if (!enRango) continue;
+    const usd = cols.val >= 0 ? toNumber(r['c' + cols.val]) || 0 : 0;
+    const q = cols.qty >= 0 ? toNumber(r['c' + cols.qty]) || 0 : 0;
+    const k = v.fecha + '|' + especie;
+    const e = by.get(k) || { fecha: v.fecha, aprox: v.aprox, pendiente: v.pendiente, especie, tipo, desc: desc >= 0 ? String(r['c' + desc] ?? '') : '', usd: 0, q: 0, clientes: new Map() };
+    e.usd += usd; e.q += q;
+    const cuenta = holdCuenta(r);
+    const c = e.clientes.get(cuenta) || { cuenta, nombre: holdNombre(r), usd: 0, q: 0 };
+    c.usd += usd; c.q += q; e.clientes.set(cuenta, c);
+    by.set(k, e);
+  }
+  return [...by.values()].sort((a, b) => a.fecha.localeCompare(b.fecha) || b.usd - a.usd);
+}
+const DIAS = ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado'];
+function renderVencimientos() {
+  if (!tenencias.rows.length) return `<div class="panel"><div class="empty">Cargá las tenencias en <b>${esc(tabLabel(HOLD_TAB))}</b> para ver los vencimientos.</div></div>`;
+  const mes = vencMes || mesActual();
+  const [y, m] = mesActual().split('-').map(Number);
+  const opciones = Array.from({ length: 6 }, (_, i) => { const d = new Date(y, m - 1 + i, 1); return [isoLocal(d).slice(0, 7), cap(MESES[d.getMonth()]) + ' ' + d.getFullYear()]; });
+  const list = vencimientos(mes);
+  const hoy = today();
+  const tot = list.reduce((a, e) => a + e.usd, 0);
+  const clientes = new Set(list.flatMap(e => [...e.clientes.keys()]));
+  const sel = `<div class="filters"><label>Período<br><select id="vencMes" class="on">
+    ${opciones.map(([k, l]) => `<option value="${k}" ${k === mes ? 'selected' : ''}>${l}</option>`).join('')}
+    <option value="90" ${mes === '90' ? 'selected' : ''}>Próximos 90 días</option>
+    <option value="pend" ${mes === 'pend' ? 'selected' : ''}>Pendientes de pago</option></select></label>
+    <button class="btn ghost" id="vencExport" ${list.length ? '' : 'disabled'}>Exportar Excel</button></div>`;
+  const label = mes === '90' ? 'los próximos 90 días' : mes === 'pend' ? 'pendientes de pago' : (opciones.find(o => o[0] === mes)?.[1] || mes);
+  let prevFecha = '';
+  const rows = list.map(e => {
+    const id = e.fecha + '|' + e.especie;
+    const open = vencOpen.has(id);
+    const d = isoDate(e.fecha);
+    const head = e.fecha !== prevFecha ? `<tr class="venc-day"><td colspan="6">${cap(DIAS[d.getDay()])} ${fmtDate(e.fecha)}${e.aprox ? ' · fin de mes (contratos)' : ''}${e.fecha < hoy ? ' · ya pasó' : e.fecha === hoy ? ' · hoy' : ''}</td></tr>` : '';
+    prevFecha = e.fecha;
+    const cl = [...e.clientes.values()].sort((a, b) => b.usd - a.usd);
+    return head + `<tr class="venc-row ${e.fecha < hoy ? 'past' : ''}" data-venc="${esc(id)}" title="Ver clientes">
+      <td><b>${esc(e.especie)}</b>${e.pendiente ? '<span class="tag warn">Pendiente de pago</span>' : ''}${e.aprox ? '<span class="tag">Aprox.</span>' : ''}</td>
+      <td>${esc(e.desc && e.desc !== e.especie ? e.desc : '')}</td><td>${esc(e.tipo)}</td>
+      <td class="num">${e.clientes.size}</td><td class="num">${e.q ? fmtNum(e.q) : ''}</td><td class="num"><b>${fmtUSD(e.usd)}</b> ${open ? '▴' : '▾'}</td></tr>
+      ${open ? `<tr class="venc-cl"><td colspan="6"><table><thead><tr><th class="nosort">Cliente</th><th class="nosort">N° de cuenta</th><th class="nosort num">Cantidad</th><th class="nosort num">USD</th></tr></thead><tbody>
+        ${cl.map(c => `<tr><td>${esc(c.nombre || '—')}</td><td>${esc(c.cuenta)}</td><td class="num">${c.q ? fmtNum(c.q) : ''}</td><td class="num">${fmtUSD(c.usd)}</td></tr>`).join('')}</tbody></table></td></tr>` : ''}`;
+  }).join('');
+  return `
+    <div class="res-head"><div><h2>Vencimientos de ${esc(label)}</h2>
+      <div class="res-note">Calculados con tus tenencias del ${fmtDate(tenencias.updatedAt)}: letras, bonos, ONs, e-cheqs, pagarés, futuros y opciones según la fecha de su código o descripción. No incluye pagos de renta ni amortizaciones parciales de bonos. Tocá una fila para ver los clientes.</div></div>${sel}</div>
+    <div class="stats">
+      <span class="stat"><b>${fmtUSD(tot)}</b>USD vencen</span>
+      <span class="stat"><b>${list.length}</b>${list.length === 1 ? 'especie' : 'especies'}</span>
+      <span class="stat"><b>${clientes.size}</b>${clientes.size === 1 ? 'cliente' : 'clientes'}</span>
+    </div>
+    ${list.length ? `<div class="table-wrap"><table><thead><tr><th class="nosort">Especie</th><th class="nosort">Instrumento</th><th class="nosort">Tipo</th><th class="nosort num">Clientes</th><th class="nosort num">Cantidad</th><th class="nosort num">USD</th></tr></thead>
+      <tbody>${rows}</tbody></table></div>` : `<div class="panel"><div class="empty">No hay vencimientos en ${esc(label)} según tus tenencias.</div></div>`}`;
+}
+async function exportVencimientos() {
+  const list = vencimientos(vencMes || mesActual());
+  const data = list.flatMap(e => [...e.clientes.values()].map(c => ({ 'Fecha': fmtDate(e.fecha) + (e.aprox ? ' (aprox.)' : ''), 'Especie': e.especie, 'Instrumento': e.desc, 'Tipo': e.tipo,
+    'Cliente': c.nombre, 'N° de cuenta': c.cuenta, 'Cantidad': c.q, 'USD': Math.round(c.usd * 100) / 100, 'Estado': e.pendiente ? 'Pendiente de pago' : '' })));
+  if (await downloadBook(data, ['Fecha', 'Especie', 'Instrumento', 'Tipo', 'Cliente', 'N° de cuenta', 'Cantidad', 'USD', 'Estado'], `vencimientos_${vencMes || mesActual()}.xlsx`)) toast('Vencimientos exportados');
+}
+
 $('#research').addEventListener('click', e => {
+  const rv = e.target.closest('[data-rv]');
+  if (rv) { resView = rv.dataset.rv; render(); return; }
+  const vr = e.target.closest('[data-venc]');
+  if (vr) { const id = vr.dataset.venc; vencOpen.has(id) ? vencOpen.delete(id) : vencOpen.add(id); render(); return; }
+  if (e.target.closest('#vencExport')) { exportVencimientos(); return; }
   const c = e.target.closest('[data-rf]');
   if (c) { resFiltro = c.dataset.rf; render(); return; }
   const g = e.target.closest('[data-goact]');
   if (g) { filtro = { tipo: g.dataset.gotipo, activo: g.dataset.goact }; tab = SUMMARY_TAB; render(); window.scrollTo(0, 0); }
 });
-document.addEventListener('change', e => { if (e.target.id === 'resDia') { resSel = e.target.value; render(); } });
+document.addEventListener('change', e => {
+  if (e.target.id === 'resDia') { resSel = e.target.value; render(); }
+  if (e.target.id === 'vencMes') { vencMes = e.target.value; vencOpen.clear(); render(); }
+});
 
 // ---------- Eventos de la tabla ----------
 ['#qNombre', '#qCuenta'].forEach(s => $(s).addEventListener('input', render));

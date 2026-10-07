@@ -69,6 +69,10 @@ los riesgos, las fuentes y la exposición actual de la cartera (USD, % y cliente
 ("Research Panel WM", días hábiles 8:59 hora de Argentina) busca noticias oficiales y de mercado, las cruza con las tenencias
 y escribe el research del día en la base del panel; avisa por celular y mail. Es un insumo de análisis, no una orden de operar.
 
+La subpestaña **Vencimientos del mes** lista, a partir de las tenencias, lo que vence en el mes elegido (o en los próximos
+90 días, o lo pendiente de pago): letras, bonos, ONs, e-cheqs, pagarés, futuros y opciones, agrupado por fecha, con el total
+en USD y el detalle por cliente. La fecha sale del código o la descripción de cada especie. No incluye rentas ni amortizaciones parciales.
+
 ## Pestañas automáticas (dentro de Tenencia total)
 
 - **En 0:** clientes de WM3 sin tenencia (o con saldo negativo) en el último informe.
