@@ -183,6 +183,22 @@
   .panel .scroll { overflow: auto; max-height: 460px; border-top: 1px solid var(--border); }
   .panel table { min-width: 520px; }
   #incomeTop .scroll { max-height: none; }
+  #incomeTop .meta { grid-column: 1 / -1; }
+  .meta-row { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; padding: 4px 16px 16px; }
+  .meta-card { border: 1px solid var(--border); border-radius: 10px; padding: 12px 14px; background: var(--bg); min-width: 0; }
+  .meta-card .k { font-size: 12px; color: var(--muted); }
+  .meta-card .v { font: 600 24px var(--font-display); margin: 4px 0 2px; font-variant-numeric: tabular-nums; }
+  .meta-card .d { font-size: 12.5px; color: var(--muted); }
+  .meta-card .bar-track { margin-top: 8px; }
+  .meta-card.ok .v { color: var(--ok); }
+  .meta-card.low .v { color: var(--late); }
+  .meta-edit { display: inline-flex !important; flex-direction: row !important; white-space: nowrap; align-items: center; gap: 6px; font-size: 12.5px; color: var(--muted); }
+  .meta-edit input { width: 90px; font: 13px var(--font-body); padding: 4px 8px; border: 1px solid var(--border); border-radius: 7px; background: var(--bg); color: var(--text); }
+  .meta-note { padding: 0 16px 12px; color: var(--muted); font-size: 12.5px; }
+  .meta-note b { color: var(--text); }
+  .copy td.acum { color: var(--muted); }
+  .copy tr.corte td { border-bottom: 2px solid var(--accent); }
+  @media (max-width: 900px) { .meta-row { grid-template-columns: 1fr; } }
   #incomeTop .panel table { min-width: 0; }
   .panel thead th { position: sticky; top: 0; z-index: 1; padding: 10px 12px; }
   .panel td { padding: 8px 12px; }
@@ -483,6 +499,7 @@ const DEFAULT_CONFIG = {
   principal: 'WM3',
   dias: 21,
   umbral: 10000,
+  metaMes: 10000,  // facturación mínima por mes que se busca, en USD
   ten: {},   // columnas elegidas para valuar las tenencias (por nombre de columna)
   tabs: [
     { id: 'total', label: 'Tenencia total' },
@@ -1476,6 +1493,94 @@ const ritmo = (total, per) => esMesCompleto(per) ? total
   : total / diasPer(per) * MES_DIAS;
 const money2 = v => Math.abs(v) < 0.005 ? '<span class="muted">—</span>' : v.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
+// ---------- Meta mensual ----------
+const mesDe = p => p.desde.slice(0, 7);
+const esMensual = p => esMesCompleto(p) || esMesParcial(p);
+const totalPer = p => p.rows.reduce((a, r) => a + r.usd, 0);
+// Meses cargados por separado, del más nuevo al más viejo (si hay dos archivos del mismo mes, el más largo)
+function mesesCargados() {
+  const by = new Map();
+  for (const p of periodos.filter(esMensual)) {
+    const k = mesDe(p), e = by.get(k);
+    if (!e || p.hasta > e.hasta) by.set(k, p);
+  }
+  return [...by.values()].sort((a, b) => b.desde.localeCompare(a.desde));
+}
+function metaPanel() {
+  const meta = config.metaMes || 10000;
+  const fmt0 = v => v.toLocaleString('es-AR', { maximumFractionDigits: 0 });
+  const pct = v => Math.round(v / meta * 100);
+  const meses = mesesCargados();
+  const hoyMes = today().slice(0, 7);
+  const actual = meses.find(p => mesDe(p) === hoyMes) || null;
+  const cerrados = meses.filter(p => esMesCompleto(p) && mesDe(p) < hoyMes);
+  const base = cerrados[0] || null;   // el último mes completo: el que hay que copiar
+  // Promedio: meses completos cargados; si no hay, el ritmo mensual del archivo más largo
+  const largo = periodos.filter(p => !esMensual(p)).sort((a, b) => diasPer(b) - diasPer(a))[0];
+  const prom = cerrados.length ? cerrados.reduce((a, p) => a + totalPer(p), 0) / cerrados.length : largo ? ritmo(totalPer(largo), largo) : null;
+  const promTxt = cerrados.length ? `${plural(cerrados.length, 'mes completo', 'meses completos')} (${cerrados.map(p => cap(MESES[Number(p.desde.slice(5, 7)) - 1]).slice(0, 3)).reverse().join(', ')})`
+    : largo ? `del ${fmtDate(largo.desde)} al ${fmtDate(largo.hasta)}, llevado a un mes` : '';
+  const card = (k, v, d, cls, bar) => `<div class="meta-card ${cls || ''}"><div class="k">${k}</div><div class="v">${v}</div><div class="d">${d}</div>${bar != null ? `<div class="bar-track"><div class="bar-fill" style="width:${Math.min(100, Math.max(0, bar)).toFixed(1)}%"></div></div>` : ''}</div>`;
+  const cards = [];
+  if (prom != null) cards.push(card('Promedio por mes', `USD ${fmt0(prom)}`, `${pct(prom)}% de la meta · ${prom >= meta ? 'la estás cumpliendo' : `faltan USD ${fmt0(meta - prom)} por mes`}<br>${esc(promTxt)}`, prom >= meta ? 'ok' : 'low', prom / meta * 100));
+  if (base) { const t = totalPer(base); cards.push(card(`${cap(MESES[Number(base.desde.slice(5, 7)) - 1])} (mes anterior)`, `USD ${fmt0(t)}`, `${pct(t)}% de la meta`, t >= meta ? 'ok' : 'low', t / meta * 100)); }
+  if (actual) {
+    const t = totalPer(actual), dia = Number(actual.hasta.slice(8)), proy = esMesParcial(actual) ? t / dia * lastDay(actual.hasta) : t;
+    cards.push(card(`${cap(MESES[Number(actual.desde.slice(5, 7)) - 1])} (al ${fmtDate(actual.hasta).slice(0, 5)})`, `USD ${fmt0(t)}`,
+      `${pct(t)}% de la meta · ${t >= meta ? 'meta cumplida' : `faltan USD ${fmt0(meta - t)}`}<br>${esMesParcial(actual) ? `A este ritmo cerrás en USD ${fmt0(proy)}` : ''}`, t >= meta ? 'ok' : '', t / meta * 100));
+  } else cards.push(card(`${cap(MESES[Number(hoyMes.slice(5)) - 1])}`, '—', `Subí la facturación de ${MESES[Number(hoyMes.slice(5)) - 1]} a la fecha para ver cuánto te falta.`));
+
+  // Para copiar este mes: los comitentes que más facturaron en el mes anterior, hasta llegar a la meta
+  const ref = base || largo || null;
+  let copy = '';
+  if (ref) {
+    const porMes = !base;   // sin un mes completo, se usa el promedio mensual del archivo largo
+    const actBy = new Map(factClientes(actual).map(e => [e.key, e]));
+    const lista = factClientes(ref).map(e => ({ ...e, mes: porMes ? ritmo(e.total, ref) : e.total })).sort((a, b) => b.mes - a.mes);
+    let acum = 0, corte = -1;
+    lista.forEach((e, i) => { acum += e.mes; e.acum = acum; if (corte < 0 && acum >= meta) corte = i; });
+    const n = corte >= 0 ? corte + 1 : 12;
+    const show = lista.slice(0, Math.min(lista.length, Math.max(n + 3, 10)));
+    const principal = e => { const [k, v] = Object.entries(e.cats).sort((a, b) => b[1] - a[1])[0] || ['', 0]; return k ? `${esc(cap(k.toLowerCase()))}${Object.keys(e.cats).length > 1 ? ` <span class="muted">+${Object.keys(e.cats).length - 1}</span>` : ''}` : ''; };
+    const refTxt = base ? cap(MESES[Number(base.desde.slice(5, 7)) - 1]) : 'Promedio por mes';
+    copy = `<div class="meta-note">${corte >= 0
+        ? `Con <b>${plural(n, 'comitente', 'comitentes')}</b> llegaste a la meta${base ? ` en ${esc(MESES[Number(base.desde.slice(5, 7)) - 1])}` : ' (en promedio por mes)'}. Si este mes repetís lo que hicieron, la cumplís. La línea marca dónde se llega a USD ${fmt0(meta)}.`
+        : `Sumando a todos los comitentes no se llega a USD ${fmt0(meta)}${base ? ` en ${esc(MESES[Number(base.desde.slice(5, 7)) - 1])}` : ''}: faltan USD ${fmt0(meta - acum)}. Hace falta sumar operaciones o clientes nuevos.`}
+      ${porMes ? `<br>Todavía no tengo la facturación separada por mes, así que uso el promedio del ${fmtDate(ref.desde)} al ${fmtDate(ref.hasta)}. Cuando subas un mes completo, esta lista usa ese mes.` : ''}</div>
+      <div class="scroll"><table class="copy"><thead><tr><th class="nosort">Comitente</th><th class="nosort">Qué facturó</th><th class="nosort num">${esc(refTxt)} USD</th><th class="nosort num">Acumulado</th>${actual ? `<th class="nosort num">Este mes USD</th><th class="nosort num">Falta para repetir</th>` : ''}</tr></thead><tbody>
+      ${show.map((e, i) => { const a = actBy.get(e.key)?.total || 0, falta = Math.max(0, e.mes - a);
+        return `<tr class="${i === corte ? 'corte' : ''}"><td>${i + 1}. ${esc(e.nombre)}${e.cuenta ? `<div class="acct">${esc(e.cuenta)}</div>` : ''}</td><td>${principal(e)}</td>
+          <td class="num"><b>${fmtUSD(e.mes)}</b></td><td class="num acum">${fmtUSD(e.acum)} · ${pct(e.acum)}%</td>
+          ${actual ? `<td class="num">${a ? fmtUSD(a) : '<span class="muted">—</span>'}</td><td class="num ${falta ? 'neg' : 'pos'}">${falta ? fmtUSD(falta) : 'Repetido ✓'}</td>` : ''}</tr>`; }).join('')}
+      </tbody></table></div>`;
+  }
+  return `<div class="panel meta"><h3>Meta de facturación</h3>
+    <div class="sub"><label class="meta-edit">Meta mensual: USD <input id="metaMes" type="number" min="1" step="500" value="${meta}"></label></div>
+    <div class="meta-row">${cards.join('')}</div>
+    ${ref ? `<h3 style="padding-top:4px">Para copiar este mes</h3>${copy}` : ''}</div>`;
+}
+document.addEventListener('change', async e => {
+  if (e.target.id !== 'metaMes') return;
+  const v = Math.round(Number(e.target.value));
+  if (!(v > 0)) { e.target.value = config.metaMes || 10000; return; }
+  config = { ...config, metaMes: v };
+  render();
+  try { await saveConfig(); toast('Meta mensual guardada'); } catch {}
+});
+// Mes de una celda de fecha: número de Excel, fecha, "2026-09-15", "15/09/2026", "09/2026" o "septiembre 2026"
+function mesDeCelda(v) {
+  if (v instanceof Date && !isNaN(v)) return `${v.getFullYear()}-${pad(v.getMonth() + 1)}`;
+  if (typeof v === 'number' && v > 30000 && v < 80000) { const d = new Date(Math.round((v - 25569) * 864e5)); return `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}`; }
+  const t = norm(v);
+  let m;
+  if ((m = t.match(/^(\d{4})[-/.](\d{1,2})/))) return `${m[1]}-${pad(m[2])}`;
+  if ((m = t.match(/^\d{1,2}[-/.](\d{1,2})[-/.](\d{4})/))) return `${m[2]}-${pad(m[1])}`;
+  if ((m = t.match(/^(\d{1,2})[-/.](\d{4})$/))) return `${m[2]}-${pad(m[1])}`;
+  const i = MESES.findIndex(x => t.startsWith(x) || t.startsWith(x.slice(0, 3) + ' ') || t.startsWith(x.slice(0, 3) + '-'));
+  if (i >= 0 && (m = t.match(/(\d{4})/))) return `${m[1]}-${pad(i + 1)}`;
+  return null;
+}
+
 function renderIngresos() {
   const per = periodoSel();
   const cmp = periodoCmp(per);
@@ -1522,7 +1627,7 @@ function renderIngresos() {
   // Top 10 y períodos cargados
   const top = all.slice().sort((a, b) => b.total - a.total).slice(0, 10);
   const top10 = top.reduce((a, e) => a + e.total, 0);
-  $('#incomeTop').innerHTML = per ? `
+  $('#incomeTop').innerHTML = (list.length ? metaPanel() : '') + (per ? `
     <div class="panel"><h3>Top 10 clientes por facturación</h3>
       <div class="sub">${esc(perLabel(per))} · concentran el ${tot ? Math.round(top10 / tot * 100) : 0}% de lo facturado</div>
       <div class="scroll">${shareTable(top.map((e, i) => [`${i + 1}. ${e.nombre}`, e.total, e.cuenta]), tot, 'Cliente', '')}</div></div>
@@ -1532,7 +1637,7 @@ function renderIngresos() {
         return `<tr class="pick" data-per="${esc(perId(p))}" title="Ver este período"><td>${esc(perLabel(p))}</td><td class="num">${fmt0(t)}</td><td class="num">${fmt0(ritmo(t, p))}</td>
           <td class="muted">${esc(p.fileName)}</td><td class="c-x"><button class="x" data-delper="${esc(perId(p))}" title="Quitar este período" aria-label="Quitar período">×</button></td></tr>`; }).join('')}
       </tbody></table></div>
-      ${list.length < 2 ? '<div class="sub" style="padding-top:10px">Para comparar mes contra mes, subí la facturación de cada mes por separado (por ejemplo, septiembre completo y octubre a la fecha).</div>' : ''}</div>` : '';
+      ${list.length < 2 ? '<div class="sub" style="padding-top:10px">Para comparar mes contra mes, subí la facturación de cada mes por separado (por ejemplo, septiembre completo y octubre a la fecha).</div>' : ''}</div>` : '');
 
   const cols = [{ key: 'cuenta', label: 'N° de cuenta' }, { key: 'nombre', label: 'Cliente' }, ...cats.map(c => ({ key: 'cat:' + c, label: c, num: true })),
     { key: 'total', label: 'Total USD', num: true }, ...(full ? [] : [{ key: 'mes', label: partial ? 'Proyección del mes' : 'Por mes', num: true }]),
@@ -1552,7 +1657,7 @@ function renderIngresos() {
   const empty = $('#empty');
   empty.hidden = rows.length > 0;
   if (!rows.length) empty.innerHTML = loading ? 'Cargando…' : per ? 'No hay clientes que coincidan con la búsqueda.'
-    : `<div>Todavía no cargaste tu facturación.</div><div>Tocá <b>Importar facturación</b> y elegí el Excel. Necesita una columna con el cliente, otra con la categoría (por ejemplo ACDI u OPERACIONES) y otra con el monto en USD.</div><div>Después elegís qué período cubre el archivo.</div>`;
+    : `<div>Todavía no cargaste tu facturación.</div><div>Tocá <b>Importar facturación</b> y elegí el Excel. Necesita una columna con el cliente, otra con la categoría (por ejemplo ACDI u OPERACIONES) y otra con el monto en USD.</div><div>Si además trae una columna con la fecha o el mes, se separa sola por mes. Si no, después elegís qué período cubre el archivo.</div>`;
   $('#tbody').innerHTML = rows.map(e => { const c = calc(e); return `<tr>
     <td class="c-num">${esc(e.cuenta) || '<span class="muted">—</span>'}</td>
     <td>${esc(e.nombre)}${e.enPanel ? '' : ` <span class="chip add" style="opacity:1">no está en ${esc(config.principal)}</span>`}</td>
@@ -1592,7 +1697,8 @@ async function importIngresos(file) {
   const cuentaCol = hs.findIndex(h => cuentaAliases.includes(h));
   const nameCol = hs.findIndex((h, i) => i !== cuentaCol && NAME_RE.test(h));
   const catCol = hs.findIndex(h => /categoria|concepto|rubro|tipo/.test(h));
-  const numeric = i => body.some(r => typeof r[i] === 'number') && !isIndexCol(grid, hi, i) && i !== cuentaCol;
+  const mesCol = hs.findIndex(h => /fecha|\bmes\b|periodo|month|date/.test(h));
+  const numeric = i => body.some(r => typeof r[i] === 'number') && !isIndexCol(grid, hi, i) && i !== cuentaCol && i !== mesCol;
   const nums = hs.map((h, i) => i).filter(numeric);
   const amtCol = nums.find(i => /dolarizado|usd|total|monto|importe|ingreso|sum/.test(hs[i])) ?? nums[nums.length - 1] ?? -1;
   if (amtCol < 0) return toast('No encontré una columna con montos en el archivo');
@@ -1603,15 +1709,46 @@ async function importIngresos(file) {
     if (!nombre && !cuenta) continue;
     if (/^(sub)?total/.test(normHeader(nombre)) || isNaN(usd)) continue;
     const cat = catCol >= 0 ? String(row[catCol] ?? '').trim() || 'Otros' : 'Facturación';
-    const k = norm(cuenta || nombre) + '|' + cat;
-    const e = agg.get(k) || { cuenta, nombre, cat, usd: 0 };
+    const mes = mesCol >= 0 ? mesDeCelda(row[mesCol]) || '' : '';
+    const k = mes + '|' + norm(cuenta || nombre) + '|' + cat;
+    const e = agg.get(k) || { cuenta, nombre, cat, mes, usd: 0 };
     e.usd += usd; agg.set(k, e);
   }
-  const rows = [...agg.values()].filter(e => Math.abs(e.usd) >= 0.005).map(e => ({ ...e, usd: Math.round(e.usd * 100) / 100 }));
-  if (!rows.length) return toast('El archivo no tiene facturación debajo de los títulos');
+  const all = [...agg.values()].filter(e => Math.abs(e.usd) >= 0.005).map(e => ({ ...e, usd: Math.round(e.usd * 100) / 100 }));
+  if (!all.length) return toast('El archivo no tiene facturación debajo de los títulos');
+  const meses = [...new Set(all.map(r => r.mes).filter(Boolean))].sort();
+  if (meses.length) return importPorMes(all, file.name, meses);
+  const rows = all.map(({ mes, ...r }) => r);
   const sum = c => rows.filter(r => r.cat === c).reduce((s, r) => s + r.usd, 0);
   const cats = [...new Set(rows.map(r => r.cat))].sort((a, b) => sum(b) - sum(a));
   openPerDialog({ rows, cats, fileName: file.name });
+}
+
+// El archivo trae una columna de fecha o mes: se guarda un período por cada mes
+async function importPorMes(all, fileName, meses) {
+  const hoy = today();
+  const docs = meses.map(m => {
+    const rows = all.filter(r => r.mes === m).map(({ mes, ...r }) => r);
+    const sum = c => rows.filter(r => r.cat === c).reduce((s, r) => s + r.usd, 0);
+    const desde = m + '-01', fin = `${m}-${pad(lastDay(desde))}`;
+    return { desde, hasta: fin > hoy && m === hoy.slice(0, 7) ? hoy : fin, rows, cats: [...new Set(rows.map(r => r.cat))].sort((a, b) => sum(b) - sum(a)), fileName, cargado: hoy };
+  });
+  const sinMes = all.filter(r => !r.mes).length;
+  const fmt0 = v => v.toLocaleString('es-AR', { maximumFractionDigits: 0 });
+  const txt = docs.map(d => `${perLabel(d)}: USD ${fmt0(totalPer(d))}`).join(' · ');
+  if (!await confirmAsk('Facturación por mes', `El archivo trae ${plural(docs.length, 'mes', 'meses')}: ${txt}.${sinMes ? ` Hay ${plural(sinMes, 'fila', 'filas')} sin fecha que no se cargan.` : ''} Se guarda cada mes por separado (si un mes ya estaba cargado, se reemplaza).`, 'Guardar meses')) return;
+  const ids = new Set(docs.map(perId));
+  const reemplazar = periodos.filter(p => esMensual(p) && docs.some(d => mesDe(d) === mesDe(p)) && !ids.has(perId(p)));
+  periodos = [...periodos.filter(p => !ids.has(perId(p)) && !reemplazar.includes(p)), ...docs];
+  selPer = perId(docs[docs.length - 1]); cmpPer = 'auto';
+  render();
+  try {
+    if (tenDb) {
+      for (const d of docs) await write(() => tenDb.doc('facturacion/' + perId(d)).set(d));
+      for (const p of reemplazar) await write(() => tenDb.doc('facturacion/' + perId(p)).delete());
+    } else saveLocal();
+    toast(`Se guardaron ${plural(docs.length, 'mes', 'meses')} de facturación`);
+  } catch {}
 }
 
 // Elegir el período del archivo antes de guardarlo
