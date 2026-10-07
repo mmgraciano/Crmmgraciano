@@ -326,30 +326,32 @@
 
 <script>
 const DEFAULT_CONFIG = {
-  v: 2,
+  v: 3,
   principal: 'WM3',
   dias: 21,
   umbral: 10000,
   ten: {},   // columnas elegidas para valuar las tenencias (por nombre de columna)
   tabs: [
     { id: 'total', label: 'Tenencia total' },
+    { id: 'fwd', label: 'Tenencias' },
+    { id: 'ingresos', label: 'Ingresos' },
     { id: 'sgr', label: 'SGR' },
     { id: 'prospects', label: 'Prospects' },
     { id: 'tareas', label: 'Tareas pendientes' },
     { id: 'fal', label: 'FAL' },
     { id: 'notas', label: 'Notas Estructuradas' },
-    { id: 'fwd', label: 'FWD' },
     { id: 'cero', label: 'En 0' },
     { id: 'menos10k', label: 'Menos de 10.000 USD' },
   ],
 };
 const MAIN = 'wm3';
-const HOLD_TAB = 'fwd';           // la pestaña FWD muestra las tenencias cargadas por Excel
+const HOLD_TAB = 'fwd';           // pestaña "Tenencias": el detalle cargado por Excel (antes se llamaba FWD)
+const INCOME_TAB = 'ingresos';    // ingresos por cliente y categoría
 const SUMMARY_TAB = 'total';      // resumen de la tenencia total y su variación
 const ZERO_TAB = 'cero';          // clientes sin tenencia
 const LOW_TAB = 'menos10k';       // clientes con menos del umbral en USD
-const AUTO_TABS = new Set([HOLD_TAB, SUMMARY_TAB, ZERO_TAB, LOW_TAB]); // no se asignan a mano
-const HOLD_CHUNK = 400;           // filas por documento en la base de datos
+const AUTO_TABS = new Set([HOLD_TAB, SUMMARY_TAB, ZERO_TAB, LOW_TAB, INCOME_TAB]); // no se asignan a mano
+const HOLD_CHUNK = 150;           // filas por documento en la base de datos
 const LOCAL_HOLD = 'panel-wm-tenencias-v1';
 const LOCAL_PREV = 'panel-wm-tenencias-prev-v1';
 const LOCAL_HIST = 'panel-wm-historial-v1';
@@ -391,8 +393,13 @@ const EMPTY_DS = () => ({ columns: [], cuentaCol: -1, nombreCol: -1, rows: [], u
 let tenPrev = EMPTY_DS();         // informe anterior, para calcular la variación
 let historial = [];               // [{fecha, total, tc, fileName}] un registro por informe
 // Dos juegos de tenencias en la base: el actual y el anterior, cada uno en bloques de filas
-const DS = { cur: { coll: 'tenencias', meta: 'actual' }, prev: { coll: 'tenencias_prev', meta: 'anterior' } };
-const dsState = { cur: { meta: null, chunks: new Map() }, prev: { meta: null, chunks: new Map() } };
+const DS = { cur: { coll: 'tenencias', meta: 'actual' }, prev: { coll: 'tenencias_prev', meta: 'anterior' }, ing: { coll: 'ingresos', meta: 'ingresos' } };
+const dsState = { cur: { meta: null, chunks: new Map() }, prev: { meta: null, chunks: new Map() }, ing: { meta: null, chunks: new Map() } };
+// Ingresos: filas {cuenta, nombre, cat, usd} agrupadas por cliente y categoría
+const EMPTY_ING = () => ({ rows: [], cats: [], fileName: '', updatedAt: '' });
+let ingresos = EMPTY_ING();
+let ingSort = { key: 'total', dir: -1 };
+const LOCAL_ING = 'panel-wm-ingresos-v1';
 let tenDb = null;
 
 const $ = s => document.querySelector(s);
@@ -417,6 +424,15 @@ function migrateConfig(c) {
     if (!c.tabs.some(t => t.id === ZERO_TAB)) c.tabs.push({ id: ZERO_TAB, label: 'En 0' });
     if (!c.tabs.some(t => t.id === LOW_TAB)) c.tabs.push({ id: LOW_TAB, label: 'Menos de 10.000 USD' });
     c.v = 2;
+  }
+  if (c.v < 3) {
+    // FWD pasa a ser "Tenencias", al lado de Tenencia total, y se suma "Ingresos"
+    const fwd = c.tabs.find(t => t.id === HOLD_TAB);
+    if (fwd && fwd.label === 'FWD') fwd.label = 'Tenencias';
+    c.tabs = c.tabs.filter(t => t.id !== HOLD_TAB && t.id !== INCOME_TAB);
+    const at = c.tabs.findIndex(t => t.id === SUMMARY_TAB) + 1;
+    c.tabs.splice(at, 0, fwd || { id: HOLD_TAB, label: 'Tenencias' }, { id: INCOME_TAB, label: 'Ingresos' });
+    c.v = 3;
   }
   return c;
 }
@@ -457,6 +473,7 @@ function saveLocal() {
     localStorage.setItem(LOCAL_HOLD, JSON.stringify(tenencias));
     localStorage.setItem(LOCAL_PREV, JSON.stringify(tenPrev));
     localStorage.setItem(LOCAL_HIST, JSON.stringify(historial));
+    localStorage.setItem(LOCAL_ING, JSON.stringify(ingresos));
   } catch { toast('No se pudo guardar en este navegador'); }
 }
 async function write(fn) {
@@ -509,6 +526,7 @@ async function initStorage() {
     try { tenencias = JSON.parse(localStorage.getItem(LOCAL_HOLD)) || tenencias; } catch {}
     try { tenPrev = JSON.parse(localStorage.getItem(LOCAL_PREV)) || tenPrev; } catch {}
     try { historial = JSON.parse(localStorage.getItem(LOCAL_HIST)) || []; } catch {}
+    try { ingresos = JSON.parse(localStorage.getItem(LOCAL_ING)) || ingresos; } catch {}
     loading = false; setSync(); render(); return;
   }
   tenDb = db;
@@ -523,7 +541,7 @@ async function initStorage() {
   db.collection('tenencias_meta').onSnapshot(snap => {
     const m = new Map(snap.docs.map(d => [d.id, structuredClone(d.data())]));
     for (const k of Object.keys(DS)) dsState[k].meta = m.get(DS[k].meta) || null;
-    assemble('cur'); assemble('prev');
+    assemble('cur'); assemble('prev'); assemble('ing');
   }, fail);
   for (const k of Object.keys(DS)) {
     db.collection(DS[k].coll).onSnapshot(snap => {
@@ -554,11 +572,12 @@ function assemble(k) {
     }
     ds = { ...EMPTY_DS(), ...meta, rows: rows.map(structuredClone) };
   }
-  if (k === 'cur') tenencias = ds; else tenPrev = ds;
+  if (k === 'ing') ingresos = meta ? { ...EMPTY_ING(), ...ds } : EMPTY_ING();
+  else if (k === 'cur') tenencias = ds; else tenPrev = ds;
   render();
 }
 async function saveDataset(k, next) {
-  if (k === 'cur') tenencias = next; else tenPrev = next;
+  if (k === 'ing') ingresos = next; else if (k === 'cur') tenencias = next; else tenPrev = next;
   if (!tenDb) { saveLocal(); return; }
   const coll = tenDb.collection(DS[k].coll);
   const chunks = [];
@@ -617,7 +636,7 @@ function tenCols(ds) {
   let mon = config.ten?.mon;
   if (!(mon === '__usd' || mon === '__ars' || (mon && ds.columns.includes(mon)))) {
     const mi = hs.findIndex(h => MON_RE.test(h));
-    mon = mi >= 0 ? ds.columns[mi] : val >= 0 && ARS_HEADER_RE.test(ds.columns[val].toLowerCase()) && !USD_HEADER_RE.test(hs[val]) ? '__ars' : '__usd';
+    mon = val >= 0 && USD_HEADER_RE.test(hs[val]) ? '__usd' : mi >= 0 ? ds.columns[mi] : val >= 0 && ARS_HEADER_RE.test(ds.columns[val].toLowerCase()) && !USD_HEADER_RE.test(hs[val]) ? '__ars' : '__usd';
   }
   return { val, qty, esp, mon, monIdx: ds.columns.indexOf(mon) };
 }
@@ -728,21 +747,22 @@ function render() {
 
   const allTabs = [{ id: MAIN, label: config.principal }, ...config.tabs];
   $('#tabs').innerHTML = allTabs.map(t => {
-    const n = t.id === SUMMARY_TAB ? null : t.id === HOLD_TAB ? holdCuentas().size : cuentas.filter(c => inTab(c, t.id)).length;
+    const n = t.id === SUMMARY_TAB ? null : t.id === HOLD_TAB ? holdCuentas().size : t.id === INCOME_TAB ? ingClientes().length : cuentas.filter(c => inTab(c, t.id)).length;
     return `<button class="tab ${t.id === tab ? 'active' : ''}" data-tab="${esc(t.id)}">${esc(t.label)}${n === null ? '' : `<span class="n">${n}</span>`}</button>`;
   }).join('') + `<button class="tab edit" id="btnTabs" title="Editar pestañas" aria-label="Editar pestañas">+</button>`;
 
-  const hold = tab === HOLD_TAB, summary = tab === SUMMARY_TAB;
-  $('#btnSinCuenta').hidden = hold || summary;
-  $('#btnNew').hidden = hold || summary;
+  const hold = tab === HOLD_TAB, summary = tab === SUMMARY_TAB, income = tab === INCOME_TAB;
+  $('#btnSinCuenta').hidden = hold || summary || income;
+  $('#btnNew').hidden = hold || summary || income;
   $('#btnAjustes').hidden = !(hold || summary);
   $('#btnImport').hidden = summary;
-  $('#btnImport').textContent = hold ? 'Importar tenencias' : 'Importar Excel';
+  $('#btnImport').textContent = hold ? 'Importar tenencias' : income ? 'Importar ingresos' : 'Importar Excel';
   $('#summary').hidden = !summary;
   $('#tableWrap').hidden = summary;
   $('#searches').hidden = summary;
-  $('table').classList.toggle('hold', hold);
+  $('table').classList.toggle('hold', hold || income);
   if (summary) { renderSummary(); return; }
+  if (income) { renderIngresos(); return; }
   if (hold) { renderTenencias(); restoreFocus(focus); return; }
 
   const base = currentRows();
@@ -814,6 +834,9 @@ function holdColumns() {
   const rest = tenencias.columns.map((label, i) => ({ key: 'c' + i, label, i }))
     .filter(c => c.i !== tenencias.cuentaCol && c.i !== tenencias.nombreCol);
   const isNum = c => tenencias.rows.some(r => typeof r[c.key] === 'number') && tenencias.rows.every(r => r[c.key] === '' || r[c.key] == null || typeof r[c.key] === 'number');
+  // La valuación usada para el total va primero, al lado del nombre
+  const vi = tenCols(tenencias).val;
+  rest.sort((x, y) => (y.i === vi) - (x.i === vi));
   return [{ key: 'cuenta', label: 'N° de cuenta' }, { key: 'nombre', label: 'Nombre' }, ...rest.map(c => ({ ...c, num: isNum(c) }))];
 }
 const holdVal = (r, k) => k === 'cuenta' ? holdCuenta(r) : k === 'nombre' ? holdNombre(r) : r[k];
@@ -882,6 +905,38 @@ function renderTenencias() {
     return `<tr class="${grouped && first ? 'group-start' : ''}">${cells}</tr>`;
   }).join('');
 }
+
+// ---------- Formato del reporte del broker ----------
+const COMBO_RE = /^\s*(\d+)\s*-\s*(.+)$/;
+// Índice de una columna tipo "12915 - MORASSI ALEJANDRO" (cuenta y nombre juntos), o -1
+function comboCol(header, rows) {
+  for (let i = 0; i < header.length; i++) {
+    if (!/comitente|cliente|cuenta/.test(normHeader(header[i]))) continue;
+    const vals = rows.map(r => r[i]).filter(v => v !== '' && v != null);
+    if (vals.length && vals.filter(v => COMBO_RE.test(String(v))).length >= vals.length * 0.6) return i;
+  }
+  return -1;
+}
+// Separa esa columna en "N° de cuenta" y "Nombre" (modifica la grilla)
+function splitCombo(grid, hi) {
+  const ci = comboCol(grid[hi], grid.slice(hi + 1));
+  if (ci < 0) return;
+  grid[hi].splice(ci, 1, 'N° de cuenta', 'Nombre');
+  for (const row of grid.slice(hi + 1)) {
+    const m = String(row[ci] ?? '').match(COMBO_RE);
+    row.splice(ci, 1, m ? m[1] : '', m ? m[2].trim() : String(row[ci] ?? '').trim());
+  }
+}
+// Títulos de las columnas del reporte de tenencias del broker
+const PRETTY = {
+  grupo_instrumento: 'Tipo', abreviatura_instrumento: 'Especie', descripcion_instrumento: 'Instrumento',
+  descripcion_moneda: 'Moneda', precio_moneda_emision: 'Precio', total: 'Cantidad', valoracion_total: 'Valuación en moneda',
+  codigo_especie: 'Código', valoracion_mep: 'Valuación USD MEP', t0: 'T+0', t1: 'T+1', t2: 'T+2',
+  pendiente: 'Pendiente', futuro: 'Futuro', garantia: 'Garantía', fecha_posicion: 'Fecha',
+};
+const prettyHeader = h => PRETTY[h] || (/^[a-z0-9]+(_[a-z0-9]+)+$/.test(h) ? (h.charAt(0).toUpperCase() + h.slice(1)).replace(/_/g, ' ') : h);
+// Columna de índice sin título (0, 1, 2…) que agregan algunos exportadores
+const isIndexCol = (grid, hi, i) => !String(grid[hi][i] ?? '').trim() && grid.slice(hi + 1).every((row, k) => row[i] === k || row[i] === k + 1 || row[i] === '');
 
 // ---------- Tenencia total ----------
 function recordHist() {
@@ -1058,6 +1113,115 @@ $('#stats').addEventListener('click', e => {
   tab = b.dataset.goto; render();
 });
 
+// ---------- Ingresos ----------
+const findCuenta = (cuenta, nombre) => cuenta
+  ? cuentas.find(c => norm(c.cuenta) === norm(cuenta))
+  : cuentas.find(c => norm(c.nombre) === norm(nombre));
+// Una fila por cliente con el total de cada categoría
+function ingClientes() {
+  const by = new Map();
+  for (const r of ingresos.rows) {
+    const c = findCuenta(r.cuenta, r.nombre);
+    const key = c ? 'id:' + c.id : 'n:' + norm(r.nombre);
+    const e = by.get(key) || { cuenta: c?.cuenta || r.cuenta || '', nombre: c?.nombre || r.nombre, enPanel: !!c, cats: {}, total: 0 };
+    e.cats[r.cat] = (e.cats[r.cat] || 0) + r.usd; e.total += r.usd;
+    by.set(key, e);
+  }
+  return [...by.values()];
+}
+function renderIngresos() {
+  const all = ingClientes();
+  const qn = norm($('#qNombre').value), qc = norm($('#qCuenta').value).replace(/\s/g, '');
+  const rows = all.filter(e => (!qn || norm(e.nombre).includes(qn)) && (!qc || norm(e.cuenta).includes(qc)));
+  const cats = ingresos.cats;
+  const tot = rows.reduce((a, e) => a + e.total, 0);
+  const fuera = all.filter(e => !e.enPanel).length;
+  const fmt2 = v => v.toLocaleString('es-AR', { maximumFractionDigits: 0 });
+  $('#stats').innerHTML = ingresos.rows.length ? `
+    <span class="stat"><b>${fmt2(tot)}</b>USD de ingresos</span>
+    ${cats.map(c => `<span class="stat"><b>${fmt2(rows.reduce((a, e) => a + (e.cats[c] || 0), 0))}</b>${esc(c)}</span>`).join('')}
+    <span class="stat info">${esc(ingresos.fileName)} · cargado ${fmtDate(ingresos.updatedAt)}</span>
+    ${fuera ? `<button class="stat info" id="btnAddIng" title="Agregarlos a ${esc(config.principal)} (sin N° de cuenta)">${fuera} no están en ${esc(config.principal)} · Agregar</button>` : ''}` : '';
+  const cols = [{ key: 'cuenta', label: 'N° de cuenta' }, { key: 'nombre', label: 'Cliente' }, ...cats.map(c => ({ key: 'cat:' + c, label: c, num: true })), { key: 'total', label: 'Total USD', num: true }];
+  $('#headRow').innerHTML = cols.map(c => `<th class="${c.num ? 'num' : ''} ${ingSort.key === c.key ? 'sorted' : ''}" data-isort="${esc(c.key)}">${esc(c.label)}<span class="ar">${ingSort.key === c.key ? (ingSort.dir > 0 ? '↑' : '↓') : '↕'}</span></th>`).join('');
+  const val = (e, k) => k === 'total' ? e.total : k.startsWith('cat:') ? (e.cats[k.slice(4)] || 0) : e[k];
+  rows.sort((a, b) => {
+    const va = val(a, ingSort.key), vb = val(b, ingSort.key);
+    const res = typeof va === 'number' ? va - vb : norm(va).localeCompare(norm(vb), 'es', { numeric: true });
+    return res * ingSort.dir || b.total - a.total;
+  });
+  const empty = $('#empty');
+  empty.hidden = rows.length > 0;
+  if (!rows.length) empty.innerHTML = loading ? 'Cargando…' : ingresos.rows.length ? 'No hay clientes que coincidan con la búsqueda.'
+    : `<div>Todavía no cargaste ingresos.</div><div>Tocá <b>Importar ingresos</b> y elegí el Excel. Necesita una columna con el cliente, otra con la categoría (por ejemplo ACDI u OPERACIONES) y otra con el monto en USD.</div><div>Cada importación reemplaza la anterior.</div>`;
+  const money = v => Math.abs(v) < 0.005 ? '<span class="muted">—</span>' : v.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  $('#tbody').innerHTML = rows.map(e => `<tr>
+    <td class="c-num">${esc(e.cuenta) || '<span class="muted">—</span>'}</td>
+    <td>${esc(e.nombre)}${e.enPanel ? '' : ` <span class="chip add" style="opacity:1">no está en ${esc(config.principal)}</span>`}</td>
+    ${cats.map(c => `<td class="num">${money(e.cats[c] || 0)}</td>`).join('')}
+    <td class="num"><b>${money(e.total)}</b></td></tr>`).join('');
+}
+async function importIngresos(file) {
+  let grid;
+  try {
+    const wb = XLSX.read(await file.arrayBuffer());
+    grid = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1, defval: '', raw: true, blankrows: false });
+  } catch { return toast('No se pudo leer el archivo. Tiene que ser un Excel (.xlsx o .xls) o un CSV.'); }
+  const NAME_RE = /comitente|cliente|nombre|razon social|titular/;
+  const hi = grid.slice(0, 20).findIndex(row => row.some(h => NAME_RE.test(normHeader(h))));
+  if (hi < 0) return toast('No encontré una columna con el cliente (por ejemplo "Comitente" o "Nombre") en las primeras filas');
+  splitCombo(grid, hi);
+  const hs = grid[hi].map(normHeader), body = grid.slice(hi + 1);
+  const cuentaAliases = EXCEL_FIELDS.find(f => f.key === 'cuenta').aliases;
+  const cuentaCol = hs.findIndex(h => cuentaAliases.includes(h));
+  const nameCol = hs.findIndex((h, i) => i !== cuentaCol && NAME_RE.test(h));
+  const catCol = hs.findIndex(h => /categoria|concepto|rubro|tipo/.test(h));
+  const numeric = i => body.some(r => typeof r[i] === 'number') && !isIndexCol(grid, hi, i) && i !== cuentaCol;
+  const nums = hs.map((h, i) => i).filter(numeric);
+  const amtCol = nums.find(i => /dolarizado|usd|total|monto|importe|ingreso|sum/.test(hs[i])) ?? nums[nums.length - 1] ?? -1;
+  if (amtCol < 0) return toast('No encontré una columna con montos en el archivo');
+  const agg = new Map();
+  for (const row of body) {
+    const nombre = String(row[nameCol] ?? '').trim(), cuenta = cuentaCol >= 0 ? String(row[cuentaCol] ?? '').trim() : '';
+    const usd = toNumber(row[amtCol]);
+    if (!nombre && !cuenta) continue;
+    if (/^(sub)?total/.test(normHeader(nombre)) || isNaN(usd)) continue;
+    const cat = catCol >= 0 ? String(row[catCol] ?? '').trim() || 'Otros' : 'Ingresos';
+    const k = norm(cuenta || nombre) + '|' + cat;
+    const e = agg.get(k) || { cuenta, nombre, cat, usd: 0 };
+    e.usd += usd; agg.set(k, e);
+  }
+  const rows = [...agg.values()].filter(e => Math.abs(e.usd) >= 0.005).map(e => ({ ...e, usd: Math.round(e.usd * 100) / 100 }));
+  if (!rows.length) return toast('El archivo no tiene ingresos debajo de los títulos');
+  const cats = [...new Set(rows.map(r => r.cat))].sort((a, b) => rows.filter(r => r.cat === b).reduce((s, r) => s + r.usd, 0) - rows.filter(r => r.cat === a).reduce((s, r) => s + r.usd, 0));
+  if (ingresos.rows.length && !await confirmAsk('Reemplazar ingresos', `Se van a reemplazar los ingresos cargados (${ingresos.fileName}) por los del archivo "${file.name}".`, 'Reemplazar')) return;
+  try {
+    await saveDataset('ing', { rows, cats, fileName: file.name, updatedAt: today() });
+    render();
+    toast(`Ingresos cargados: ${plural(new Set(rows.map(r => norm(r.cuenta || r.nombre))).size, 'cliente', 'clientes')}`);
+  } catch {}
+}
+async function exportIngresos() {
+  const list = ingClientes().sort((a, b) => b.total - a.total);
+  if (!list.length) return toast('No hay ingresos para exportar');
+  const data = list.map(e => ({ 'N° de cuenta': e.cuenta, 'Cliente': e.nombre, ...Object.fromEntries(ingresos.cats.map(c => [c, Math.round((e.cats[c] || 0) * 100) / 100])), 'Total USD': Math.round(e.total * 100) / 100 }));
+  if (await downloadBook(data, ['N° de cuenta', 'Cliente', ...ingresos.cats, 'Total USD'], `ingresos_${today()}.xlsx`)) toast('Ingresos exportados');
+}
+$('#headRow').addEventListener('click', e => {
+  const th = e.target.closest('[data-isort]'); if (!th) return;
+  const k = th.dataset.isort;
+  ingSort = ingSort.key === k ? { key: k, dir: -ingSort.dir } : { key: k, dir: k === 'cuenta' || k === 'nombre' ? 1 : -1 };
+  render();
+});
+$('#stats').addEventListener('click', async e => {
+  if (!e.target.closest('#btnAddIng')) return;
+  const nuevos = ingClientes().filter(x => !x.enPanel);
+  if (!await confirmAsk('Agregar clientes', `Se van a agregar ${plural(nuevos.length, 'cliente', 'clientes')} a ${config.principal} con su nombre${nuevos.some(x => !x.cuenta) ? ' (sin N° de cuenta: completalo después editando cada uno)' : ''}.`, 'Agregar')) return;
+  const list = nuevos.map(x => ({ id: uid(), creado: today(), cuenta: x.cuenta, nombre: x.nombre, telefono: '', email: '', ultimoContacto: '', accion: '', notas: '', pestanas: [] }));
+  cuentas.push(...list); render();
+  try { await saveMany(list, 'Guardando'); toast(`Se agregaron ${plural(list.length, 'cliente', 'clientes')}`); } catch {}
+});
+
 // ---------- Eventos de la tabla ----------
 ['#qNombre', '#qCuenta'].forEach(s => $(s).addEventListener('input', render));
 $('#tabs').addEventListener('click', e => {
@@ -1185,7 +1349,7 @@ $('#tagsForm').addEventListener('submit', async () => {
 let draftTabs = [];
 function renderTabRows() {
   $('#tabRows').innerHTML = [{ id: MAIN, label: config.principal, main: true }, ...draftTabs].map((t, i) => {
-    const n = t.main ? cuentas.length : t.id === SUMMARY_TAB ? null : t.id === HOLD_TAB ? holdCuentas().size : cuentas.filter(c => inTab(c, t.id)).length;
+    const n = t.main ? cuentas.length : t.id === SUMMARY_TAB ? null : t.id === HOLD_TAB ? holdCuentas().size : t.id === INCOME_TAB ? ingClientes().length : cuentas.filter(c => inTab(c, t.id)).length;
     return `<div class="tab-row" data-i="${i - 1}">
       <input id="tabname-${esc(t.id)}" value="${esc(t.label)}" aria-label="Nombre de la pestaña">
       <span class="count">${n === null ? '' : n + ' cuentas'}</span>
@@ -1278,6 +1442,7 @@ function downloadTemplate() {
 $('#btnExport').addEventListener('click', async () => {
   if (tab === HOLD_TAB) return exportTenencias();
   if (tab === SUMMARY_TAB) return exportVariacion();
+  if (tab === INCOME_TAB) return exportIngresos();
   const rows = currentRows().filter(c => !soloContactar || alarma(c).late).sort(compare);
   if (!rows.length) return toast('No hay cuentas para exportar en esta vista');
   const data = rows.map(c => ({
@@ -1331,6 +1496,7 @@ $('#fileInput').addEventListener('change', async e => {
   const file = e.target.files[0]; if (!file) return;
   e.target.value = '';
   if (tab === HOLD_TAB || tab === SUMMARY_TAB) return importTenencias(file);
+  if (tab === INCOME_TAB) return importIngresos(file);
   let raw;
   try {
     const wb = XLSX.read(await file.arrayBuffer());
@@ -1343,17 +1509,24 @@ $('#fileInput').addEventListener('change', async e => {
     const f = EXCEL_FIELDS.find(f => f.aliases.includes(normHeader(h)));
     if (f && !map[f.key]) map[f.key] = h;
   }
-  if (!map.nombre && !map.cuenta) return toast('No encontré columnas "Nombre" ni "N° de cuenta" en la primera fila del archivo');
+  if (!map.nombre && !map.cuenta) {
+    const keys = Object.keys(raw[0]);
+    const ci = comboCol(keys, raw.slice(0, 50).map(r => keys.map(k => r[k])));
+    if (ci >= 0) map.combo = keys[ci];
+  }
+  if (!map.nombre && !map.cuenta && !map.combo) return toast('No encontré columnas "Nombre" ni "N° de cuenta" en la primera fila del archivo');
 
   const created = [];
   const toWrite = [];
   let added = 0, updated = 0;
   for (const r of raw) {
     const get = k => map[k] ? String(r[map[k]] ?? '').trim() : '';
-    const nombre = get('nombre'), cuenta = get('cuenta');
+    const combo = map.combo ? get('combo').match(COMBO_RE) : null;
+    const nombre = combo ? combo[2].trim() : get('nombre'), cuenta = combo ? combo[1] : get('cuenta');
     if (!nombre && !cuenta) continue;
     const data = {};
     for (const k of ['cuenta', 'nombre', 'telefono', 'email', 'accion', 'notas']) if (map[k] && get(k)) data[k] = get(k);
+    if (combo) { data.cuenta = cuenta; data.nombre = nombre; }
     if (map.ultimoContacto && r[map.ultimoContacto] !== '') data.ultimoContacto = parseDate(r[map.ultimoContacto]);
     let tags = map.pestanas ? parseTabs(r[map.pestanas], created) : [];
     if (tab !== MAIN && !AUTO_TABS.has(tab) && !tags.includes(tab)) tags.push(tab);
@@ -1389,12 +1562,18 @@ async function importTenencias(file) {
   } catch { return toast('No se pudo leer el archivo. Tiene que ser un Excel (.xlsx o .xls) o un CSV.'); }
   const cuentaAliases = EXCEL_FIELDS.find(f => f.key === 'cuenta').aliases;
   const nombreAliases = EXCEL_FIELDS.find(f => f.key === 'nombre').aliases;
-  const hi = grid.slice(0, 20).findIndex(row => row.some(h => cuentaAliases.includes(normHeader(h))));
+  let hi = grid.slice(0, 20).findIndex(row => row.some(h => cuentaAliases.includes(normHeader(h))));
+  if (hi < 0) hi = grid.slice(0, 20).findIndex((row, k) => comboCol(row, grid.slice(k + 1, k + 30)) >= 0);
   if (hi < 0) return toast('No encontré una columna de N° de cuenta (por ejemplo "N° de cuenta", "Cuenta" o "Comitente") en las primeras filas');
+  splitCombo(grid, hi);
 
-  const header = grid[hi].map((h, i) => String(h ?? '').trim() || `Columna ${i + 1}`);
-  const used = header.map((_, i) => grid.slice(hi + 1).some(row => row[i] !== '' && row[i] != null));
-  const keep = header.map((_, i) => i).filter(i => used[i] || cuentaAliases.includes(normHeader(header[i])));
+  const body = grid.slice(hi + 1);
+  const header = grid[hi].map((h, i) => prettyHeader(String(h ?? '').trim()) || `Columna ${i + 1}`);
+  const used = header.map((_, i) => body.some(row => row[i] !== '' && row[i] != null));
+  // Se descartan la columna de índice y las que tienen el mismo valor en todas las filas (por ejemplo, el administrador)
+  const constant = i => body.length >= 10 && body.every(row => String(row[i] ?? '') === String(body[0][i] ?? ''));
+  const isKey = i => cuentaAliases.includes(normHeader(header[i])) || nombreAliases.includes(normHeader(header[i]));
+  const keep = header.map((_, i) => i).filter(i => isKey(i) || (used[i] && !isIndexCol(grid, hi, i) && !constant(i)));
   const columns = keep.map(i => header[i]);
   const cuentaCol = columns.findIndex(h => cuentaAliases.includes(normHeader(h)));
   const nombreCol = columns.findIndex(h => nombreAliases.includes(normHeader(h)));

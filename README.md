@@ -21,9 +21,10 @@ Panel para registrar tu base de cuentas, en un solo archivo (`index.html`).
 - **×** en WM3 elimina la cuenta; en otra pestaña solo la quita de esa pestaña.
 - **Eliminar sin cuenta** borra los registros que no tienen N° de cuenta (en la pestaña que estás viendo).
 
-## Tenencias (pestaña FWD)
+## Tenencias
 
-La pestaña **FWD** muestra las tenencias de tus clientes. Tocá **Importar tenencias** estando en FWD y elegí el Excel.
+La pestaña **Tenencias** muestra el detalle por especie de tus clientes. Tocá **Importar tenencias** estando en Tenencias y elegí el Excel
+(el reporte del broker con `descripcion_comitente_completa`, `valoracion_mep`, etc. se lee tal cual).
 
 - Necesita una columna con el N° de cuenta (`N° de cuenta`, `Cuenta`, `Comitente`…). Puede haber filas de título arriba.
 - El resto de las columnas (especie, cantidad, precio, valuación, moneda…) se muestran tal como vienen en el archivo.
@@ -44,6 +45,11 @@ La pestaña **Tenencia total** muestra el total en USD del último informe de te
 En **Ajustes de tenencia** se elige qué columna es la valuación, la moneda, la cantidad y la especie, y se carga el
 **tipo de cambio** para pasar a USD las posiciones en pesos. Si importás dos veces el mismo día, la segunda corrige a la primera.
 
+## Ingresos
+
+La pestaña **Ingresos** muestra lo que generó cada cliente por categoría (por ejemplo ACDI, OPERACIONES, FUTUROS) y el total en USD.
+Tocá **Importar ingresos** estando en esa pestaña. Los clientes del archivo que no están en WM3 se pueden agregar con un clic.
+
 ## Pestañas automáticas
 
 - **En 0:** clientes de WM3 sin tenencia en el último informe.
@@ -51,7 +57,7 @@ En **Ajustes de tenencia** se elige qué columna es la valuación, la moneda, la
 
 ## Importar desde Excel
 
-El archivo necesita una columna `Nombre` o `N° de cuenta`. También reconoce `Última vez contactado`, `Acción / comentarios`,
+El archivo necesita una columna `Nombre` o `N° de cuenta` (o una columna tipo `12915 - APELLIDO NOMBRE`, como el reporte del broker). También reconoce `Última vez contactado`, `Acción / comentarios`,
 `Teléfono`, `Email`, `Notas` y `Pestañas` (por ejemplo `SGR, FAL`; si una pestaña no existe, se crea).
 
 - Si importás estando en una pestaña (por ejemplo SGR), las cuentas importadas también quedan en esa pestaña.
