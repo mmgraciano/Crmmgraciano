@@ -210,6 +210,19 @@
   .venc-cl td td, .venc-cl th { padding: 6px 10px; }
   .tag { display: inline-block; font: 600 10.5px var(--font-body); letter-spacing: .05em; text-transform: uppercase; padding: 2px 6px; border-radius: 4px; background: var(--soft); color: var(--muted); margin-left: 6px; }
   .tag.warn { background: var(--late-bg); color: var(--late); }
+  .model-grid { display: grid; grid-template-columns: minmax(0, 1.7fr) minmax(0, 1fr); gap: 16px; align-items: start; }
+  .model-grid .panel { padding-bottom: 6px; }
+  .model-grid table { min-width: 0; }
+  .grp td { background: var(--soft); font-weight: 600; font-size: 12.5px; }
+  .line-why { font-size: 12px; color: var(--muted); margin-top: 2px; max-width: 62ch; }
+  .alloc { display: flex; flex-direction: column; gap: 10px; padding: 6px 16px 14px; }
+  .alloc-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 4px 10px; font-size: 13px; }
+  .alloc-row .bar-track { grid-column: 1 / -1; }
+  .money-in { width: 170px; padding: 9px 14px; border: 1px solid var(--border); border-radius: 999px; background: var(--panel); color: var(--text); font: 13.5px var(--font-body); font-variant-numeric: tabular-nums; }
+  .model-src { display: flex; flex-direction: column; gap: 6px; padding: 4px 16px 14px; font-size: 12.5px; }
+  .model-src a { color: var(--accent); text-decoration: none; overflow-wrap: anywhere; }
+  .model-src a:hover { text-decoration: underline; }
+  @media (max-width: 900px) { .model-grid { grid-template-columns: 1fr; } }
   details.hist { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 12px 16px; }
   details.hist summary { cursor: pointer; font-weight: 600; }
   details.hist table { min-width: 0; margin-top: 8px; }
@@ -488,7 +501,8 @@ const LOCAL_FACT = 'panel-wm-facturacion-v1';
 // Research: un documento por día en "research/AAAA-MM-DD", escrito por la tarea programada
 let research = [];
 let resSel = '', resFiltro = 'todas';
-let resView = 'alertas', vencMes = '', vencOpen = new Set();  // subpestaña de Research, mes elegido y filas abiertas
+let resView = 'alertas', vencMes = '', vencOpen = new Set();
+let modelPerfil = 'moderado', modelMonto = 100000;   // cartera nueva: perfil y monto elegidos  // subpestaña de Research, mes elegido y filas abiertas
 const LOCAL_RES = 'panel-wm-research-v1';
 let tenDb = null;
 
@@ -1603,8 +1617,10 @@ function renderResearch() {
   const nav = `<nav class="subtabs" id="resNav">
     <button data-rv="alertas" class="${resView === 'alertas' ? 'on' : ''}">Alertas${research[0] ? `<span class="n">${(research[0].alertas || []).length}</span>` : ''}</button>
     <button data-rv="venc" class="${resView === 'venc' ? 'on' : ''}">Vencimientos del mes<span class="n">${vencimientos(mesActual()).length}</span></button>
+    <button data-rv="modelo" class="${resView === 'modelo' ? 'on' : ''}">Cartera nueva</button>
   </nav>`;
   if (resView === 'venc') { el.innerHTML = nav + renderVencimientos(); return; }
+  if (resView === 'modelo') { el.innerHTML = nav + renderModelo(); return; }
   if (!research.length) {
     el.innerHTML = nav + `<div class="panel"><div class="empty"><div>Todavía no hay research.</div>
       <div>Se genera solo los días hábiles a las 9:00: revisa las noticias oficiales sobre los activos de tu cartera y deja acá las alertas de compra y venta, con la explicación y las fuentes.</div></div></div>`;
@@ -1760,6 +1776,57 @@ function renderVencimientos() {
     ${list.length ? `<div class="table-wrap"><table><thead><tr><th class="nosort">Especie</th><th class="nosort">Instrumento</th><th class="nosort">Tipo</th><th class="nosort num">Clientes</th><th class="nosort num">Cantidad</th><th class="nosort num">USD</th></tr></thead>
       <tbody>${rows}</tbody></table></div>` : `<div class="panel"><div class="empty">No hay vencimientos en ${esc(label)} según tus tenencias.</div></div>`}`;
 }
+// ---------- Cartera nueva (cartera modelo por perfil, la escribe el research diario) ----------
+const PERFILES = { conservador: 'Conservador', moderado: 'Moderado', agresivo: 'Agresivo' };
+const modeloDoc = () => research.find(x => x.carteraModelo?.perfiles);
+function renderModelo() {
+  const doc = modeloDoc();
+  if (!doc) return `<div class="panel"><div class="empty"><div>Todavía no hay una cartera modelo.</div><div>El research diario la arma con las noticias del día para cada perfil de inversor.</div></div></div>`;
+  const cm = doc.carteraModelo;
+  const perfil = cm.perfiles[modelPerfil] ? modelPerfil : Object.keys(cm.perfiles)[0];
+  const p = cm.perfiles[perfil];
+  const lineas = (p.lineas || []).slice();
+  const totPct = lineas.reduce((a, l) => a + (+l.pct || 0), 0) || 100;
+  const v = valuar(tenencias);
+  const tenidos = esp => { if (!v?.ok || !v.porEspecie.has(esp)) return 0; const x = valuar(tenencias, { tipo: '', activo: esp }); return [...x.porCuenta.values()].filter(c => Math.abs(c.usd) >= 0.5).length; };
+  const grupos = [];
+  for (const l of lineas) { let g = grupos.find(x => x.nombre === l.grupo); if (!g) grupos.push(g = { nombre: l.grupo, pct: 0, lineas: [] }); g.pct += +l.pct || 0; g.lineas.push(l); }
+  const usd = pct => modelMonto * pct / totPct;
+  return `
+    <div class="res-head">
+      <div><h2>Cartera nueva · perfil ${esc(PERFILES[perfil] || perfil)}</h2>
+        <div class="res-note">Propuesta del research del ${fmtDate(doc.fecha)} para armar una cartera desde cero. ${esc(cm.nota || '')} Antes de operar, confirmá precios, liquidez y mínimos de cada instrumento y que encaje con el perfil y el horizonte del cliente.</div></div>
+      <div class="filters">
+        <label>Perfil<br><select id="modelPerfil" class="on">${Object.keys(cm.perfiles).map(k => `<option value="${k}" ${k === perfil ? 'selected' : ''}>${esc(PERFILES[k] || k)}</option>`).join('')}</select></label>
+        <label>Monto a invertir (USD)<br><input id="modelMonto" class="money-in" type="number" min="0" step="1000" value="${modelMonto}"></label>
+        <button class="btn ghost" id="modelExport">Exportar Excel</button>
+      </div>
+    </div>
+    ${p.descripcion ? `<div class="res-ctx"><h3>Cómo está pensada</h3><p>${esc(p.descripcion)}</p>${p.riesgos ? `<p class="muted" style="font-size:12.5px"><b>Riesgos:</b> ${esc(p.riesgos)}</p>` : ''}</div>` : ''}
+    <div class="model-grid">
+      <div class="table-wrap"><table>
+        <thead><tr><th class="nosort">Instrumento</th><th class="nosort">Tipo</th><th class="nosort num">%</th><th class="nosort num">USD</th></tr></thead>
+        <tbody>${grupos.map(g => `<tr class="grp"><td colspan="2">${esc(g.nombre)}</td><td class="num">${(g.pct / totPct * 100).toLocaleString('es-AR', { maximumFractionDigits: 1 })}%</td><td class="num">${fmtUSD(usd(g.pct))}</td></tr>
+          ${g.lineas.map(l => { const n = l.activo ? tenidos(l.activo) : 0; return `<tr>
+            <td><b>${esc(l.activo || '')}</b>${l.descripcion ? ' · ' + esc(l.descripcion) : ''}${n ? `<span class="tag">Ya en ${n} ${n === 1 ? 'cliente' : 'clientes'}</span>` : ''}
+              ${l.porque ? `<div class="line-why">${esc(l.porque)}</div>` : ''}</td>
+            <td class="muted">${esc(l.tipo || '')}</td><td class="num">${(+l.pct || 0).toLocaleString('es-AR', { maximumFractionDigits: 1 })}%</td><td class="num"><b>${fmtUSD(usd(+l.pct || 0))}</b></td></tr>`; }).join('')}`).join('')}
+        </tbody></table></div>
+      <div class="panel"><h3>Distribución</h3><div class="sub">Por tipo de inversión</div>
+        <div class="alloc">${grupos.map(g => `<div class="alloc-row"><span>${esc(g.nombre)}</span><span class="num">${(g.pct / totPct * 100).toLocaleString('es-AR', { maximumFractionDigits: 1 })}%</span>
+          <div class="bar-track"><div class="bar-fill" style="width:${(g.pct / Math.max(...grupos.map(x => x.pct)) * 100).toFixed(1)}%"></div></div></div>`).join('')}</div>
+        ${cm.fuentes?.length ? `<h3 style="padding-top:4px">Fuentes</h3><div class="model-src">${cm.fuentes.map(f => `<a href="${esc(/^https?:\/\//.test(f.url || '') ? f.url : '#')}" target="_blank" rel="noopener noreferrer">${esc(f.titulo || f.url)}</a>`).join('')}</div>` : ''}
+      </div>
+    </div>`;
+}
+async function exportModelo() {
+  const doc = modeloDoc(); if (!doc) return;
+  const p = doc.carteraModelo.perfiles[modelPerfil] || Object.values(doc.carteraModelo.perfiles)[0];
+  const totPct = p.lineas.reduce((a, l) => a + (+l.pct || 0), 0) || 100;
+  const data = p.lineas.map(l => ({ 'Grupo': l.grupo, 'Especie': l.activo, 'Instrumento': l.descripcion, 'Tipo': l.tipo, '%': +l.pct || 0, 'USD': Math.round(modelMonto * (+l.pct || 0) / totPct), 'Por qué': l.porque }));
+  if (await downloadBook(data, ['Grupo', 'Especie', 'Instrumento', 'Tipo', '%', 'USD', 'Por qué'], `cartera_nueva_${modelPerfil}_${doc.fecha}.xlsx`)) toast('Cartera exportada');
+}
+
 async function exportVencimientos() {
   const list = vencimientos(vencMes || mesActual());
   const data = list.flatMap(e => [...e.clientes.values()].map(c => ({ 'Fecha': fmtDate(e.fecha) + (e.aprox ? ' (aprox.)' : ''), 'Especie': e.especie, 'Instrumento': e.desc, 'Tipo': e.tipo,
@@ -1773,6 +1840,7 @@ $('#research').addEventListener('click', e => {
   const vr = e.target.closest('[data-venc]');
   if (vr) { const id = vr.dataset.venc; vencOpen.has(id) ? vencOpen.delete(id) : vencOpen.add(id); render(); return; }
   if (e.target.closest('#vencExport')) { exportVencimientos(); return; }
+  if (e.target.closest('#modelExport')) { exportModelo(); return; }
   const c = e.target.closest('[data-rf]');
   if (c) { resFiltro = c.dataset.rf; render(); return; }
   const g = e.target.closest('[data-goact]');
@@ -1781,6 +1849,8 @@ $('#research').addEventListener('click', e => {
 document.addEventListener('change', e => {
   if (e.target.id === 'resDia') { resSel = e.target.value; render(); }
   if (e.target.id === 'vencMes') { vencMes = e.target.value; vencOpen.clear(); render(); }
+  if (e.target.id === 'modelPerfil') { modelPerfil = e.target.value; render(); }
+  if (e.target.id === 'modelMonto') { modelMonto = Math.max(0, Number(e.target.value) || 0); render(); }
 });
 
 // ---------- Eventos de la tabla ----------

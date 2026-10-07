@@ -73,6 +73,10 @@ La subpestaña **Vencimientos del mes** lista, a partir de las tenencias, lo que
 90 días, o lo pendiente de pago): letras, bonos, ONs, e-cheqs, pagarés, futuros y opciones, agrupado por fecha, con el total
 en USD y el detalle por cliente. La fecha sale del código o la descripción de cada especie. No incluye rentas ni amortizaciones parciales.
 
+La subpestaña **Cartera nueva** propone qué comprar para armar una cartera desde cero según el perfil (conservador, moderado
+o agresivo) y el monto a invertir: instrumentos concretos agrupados por tipo, % y USD de cada uno, por qué, y si ya está
+en la cartera de otros clientes. La actualiza el research diario y se puede exportar a Excel.
+
 ## Pestañas automáticas (dentro de Tenencia total)
 
 - **En 0:** clientes de WM3 sin tenencia (o con saldo negativo) en el último informe.
