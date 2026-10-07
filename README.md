@@ -77,7 +77,8 @@ La subpestaña **Cartera nueva** propone qué comprar para armar una cartera des
 o agresivo) y el monto a invertir: instrumentos concretos agrupados por tipo, % y USD de cada uno, por qué, y si ya está
 en la cartera de otros clientes. La actualiza el research diario y se puede exportar a Excel.
 El perfil **moderado** sigue siempre la regla de Micaela: 80% en obligaciones negociables de emisores con calificación
-AAA local y 20% en CEDEARs o acciones argentinas, según el momento.
+AAA local y 20% en CEDEARs o acciones argentinas, según el momento. Las acciones se eligen por consenso de analistas
+(recomendación, precio objetivo promedio y potencial de suba), sin índices en máximos, y se muestran las candidatas descartadas con el motivo.
 
 ## Pestañas automáticas (dentro de Tenencia total)
 

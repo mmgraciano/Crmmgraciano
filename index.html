@@ -225,6 +225,11 @@
   .alloc { display: flex; flex-direction: column; gap: 10px; padding: 6px 16px 14px; }
   .alloc-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 4px 10px; font-size: 13px; }
   .alloc-row .bar-track { grid-column: 1 / -1; }
+  .cons { display: inline-flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
+  .cons span { font: 600 11px var(--font-body); padding: 2px 7px; border-radius: 5px; background: var(--ok-bg); color: var(--ok); font-variant-numeric: tabular-nums; }
+  .cons span.n { background: var(--soft); color: var(--muted); }
+  .descartes { margin: 0; padding: 0 16px 14px 32px; display: flex; flex-direction: column; gap: 4px; font-size: 12.5px; color: var(--muted); }
+  .descartes b { color: var(--text); }
   .money-in { width: 170px; padding: 9px 14px; border: 1px solid var(--border); border-radius: 999px; background: var(--panel); color: var(--text); font: 13.5px var(--font-body); font-variant-numeric: tabular-nums; }
   .model-src { display: flex; flex-direction: column; gap: 6px; padding: 4px 16px 14px; font-size: 12.5px; }
   .model-src a { color: var(--accent); text-decoration: none; overflow-wrap: anywhere; }
@@ -1818,12 +1823,14 @@ function renderModelo() {
         <tbody>${grupos.map(g => `<tr class="grp"><td colspan="2">${esc(g.nombre)}</td><td class="num">${(g.pct / totPct * 100).toLocaleString('es-AR', { maximumFractionDigits: 1 })}%</td><td class="num">${fmtUSD(usd(g.pct))}</td></tr>
           ${g.lineas.map(l => { const n = l.activo ? tenidos(l.activo) : 0; return `<tr>
             <td><b>${esc(l.activo || '')}</b>${l.descripcion ? ' · ' + esc(l.descripcion) : ''}${n ? `<span class="tag">Ya en ${n} ${n === 1 ? 'cliente' : 'clientes'}</span>` : ''}
+              ${l.consenso || l.precioObjetivo || l.potencial != null ? `<div class="cons">${l.consenso ? `<span>${esc(l.consenso)}</span>` : ''}${l.precioObjetivo ? `<span class="n">Precio objetivo ${esc(l.precioObjetivo)}</span>` : ''}${l.potencial != null && l.potencial !== '' ? `<span>${Number(l.potencial) >= 0 ? '+' : ''}${Number(l.potencial).toLocaleString('es-AR', { maximumFractionDigits: 1 })}% potencial</span>` : ''}${l.analistas ? `<span class="n">${esc(l.analistas)}</span>` : ''}</div>` : ''}
               ${l.porque ? `<div class="line-why">${esc(l.porque)}</div>` : ''}</td>
             <td class="muted">${esc(l.tipo || '')}</td><td class="num">${(+l.pct || 0).toLocaleString('es-AR', { maximumFractionDigits: 1 })}%</td><td class="num"><b>${fmtUSD(usd(+l.pct || 0))}</b></td></tr>`; }).join('')}`).join('')}
         </tbody></table></div>
       <div class="panel"><h3>Distribución</h3><div class="sub">Por tipo de inversión</div>
         <div class="alloc">${grupos.map(g => `<div class="alloc-row"><span>${esc(g.nombre)}</span><span class="num">${(g.pct / totPct * 100).toLocaleString('es-AR', { maximumFractionDigits: 1 })}%</span>
           <div class="bar-track"><div class="bar-fill" style="width:${(g.pct / Math.max(...grupos.map(x => x.pct)) * 100).toFixed(1)}%"></div></div></div>`).join('')}</div>
+        ${p.descartados?.length ? `<h3 style="padding-top:4px">Analizados y descartados</h3><ul class="descartes">${p.descartados.map(d => `<li><b>${esc(d.activo)}</b>: ${esc(d.motivo)}</li>`).join('')}</ul>` : ''}
         ${cm.fuentes?.length ? `<h3 style="padding-top:4px">Fuentes</h3><div class="model-src">${cm.fuentes.map(f => `<a href="${esc(/^https?:\/\//.test(f.url || '') ? f.url : '#')}" target="_blank" rel="noopener noreferrer">${esc(f.titulo || f.url)}</a>`).join('')}</div>` : ''}
       </div>
     </div>`;
@@ -1832,8 +1839,9 @@ async function exportModelo() {
   const doc = modeloDoc(); if (!doc) return;
   const p = doc.carteraModelo.perfiles[modelPerfil] || Object.values(doc.carteraModelo.perfiles)[0];
   const totPct = p.lineas.reduce((a, l) => a + (+l.pct || 0), 0) || 100;
-  const data = p.lineas.map(l => ({ 'Grupo': l.grupo, 'Especie': l.activo, 'Instrumento': l.descripcion, 'Tipo': l.tipo, '%': +l.pct || 0, 'USD': Math.round(modelMonto * (+l.pct || 0) / totPct), 'Por qué': l.porque }));
-  if (await downloadBook(data, ['Grupo', 'Especie', 'Instrumento', 'Tipo', '%', 'USD', 'Por qué'], `cartera_nueva_${modelPerfil}_${doc.fecha}.xlsx`)) toast('Cartera exportada');
+  const data = p.lineas.map(l => ({ 'Grupo': l.grupo, 'Especie': l.activo, 'Instrumento': l.descripcion, 'Tipo': l.tipo, '%': +l.pct || 0, 'USD': Math.round(modelMonto * (+l.pct || 0) / totPct),
+    'Consenso': l.consenso || '', 'Precio objetivo': l.precioObjetivo || '', 'Potencial %': l.potencial ?? '', 'Por qué': l.porque }));
+  if (await downloadBook(data, ['Grupo', 'Especie', 'Instrumento', 'Tipo', '%', 'USD', 'Consenso', 'Precio objetivo', 'Potencial %', 'Por qué'], `cartera_nueva_${modelPerfil}_${doc.fecha}.xlsx`)) toast('Cartera exportada');
 }
 
 async function exportVencimientos() {
