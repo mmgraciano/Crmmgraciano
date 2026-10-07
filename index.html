@@ -188,6 +188,10 @@
   .res-ctx h3 { margin: 0 0 6px; font: 600 15px var(--font-display); }
   .res-ctx ul { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 4px; }
   .res-ctx p { margin: 0 0 8px; max-width: 80ch; }
+  .ctx-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+  .res-news { border-color: var(--accent); }
+  .res-news a { color: var(--accent); font-size: 12.5px; }
+  @media (max-width: 900px) { .ctx-grid { grid-template-columns: 1fr; } }
   .chipbar { display: flex; flex-wrap: wrap; gap: 6px; }
   .chipbar button { border: 1px solid var(--border); background: var(--panel); color: var(--text); border-radius: 999px; padding: 6px 12px; font: 500 12.5px var(--font-body); cursor: pointer; }
   .chipbar button.on { background: var(--accent); color: var(--on-accent); border-color: var(--accent); }
@@ -1651,7 +1655,12 @@ function renderResearch() {
       </div>
       <div class="filters"><label>Ver otro día<br><select id="resDia">${research.map(x => `<option value="${esc(x.fecha)}" ${x.fecha === doc.fecha ? 'selected' : ''}>${fmtDate(x.fecha)} · ${plural((x.alertas || []).length, 'alerta', 'alertas')}</option>`).join('')}</select></label></div>
     </div>
-    ${doc.resumen || doc.contexto?.length ? `<div class="res-ctx"><h3>Contexto del día</h3>${doc.resumen ? `<p>${esc(doc.resumen)}</p>` : ''}${doc.contexto?.length ? `<ul>${doc.contexto.map(c => `<li>${esc(c)}</li>`).join('')}</ul>` : ''}</div>` : ''}
+    ${doc.titulares?.length ? `<div class="res-ctx res-news"><h3>Lo que tenés que saber hoy</h3><ul>${doc.titulares.map(t => `<li><b>${esc(t.titulo)}</b>${t.fecha ? ` <span class="tag">${esc(t.fecha)}</span>` : ''}${t.detalle ? ` · ${esc(t.detalle)}` : ''}${t.url && /^https?:\/\//.test(t.url) ? ` <a href="${esc(t.url)}" target="_blank" rel="noopener noreferrer">Ver</a>` : ''}</li>`).join('')}</ul></div>` : ''}
+    ${doc.contextoLocal?.length || doc.contextoInternacional?.length ? `<div class="ctx-grid">
+      <div class="res-ctx"><h3>Argentina</h3><ul>${(doc.contextoLocal || []).map(c => `<li>${esc(c)}</li>`).join('')}</ul></div>
+      <div class="res-ctx"><h3>Internacional</h3><ul>${(doc.contextoInternacional || []).map(c => `<li>${esc(c)}</li>`).join('')}</ul></div>
+    </div>${doc.resumen ? `<div class="res-ctx"><h3>Qué significa para tu cartera</h3><p>${esc(doc.resumen)}</p></div>` : ''}`
+    : doc.resumen || doc.contexto?.length ? `<div class="res-ctx"><h3>Contexto del día</h3>${doc.resumen ? `<p>${esc(doc.resumen)}</p>` : ''}${doc.contexto?.length ? `<ul>${doc.contexto.map(c => `<li>${esc(c)}</li>`).join('')}</ul>` : ''}</div>` : ''}
     <div class="chipbar" id="resChips">
       ${[['todas', `Todas (${(doc.alertas || []).length})`], ['buy', `Comprar o sumar (${counts('buy')})`], ['sell', `Vender o reducir (${counts('sell')})`], ['watch', `Vigilar (${counts('watch')})`]]
         .map(([k, l]) => `<button data-rf="${k}" class="${resFiltro === k ? 'on' : ''}">${l}</button>`).join('')}
