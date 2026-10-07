@@ -1542,14 +1542,15 @@ function metaPanel() {
     const n = corte >= 0 ? corte + 1 : 12;
     const show = lista.slice(0, Math.min(lista.length, Math.max(n + 3, 10)));
     const principal = e => { const [k, v] = Object.entries(e.cats).sort((a, b) => b[1] - a[1])[0] || ['', 0]; return k ? `${esc(cap(k.toLowerCase()))}${Object.keys(e.cats).length > 1 ? ` <span class="muted">+${Object.keys(e.cats).length - 1}</span>` : ''}` : ''; };
+    const conCat = (ref.cats || []).length > 1;   // la columna de categoría solo sirve si el archivo las trae
     const refTxt = base ? cap(MESES[Number(base.desde.slice(5, 7)) - 1]) : 'Promedio por mes';
     copy = `<div class="meta-note">${corte >= 0
         ? `Con <b>${plural(n, 'comitente', 'comitentes')}</b> llegaste a la meta${base ? ` en ${esc(MESES[Number(base.desde.slice(5, 7)) - 1])}` : ' (en promedio por mes)'}. Si este mes repetís lo que hicieron, la cumplís. La línea marca dónde se llega a USD ${fmt0(meta)}.`
         : `Sumando a todos los comitentes no se llega a USD ${fmt0(meta)}${base ? ` en ${esc(MESES[Number(base.desde.slice(5, 7)) - 1])}` : ''}: faltan USD ${fmt0(meta - acum)}. Hace falta sumar operaciones o clientes nuevos.`}
       ${porMes ? `<br>Todavía no tengo la facturación separada por mes, así que uso el promedio del ${fmtDate(ref.desde)} al ${fmtDate(ref.hasta)}. Cuando subas un mes completo, esta lista usa ese mes.` : ''}</div>
-      <div class="scroll"><table class="copy"><thead><tr><th class="nosort">Comitente</th><th class="nosort">Qué facturó</th><th class="nosort num">${esc(refTxt)} USD</th><th class="nosort num">Acumulado</th>${actual ? `<th class="nosort num">Este mes USD</th><th class="nosort num">Falta para repetir</th>` : ''}</tr></thead><tbody>
+      <div class="scroll"><table class="copy"><thead><tr><th class="nosort">Comitente</th>${conCat ? '<th class="nosort">Qué facturó</th>' : ''}<th class="nosort num">${esc(refTxt)} USD</th><th class="nosort num">Acumulado</th>${actual ? `<th class="nosort num">Este mes USD</th><th class="nosort num">Falta para repetir</th>` : ''}</tr></thead><tbody>
       ${show.map((e, i) => { const a = actBy.get(e.key)?.total || 0, falta = Math.max(0, e.mes - a);
-        return `<tr class="${i === corte ? 'corte' : ''}"><td>${i + 1}. ${esc(e.nombre)}${e.cuenta ? `<div class="acct">${esc(e.cuenta)}</div>` : ''}</td><td>${principal(e)}</td>
+        return `<tr class="${i === corte ? 'corte' : ''}"><td>${i + 1}. ${esc(e.nombre)}${e.cuenta ? `<div class="acct">${esc(e.cuenta)}</div>` : ''}</td>${conCat ? `<td>${principal(e)}</td>` : ''}
           <td class="num"><b>${fmtUSD(e.mes)}</b></td><td class="num acum">${fmtUSD(e.acum)} · ${pct(e.acum)}%</td>
           ${actual ? `<td class="num">${a ? fmtUSD(a) : '<span class="muted">—</span>'}</td><td class="num ${falta ? 'neg' : 'pos'}">${falta ? fmtUSD(falta) : 'Repetido ✓'}</td>` : ''}</tr>`; }).join('')}
       </tbody></table></div>`;
