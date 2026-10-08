@@ -2473,7 +2473,7 @@ async function importGanancias(file) {
     const q = toNumber(r[c.q]), precio = toNumber(r[c.precio]), ppc = toNumber(r[c.ppc]);
     if (tipo === 'MON' || !(ppc > 0) || isNaN(precio)) continue;
     const rend = c.rend >= 0 && !isNaN(toNumber(r[c.rend])) ? toNumber(r[c.rend]) : precio / ppc - 1;
-    if (rend < 0.05) continue;   // se guardan desde +5% para poder bajar el umbral sin volver a importar
+    // se guardan todas las posiciones (también planas o en negativo) para poder consultarlas; la solapa filtra por el umbral
     const val = isNaN(q) ? 0 : q * precio;
     rows.push({ cuenta: m ? m[1] : '', nombre: (m ? m[2] : com).trim(), tk: String(r[c.tk] ?? '').trim(), desc: c.desc >= 0 ? String(r[c.desc] ?? '').trim() : '', tipo,
       compra: c.fecha >= 0 ? isoDeCelda(r[c.fecha]) : '', q: isNaN(q) ? 0 : q, ppc, precio, rend: Math.round(rend * 10000) / 10000,
@@ -2513,7 +2513,7 @@ const ganTareaDe = e => {
   const c = findCuenta(e.cuenta, e.nombre);
   return tareas.find(t => !t.hecha && /^Tomar ganancia/.test(t.texto || '') && (c ? t.cuentaId === c.id : norm(t.cliente) === norm(e.nombre)));
 };
-const fmtRend = v => '+' + (v * 100).toLocaleString('es-AR', { maximumFractionDigits: v >= 1 ? 0 : 1 }) + '%';
+const fmtRend = v => (v >= 0 ? '+' : '') + (v * 100).toLocaleString('es-AR', { maximumFractionDigits: v >= 1 ? 0 : 1 }) + '%';
 function renderGanancias() {
   if (!ganancias?.rows) {
     $('#tareasBox').innerHTML = `<div class="tk-head"><h2>Tomar ganancia</h2></div>
@@ -2602,9 +2602,12 @@ function iaContexto() {
   } else L.push('\n## TENENCIAS: no hay informe de tenencias cargado.');
   // Rendimientos desde la compra
   if (ganancias?.rows?.length) {
-    L.push(`\n## RENDIMIENTO DESDE LA COMPRA (USD MEP, informe ${fmtDate(ganancias.fecha)}; solo posiciones +5% o más; +300% o más suele ser un precio de compra mal cargado). Formato: cuenta nombre: activo +x% (comprado dd/mm/aaaa, valor USD, ganancia USD)`);
-    for (const r of ganancias.rows.slice().sort((a, b) => b.gan - a.gan))
-      L.push(`${r.cuenta} ${r.nombre}: ${r.tk} ${fmtRend(r.rend)} (comprado ${r.compra ? fmtDate(r.compra) : '?'}, valor ${r0(r.val)}, ganancia ${r0(r.gan)})`);
+    const soloMas5 = ganancias.rows.every(r => r.rend >= 0.05);
+    L.push(`\n## RENDIMIENTO DESDE LA COMPRA por posición (USD MEP, informe ${fmtDate(ganancias.fecha)}${soloMas5 ? '; este informe se guardó solo con posiciones +5% o más: las que no figuran están por debajo' : '; incluye todas las posiciones, también planas o en negativo'}; +300% o más suele ser un precio de compra mal cargado). Formato: cuenta nombre: activo rendimiento (comprado dd/mm/aa, valor USD, ganancia USD)`);
+    const porCli = new Map();
+    for (const r of ganancias.rows) { const k = r.cuenta || r.nombre; (porCli.get(k) || porCli.set(k, []).get(k)).push(r); }
+    for (const list of porCli.values())
+      L.push(`${list[0].cuenta} ${list[0].nombre}: ` + list.sort((a, b) => b.val - a.val).map(r => `${r.tk} ${fmtRend(r.rend)} (${r.compra ? fmtDate(r.compra).replace(/\/(\d{2})(\d{2})$/, '/$2') : '?'}, ${r0(r.val)}, ${r0(r.gan)})`).join('; '));
   }
   // Research del día
   const rs = research[0];
