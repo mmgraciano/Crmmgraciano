@@ -183,6 +183,10 @@
   .ia-form { display: flex; gap: 8px; padding: 12px 16px 16px; border-top: 1px solid var(--border); align-items: flex-end; }
   .ia-form textarea { flex: 1; min-height: 44px; max-height: 160px; font: 14px var(--font-body); padding: 10px 12px; border: 1px solid var(--border); border-radius: 10px; background: var(--bg); color: var(--text); resize: vertical; }
   .ia-form textarea:focus { outline: none; border-color: var(--accent); }
+  .ia-card { margin-top: 10px; padding: 10px 12px; border: 1px dashed var(--accent); border-radius: 10px; background: var(--panel); }
+  .ia-card.ok { border-style: solid; border-color: var(--ok); color: var(--ok); }
+  .ia-card ul { margin: 6px 0 8px; } .ia-card .btn { padding: 6px 12px; font-size: 12.5px; }
+  .ia-card-act { display: flex; gap: 8px; flex-wrap: wrap; }
   .ia-hint { padding: 0 16px 10px; color: var(--muted); font-size: 12.5px; }
   .tk-sub { padding: 14px 16px 8px; border-top: 1px solid var(--border); font: 600 11px var(--font-body); letter-spacing: .07em; text-transform: uppercase; color: var(--muted); }
   .hero { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 20px 22px; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.6fr); gap: 24px; }
@@ -2488,6 +2492,7 @@ const IA_SUGERENCIAS = [
   '¿Qué clientes facturaron en septiembre y todavía no en octubre?',
   '¿Qué vence este mes y a quién tengo que llamar primero?',
   '¿Qué clientes tienen más de 20% en un solo activo?',
+  'Decime los clientes que tienen SPY y poné como tarea venderlo y comprar Google y Amazon',
 ];
 const r0 = v => Math.round(v);
 function iaContexto() {
@@ -2548,6 +2553,11 @@ Reglas:
 - Si recomendás vender, comprar o rotar, explicá el porqué con el research interno y los rendimientos desde la compra; aclará riesgos. Para carteras moderadas ella usa 80% ONs (en lo posible AAA) y 20% CEDEARs/acciones elegidas por consenso de analistas; evita índices en máximos (como SPY) y no supera 10% de Telecom por cliente.
 - Formato: párrafos cortos y listas con "- ". Podés usar **negrita**. No uses tablas.
 - Es información de apoyo: ella decide qué hacer.
+- Si te pide crear, anotar o agendar tareas, respondé normalmente y AL FINAL agregá un bloque así (y solo en ese caso):
+\`\`\`tareas
+[{"cuenta":"12822","cliente":"MARCUS JAVIER JONATAN","texto":"Vender SPY (USD 1.631) y comprar GOOGL y AMZN","vence":"AAAA-MM-DD"}]
+\`\`\`
+  Una tarea por cliente, texto corto y accionable con activos y montos, "cuenta" tal como figura en los datos, "vence" solo si ella dio una fecha. Ella las revisa y confirma antes de que se creen.
 
 DATOS DEL PANEL:
 `;
@@ -2575,16 +2585,38 @@ const IA_ERR = {
   refused: 'Claude no respondió esa pregunta. Probá reformularla.',
   empty_completion: 'No llegó respuesta. Probá preguntarlo de otra forma.',
 };
+// Bloque de tareas propuestas por la IA al final de la respuesta
+const IA_BLOQUE = /```tareas\s*([\s\S]*?)(?:```|$)/;
+function iaSeparar(text) {
+  const i = text.indexOf('```tareas');
+  if (i < 0) return { texto: text, tareas: null };
+  let tareas = null;
+  try {
+    const arr = JSON.parse((text.slice(i).match(IA_BLOQUE) || [])[1] || '');
+    if (Array.isArray(arr)) tareas = arr.filter(t => t && String(t.texto || '').trim()).slice(0, 200).map(t => ({
+      cuenta: String(t.cuenta ?? '').trim(), cliente: String(t.cliente ?? '').trim(), texto: String(t.texto).trim().slice(0, 500),
+      vence: /^\d{4}-\d{2}-\d{2}$/.test(String(t.vence || '')) ? t.vence : '' }));
+  } catch {}
+  return { texto: text.slice(0, i).trimEnd(), tareas };
+}
+function iaTareasCard(t, i) {
+  const list = t.propuestas || [];
+  if (t.estado === 'creadas') return `<div class="ia-card ok">✓ Se crearon ${plural(list.length, 'tarea', 'tareas')} en Mis tareas. <button class="btn ghost" data-ia-ver>Ver Mis tareas</button></div>`;
+  if (t.estado === 'descartadas') return `<div class="ia-card">Descartaste ${plural(list.length, 'tarea propuesta', 'tareas propuestas')}.</div>`;
+  return `<div class="ia-card"><b>${plural(list.length, 'tarea propuesta', 'tareas propuestas')}</b>
+    <ul>${list.slice(0, 50).map(x => `<li>${x.cliente ? `<b>${esc(x.cliente)}</b>${x.cuenta ? ` <span class="acct">${esc(x.cuenta)}</span>` : ''}: ` : ''}${esc(x.texto)}${x.vence ? ` <span class="tag">${esc(fmtDate(x.vence))}</span>` : ''}</li>`).join('')}${list.length > 50 ? `<li>… y ${list.length - 50} más</li>` : ''}</ul>
+    <div class="ia-card-act"><button class="btn primary" data-ia-crear="${i}">Crear ${plural(list.length, 'tarea', 'tareas')}</button><button class="btn ghost" data-ia-desc="${i}">Descartar</button></div></div>`;
+}
 function iaLogHtml() {
-  const msgs = iaTurns.map(t => t.role === 'user' ? `<div class="ia-msg user">${esc(t.content)}</div>` : `<div class="ia-msg bot">${iaMd(t.content)}</div>`);
-  if (iaBusy) msgs.push(iaLive ? `<div class="ia-msg bot" id="iaLive">${iaMd(iaLive)}</div>` : `<div class="ia-msg bot wait" id="iaLive">Pensando… (revisa tus tenencias, rendimientos y el research)</div>`);
+  const msgs = iaTurns.map((t, i) => t.role === 'user' ? `<div class="ia-msg user">${esc(t.content)}</div>` : `<div class="ia-msg bot">${iaMd(t.content)}${t.propuestas?.length ? iaTareasCard(t, i) : ''}</div>`);
+  if (iaBusy) msgs.push(iaLive ? `<div class="ia-msg bot" id="iaLive">${iaMd(iaSeparar(iaLive).texto)}</div>` : `<div class="ia-msg bot wait" id="iaLive">Pensando… (revisa tus tenencias, rendimientos y el research)</div>`);
   return msgs.join('') || `<div class="ia-hint" style="padding:0">Preguntale lo que quieras sobre tus clientes. Responde con los datos que tenés cargados en el panel.</div>`;
 }
 async function renderIA() {
   const box = $('#tareasBox');
   if (!box.querySelector('#iaRoot')) {
     box.innerHTML = `<div id="iaRoot">
-      <div class="tk-head"><h2>Preguntale a la IA</h2><span>Responde con tus tenencias, rendimientos, research, facturación y clientes</span></div>
+      <div class="tk-head"><h2>Preguntale a la IA</h2><span>Responde con tus tenencias, rendimientos, research, facturación y clientes, y te arma tareas para confirmar</span></div>
       <div class="ia-log" id="iaLog"></div>
       <div class="ia-sug" id="iaSug">${IA_SUGERENCIAS.map(q => `<button type="button" data-q="${esc(q)}">${esc(q)}</button>`).join('')}</div>
       <form class="ia-form" id="iaForm"><textarea id="iaQ" rows="2" placeholder="Ej: ¿Qué clientes tienen QQQ, SPY o NVDA y por qué rotarlo?"></textarea>
@@ -2610,14 +2642,16 @@ async function iaPreguntar(q) {
   iaCtl = new AbortController();
   const hist = iaTurns.slice(-9);   // últimas preguntas y respuestas; arranca siempre en una pregunta
   while (hist.length && hist[0].role !== 'user') hist.shift();
-  const input = [{ role: 'user', content: IA_REGLAS + iaContexto() }, ...hist];
+  const input = [{ role: 'user', content: IA_REGLAS + iaContexto() }, ...hist.map(t => ({ role: t.role, content: t.content + (t.propuestas?.length ? `\n\n(Propuse ${t.propuestas.length} tareas; ella las ${t.estado === 'creadas' ? 'creó' : t.estado === 'descartadas' ? 'descartó' : 'está revisando'}.)` : '') }))];
   let shown = '';
   try {
     const { text, truncated } = await iaSample(input, {
       cache: false, signal: iaCtl.signal,
-      onText: ({ text }) => { shown = text; iaLive = text; const el = $('#iaLive'); if (el) { el.classList.remove('wait'); el.innerHTML = iaMd(text); } },
+      onText: ({ text }) => { shown = text; iaLive = text; const el = $('#iaLive'); if (el) { el.classList.remove('wait'); el.innerHTML = iaMd(iaSeparar(text).texto); } },
     });
-    iaTurns.push({ role: 'assistant', content: text + (truncated ? '\n\n(La respuesta quedó cortada: pedí menos cosas a la vez.)' : '') });
+    const sep = iaSeparar(text);
+    iaTurns.push({ role: 'assistant', content: (sep.texto || 'Te propongo estas tareas:') + (truncated ? '\n\n(La respuesta quedó cortada: pedí menos cosas a la vez.)' : ''),
+      ...(sep.tareas?.length ? { propuestas: sep.tareas, estado: 'pendiente' } : {}) });
   } catch (e) {
     if (e?.code === 'cancelled') { if (e.text || shown) iaTurns.push({ role: 'assistant', content: (e.text || shown) + '\n\n(Frenada)' }); else iaTurns.pop(); }
     else {
@@ -2630,6 +2664,22 @@ async function iaPreguntar(q) {
     if (tab === TASKS_TAB && tkView === 'ia') { renderIA(); $('#iaLog').lastElementChild?.scrollIntoView({ block: 'nearest' }); }
   }
 }
+async function iaCrearTareas(i) {
+  const turn = iaTurns[i]; if (!turn?.propuestas?.length || turn.estado !== 'pendiente') return;
+  turn.estado = 'creadas'; iaSave();
+  const nuevas = turn.propuestas.map(x => {
+    const c = x.cuenta ? cuentas.find(k => norm(k.cuenta) === norm(x.cuenta)) : x.cliente ? cuentas.find(k => norm(k.nombre) === norm(x.cliente)) : null;
+    const t = { id: uid(), texto: x.texto, cuentaId: c?.id || '', cliente: c ? c.nombre : x.cliente, vence: x.vence || '', creado: new Date().toISOString(), hechaEl: '' };
+    setEstado(t, 'sin');
+    return t;
+  });
+  tareas = [...tareas, ...nuevas];
+  render();
+  try {
+    for (const t of nuevas) await saveTarea(t);
+    toast(`Se crearon ${plural(nuevas.length, 'tarea', 'tareas')} en Mis tareas`);
+  } catch {}
+}
 $('#tareasBox').addEventListener('submit', e => {
   if (e.target.id !== 'iaForm') return;
   e.preventDefault(); iaPreguntar($('#iaQ').value);
@@ -2640,6 +2690,10 @@ $('#tareasBox').addEventListener('keydown', e => {
 $('#tareasBox').addEventListener('click', e => {
   const s = e.target.closest('#iaSug [data-q]'); if (s) return iaPreguntar(s.dataset.q);
   if (e.target.closest('#iaStop')) iaCtl?.abort();
+  if (e.target.closest('[data-ia-ver]')) { tkView = 'tareas'; render(); return; }
+  const cr = e.target.closest('[data-ia-crear]'), ds = e.target.closest('[data-ia-desc]');
+  if (ds) { const t = iaTurns[Number(ds.dataset.iaDesc)]; if (t) { t.estado = 'descartadas'; iaSave(); renderIA(); } return; }
+  if (cr) { iaCrearTareas(Number(cr.dataset.iaCrear)); return; }
   if (e.target.closest('#iaNew')) { if (iaBusy) iaCtl?.abort(); iaTurns = []; iaSave(); renderIA(); }
 });
 
