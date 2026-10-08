@@ -190,6 +190,12 @@
   .ia-hint { padding: 0 16px 10px; color: var(--muted); font-size: 12.5px; }
   .tk-search { padding: 14px 16px 2px; }
   .tk-search .search { width: 100%; max-width: 420px; }
+  .row-tasks { display: flex; flex-direction: column; gap: 3px; margin-top: 6px; }
+  .row-task { display: flex; align-items: center; gap: 6px; border: none; background: none; padding: 0; font: 12px var(--font-body); color: var(--text); text-align: left; cursor: pointer; overflow-wrap: anywhere; }
+  .row-task:hover { color: var(--accent); text-decoration: underline; }
+  .row-task.more { color: var(--muted); }
+  .tk-dot { width: 8px; height: 8px; border-radius: 50%; border: 1.5px solid var(--muted); flex: none; }
+  .tk-dot.pend { background: var(--accent); border-color: var(--accent); }
   .tk-sub { padding: 14px 16px 8px; border-top: 1px solid var(--border); font: 600 11px var(--font-body); letter-spacing: .07em; text-transform: uppercase; color: var(--muted); }
   .hero { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 20px 22px; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.6fr); gap: 24px; }
   .hero .label { font: 600 11px var(--font-body); letter-spacing: .07em; text-transform: uppercase; color: var(--muted); }
@@ -1113,10 +1119,12 @@ function render() {
     const a = alarma(c);
     const chips = validTags(c).filter(id => id !== tab)
       .map(id => `<button class="chip" data-act="tags">${esc(tabLabel(id))}</button>`).join('');
+    const tks = tareasDe(c);
     return `<tr data-id="${c.id}">
       <td class="c-num">${esc(c.cuenta)}</td>
       <td class="c-name"><button class="name" data-act="edit">${esc(c.nombre)}</button>
-        <div class="chips">${chips}<button class="chip add" data-act="tags">+ pestaña</button></div></td>
+        <div class="chips">${chips}<button class="chip add" data-act="tags">+ pestaña</button></div>
+        ${tks.length ? `<div class="row-tasks">${tks.slice(0, 2).map(t => `<button class="row-task" data-act="tareas" title="Ver en Mis tareas"><span class="tk-dot ${estadoDe(t)}"></span>${esc(t.texto)}${t.vence ? ` · ${esc(fmtDate(t.vence).slice(0, 5))}` : ''}</button>`).join('')}${tks.length > 2 ? `<button class="row-task more" data-act="tareas">+${plural(tks.length - 2, 'tarea más', 'tareas más')}</button>` : ''}</div>` : ''}</td>
       <td class="c-date"><input class="inline" type="date" data-field="ultimoContacto" value="${esc(c.ultimoContacto)}" aria-label="Última vez contactado"></td>
       <td><input class="inline" data-field="accion" value="${esc(c.accion)}" placeholder="Agregar acción…" aria-label="Acción / comentarios"></td>
       ${showTen ? `<td class="num">${c.cuenta ? fmtUSD(tenenciaCuenta(c)) : '<span class="muted">—</span>'}</td>` : ''}
@@ -2225,6 +2233,7 @@ $('#tbody').addEventListener('click', async e => {
   const act = btn.dataset.act;
   if (act === 'edit') openDialog(c);
   if (act === 'tags') openTagsDialog(c);
+  if (act === 'tareas') { tab = TASKS_TAB; tkView = 'tareas'; tkQ = c.cuenta || c.nombre; render(); window.scrollTo(0, 0); return; }
   if (act === 'hoy') {
     c.ultimoContacto = today(); render(); await saveCuenta(c);
     toast(`${c.nombre}: contactado hoy`);
@@ -2275,6 +2284,8 @@ function deleteTarea(id) {
   if (!tasksRef) { saveLocal(); return Promise.resolve(); }
   return write(() => tasksRef.doc(id).delete());
 }
+// Tareas abiertas de una cuenta (vinculadas o con el mismo nombre de cliente)
+const tareasDe = c => tareas.filter(t => !t.hecha && (t.cuentaId ? t.cuentaId === c.id : t.cliente && norm(t.cliente) === norm(c.nombre)));
 const tareaCliente = t => cuentas.find(c => c.id === t.cuentaId)?.nombre || t.cliente || '';
 function venceInfo(v) {
   if (!v) return null;
@@ -2313,7 +2324,7 @@ document.addEventListener('input', e => { if (e.target.id === 'tkQ') { tkQ = e.t
 function renderTareas() {
   // Pendientes: primero las que tienen fecha (la más próxima arriba), después las sin fecha por orden de carga
   const q = norm(tkQ);
-  const pasa = t => !q || norm([t.texto, tareaCliente(t), ESTADOS.find(e => e.id === estadoDe(t))?.label, t.vence ? fmtDate(t.vence) : ''].join(' ')).includes(q);
+  const pasa = t => !q || norm([t.texto, tareaCliente(t), cuentas.find(c => c.id === t.cuentaId)?.cuenta, ESTADOS.find(e => e.id === estadoDe(t))?.label, t.vence ? fmtDate(t.vence) : ''].join(' ')).includes(q);
   const pend = tareas.filter(t => !t.hecha && pasa(t)).sort((a, b) => (a.vence || '9999').localeCompare(b.vence || '9999') || (a.creado || '').localeCompare(b.creado || ''));
   const hechas = tareas.filter(t => t.hecha && pasa(t)).sort((a, b) => (b.hechaEl || '').localeCompare(a.hechaEl || ''));
   const vencidas = pend.filter(t => t.vence && t.vence < today()).length;

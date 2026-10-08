@@ -15,7 +15,8 @@ Panel para registrar tu base de cuentas, en un solo archivo (`index.html`).
 - **Tareas pendientes:** con **+ Nueva tarea** anotás una tarea, con un cliente y una fecha si querés. Cada tarea tiene un
   estado (**Sin hacer**, **Pendiente** o **Hecha ✓**): tocá el estado para pasar al siguiente. Las vencidas se marcan en rojo
   y las hechas quedan guardadas abajo, en **Hechas**. Arriba hay un buscador (por texto, cliente o estado; en Tomar ganancia,
-  por cliente, N° de cuenta o activo). Se guardan en la base del panel (colección `tareas`).
+  por cliente, N° de cuenta o activo). En WM3 y las demás pestañas de cuentas, debajo de cada cliente se ven sus tareas abiertas;
+  al tocarlas se abre Mis tareas filtrado por ese cliente. Se guardan en la base del panel (colección `tareas`).
 - **Tomar ganancia (+10%):** segunda solapa de Tareas pendientes. Con **Importar rendimientos** se sube el Excel de rendimientos
   por posición (Comitente, Ticker, Pppc Mep, Precio Actual Mep) y lista, por cliente, los activos 10% o más arriba del precio de
   compra en USD MEP (el % se puede cambiar). **+ Tarea** crea la tarea en Mis tareas. Las subas de 300% o más se marcan para revisar
