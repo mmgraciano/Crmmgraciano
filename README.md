@@ -27,7 +27,8 @@ Panel para registrar tu base de cuentas, en un solo archivo (`index.html`).
   tienen QQQ, SPY o NVDA y por qué rotarlos?") y responde Claude con los datos del panel: tenencias, rendimientos desde la compra,
   research del día, facturación por mes, clientes y tareas. Usa la cuenta de Claude de quien pregunta (capacidad `sample`); la
   conversación queda solo en ese navegador. Si se le pide ("poné como tarea…"), propone tareas por cliente que se crean en
-  Mis tareas al tocar **Crear tareas**.
+  Mis tareas al tocar **Crear tareas**. Con 📎 (o pegando o arrastrando) se le pueden pasar prints e imágenes, PDF, Excel, CSV o
+  texto: las imágenes van a Claude como imágenes y el resto se lee en el navegador y va como texto.
 - **Asignar pestañas:** tocá **+ pestaña** debajo del nombre de la cuenta, o marcalas al editarla.
 - **Agregar, renombrar o quitar pestañas:** botón **+** al final de las pestañas. Ahí también se cambian los días de la alarma.
 - **Alarma:** se pone en rojo cuando pasaron más de 21 días desde el último contacto (o si no hay fecha).

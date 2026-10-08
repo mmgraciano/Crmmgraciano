@@ -187,6 +187,16 @@
   .ia-card.ok { border-style: solid; border-color: var(--ok); color: var(--ok); }
   .ia-card ul { margin: 6px 0 8px; } .ia-card .btn { padding: 6px 12px; font-size: 12.5px; }
   .ia-card-act { display: flex; gap: 8px; flex-wrap: wrap; }
+  .ia-clip { padding: 9px 12px; font-size: 16px; line-height: 1; cursor: pointer; align-self: flex-end; }
+  .ia-adj { display: flex; flex-wrap: wrap; gap: 6px; padding: 10px 16px 0; border-top: 1px solid var(--border); }
+  .ia-adj + .ia-form { border-top: none; }
+  .ia-chip { display: inline-flex; align-items: center; gap: 6px; padding: 4px 6px 4px 8px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg); font-size: 12.5px; max-width: 100%; }
+  .ia-chip img { width: 28px; height: 28px; object-fit: cover; border-radius: 4px; }
+  .ia-chip em { color: var(--muted); font-style: normal; font-size: 11.5px; }
+  .ia-chip button { border: none; background: none; color: var(--muted); font-size: 15px; cursor: pointer; padding: 0 2px; }
+  .ia-files { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 6px; font-size: 12px; opacity: .9; }
+  .ia-files span { background: rgba(255,255,255,.15); padding: 2px 8px; border-radius: 6px; }
+  #iaRoot.drop { outline: 2px dashed var(--accent); outline-offset: -6px; border-radius: 12px; }
   .ia-hint { padding: 0 16px 10px; color: var(--muted); font-size: 12.5px; }
   .tk-search { padding: 14px 16px 2px; }
   .tk-search .search { width: 100%; max-width: 420px; }
@@ -2656,6 +2666,8 @@ function iaMd(t) {
   return out.join('');
 }
 const IA_ERR = {
+  images_unavailable: 'En esta vista no se pueden mandar imágenes a Claude. Probá abriendo el panel desde claude.ai.',
+  image_rejected: 'Alguna imagen no se pudo usar (muy grande o formato no admitido). Probá con un print más chico en PNG o JPG.',
   not_granted: 'No diste permiso para que el panel consulte a Claude. Podés habilitarlo desde el menú de permisos del artifact.',
   sampling_disabled: 'Claude no está disponible para esta cuenta.',
   rate_limited: 'Hiciste muchas preguntas seguidas o llegaste al límite de uso. Probá de nuevo en un rato.',
@@ -2687,7 +2699,7 @@ function iaTareasCard(t, i) {
     <div class="ia-card-act"><button class="btn primary" data-ia-crear="${i}">Crear ${plural(list.length, 'tarea', 'tareas')}</button><button class="btn ghost" data-ia-desc="${i}">Descartar</button></div></div>`;
 }
 function iaLogHtml() {
-  const msgs = iaTurns.map((t, i) => t.role === 'user' ? `<div class="ia-msg user">${esc(t.content)}</div>` : `<div class="ia-msg bot">${iaMd(t.content)}${t.propuestas?.length ? iaTareasCard(t, i) : ''}</div>`);
+  const msgs = iaTurns.map((t, i) => t.role === 'user' ? `<div class="ia-msg user">${t.files?.length ? `<div class="ia-files">${t.files.map(f => `<span>${f.img ? '🖼' : '📄'} ${esc(f.name)}</span>`).join('')}</div>` : ''}${esc(t.content)}</div>` : `<div class="ia-msg bot">${iaMd(t.content)}${t.propuestas?.length ? iaTareasCard(t, i) : ''}</div>`);
   if (iaBusy) msgs.push(iaLive ? `<div class="ia-msg bot" id="iaLive">${iaMd(iaSeparar(iaLive).texto)}</div>` : `<div class="ia-msg bot wait" id="iaLive">Pensando… (revisa tus tenencias, rendimientos y el research)</div>`);
   return msgs.join('') || `<div class="ia-hint" style="padding:0">Preguntale lo que quieras sobre tus clientes. Responde con los datos que tenés cargados en el panel.</div>`;
 }
@@ -2698,12 +2710,17 @@ async function renderIA() {
       <div class="tk-head"><h2>Preguntale a la IA</h2><span>Responde con tus tenencias, rendimientos, research, facturación y clientes, y te arma tareas para confirmar</span></div>
       <div class="ia-log" id="iaLog"></div>
       <div class="ia-sug" id="iaSug">${IA_SUGERENCIAS.map(q => `<button type="button" data-q="${esc(q)}">${esc(q)}</button>`).join('')}</div>
-      <form class="ia-form" id="iaForm"><textarea id="iaQ" rows="2" placeholder="Ej: ¿Qué clientes tienen QQQ, SPY o NVDA y por qué rotarlo?"></textarea>
+      <div class="ia-adj" id="iaAdj" hidden></div>
+      <form class="ia-form" id="iaForm">
+        <label class="btn ghost ia-clip" for="iaFile" title="Adjuntar imágenes, PDF, Excel o texto" aria-label="Adjuntar archivos">📎</label>
+        <input id="iaFile" type="file" multiple hidden accept="image/png,image/jpeg,image/webp,image/gif,.pdf,.xlsx,.xls,.csv,.txt,.md,.json">
+        <textarea id="iaQ" rows="2" placeholder="Ej: ¿Qué clientes tienen QQQ, SPY o NVDA y por qué rotarlo? (podés pegar o arrastrar prints y archivos)"></textarea>
         <button class="btn primary" id="iaSend" type="submit">Preguntar</button><button class="btn ghost" id="iaStop" type="button" hidden>Frenar</button></form>
       <div class="ia-hint"><button class="btn ghost" id="iaNew" type="button" style="padding:5px 10px;font-size:12px">Nueva conversación</button>
         Cada pregunta usa tu cuenta de Claude. Es información de apoyo: revisá los números antes de operar.</div></div>`;
   }
   $('#iaLog').innerHTML = iaLogHtml();
+  iaAdjRender();
   $('#iaSug').hidden = iaTurns.length > 0;
   $('#iaSend').hidden = iaBusy; $('#iaStop').hidden = !iaBusy;
   if (iaSample === undefined) {
@@ -2713,19 +2730,110 @@ async function renderIA() {
     if (!s && tab === TASKS_TAB && tkView === 'ia') $('#iaLog').innerHTML = `<div class="ia-hint" style="padding:0">La IA no está disponible en esta vista. Abrí el panel desde claude.ai para usarla.</div>`;
   }
 }
+// ---- Adjuntos: imágenes van como imágenes; PDF, Excel, CSV y texto se leen acá y van como texto ----
+let iaAdj = [], iaLeyendo = 0;
+const IA_MAX_TXT = 60000;   // caracteres por archivo
+const IA_IMG = /^image\/(png|jpe?g|webp|gif)$/;
+function iaAdjRender() {
+  const box = $('#iaAdj'); if (!box) return;
+  box.hidden = !iaAdj.length && !iaLeyendo;
+  box.innerHTML = iaAdj.map((a, i) => `<span class="ia-chip">${a.blob ? `<img src="${a.url}" alt="">` : '📄'} ${esc(a.name)}${a.nota ? ` <em>${esc(a.nota)}</em>` : ''}<button type="button" data-adj-x="${i}" aria-label="Quitar ${esc(a.name)}">×</button></span>`).join('')
+    + (iaLeyendo ? '<span class="ia-chip">Leyendo archivo…</span>' : '');
+}
+let pdfLib = null;
+async function cargarPdf() {
+  if (pdfLib) return pdfLib;
+  await new Promise((ok, mal) => { const sc = document.createElement('script'); sc.src = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js'; sc.onload = ok; sc.onerror = mal; document.head.append(sc); });
+  pdfLib = window.pdfjsLib;
+  pdfLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+  return pdfLib;
+}
+async function textoDePdf(file) {
+  const lib = await cargarPdf();
+  const doc = await lib.getDocument({ data: new Uint8Array(await file.arrayBuffer()) }).promise;
+  const partes = [];
+  for (let i = 1; i <= Math.min(doc.numPages, 40); i++) {
+    const pg = await doc.getPage(i);
+    const tc = await pg.getTextContent();
+    partes.push(`[Página ${i}]\n` + tc.items.map(it => it.str + (it.hasEOL ? '\n' : ' ')).join(''));
+    if (partes.join('').length > IA_MAX_TXT) break;
+  }
+  return { texto: partes.join('\n'), nota: doc.numPages > 40 ? `${doc.numPages} páginas, se leen las primeras 40` : '' };
+}
+async function iaAgregar(files) {
+  const lim = iaSample ? await iaSample.limits().catch(() => null) : null;
+  const maxImg = lim?.images?.maxCount ?? 0;
+  for (const f of files) {
+    const name = f.name || 'imagen pegada.png';
+    if (IA_IMG.test(f.type)) {
+      if (!lim?.images) { toast('En esta vista no se pueden mandar imágenes a Claude'); continue; }
+      if (iaAdj.filter(a => a.blob).length >= maxImg) { toast(`Podés adjuntar hasta ${maxImg} imágenes por pregunta`); continue; }
+      iaAdj.push({ name, blob: f, url: URL.createObjectURL(f) });
+      continue;
+    }
+    iaLeyendo++; iaAdjRender();
+    try {
+      let texto = '', nota = '';
+      if (/\.pdf$/i.test(name) || f.type === 'application/pdf') ({ texto, nota } = await textoDePdf(f));
+      else if (/\.(xlsx|xls)$/i.test(name)) {
+        const wb = XLSX.read(await f.arrayBuffer());
+        texto = wb.SheetNames.slice(0, 5).map(n => `[Hoja ${n}]\n` + XLSX.utils.sheet_to_csv(wb.Sheets[n], { blankrows: false })).join('\n\n');
+      } else if (/\.(csv|txt|md|json)$/i.test(name) || /^text\//.test(f.type)) texto = await f.text();
+      else { toast(`"${name}": ese tipo de archivo no se puede leer. Usá imágenes, PDF, Excel, CSV o texto.`); continue; }
+      texto = texto.replace(/[ \t]+\n/g, '\n').trim();
+      if (!texto) { toast(`"${name}" no tiene texto para leer${/\.pdf$/i.test(name) ? ' (si es un PDF escaneado, mandalo como captura)' : ''}`); continue; }
+      if (texto.length > IA_MAX_TXT) { texto = texto.slice(0, IA_MAX_TXT); nota = nota || 'muy largo: se lee el comienzo'; }
+      iaAdj.push({ name, texto, nota });
+    } catch { toast(`No se pudo leer "${name}"`); }
+    finally { iaLeyendo--; iaAdjRender(); }
+  }
+  iaAdjRender();
+}
+$('#tareasBox').addEventListener('change', e => { if (e.target.id === 'iaFile') { iaAgregar([...e.target.files]); e.target.value = ''; } });
+$('#tareasBox').addEventListener('paste', e => {
+  if (e.target.id !== 'iaQ') return;
+  const files = [...(e.clipboardData?.files || [])];
+  if (files.length) { e.preventDefault(); iaAgregar(files); }
+});
+$('#tareasBox').addEventListener('dragover', e => { if (e.target.closest('#iaRoot')) { e.preventDefault(); e.target.closest('#iaRoot').classList.add('drop'); } });
+$('#tareasBox').addEventListener('dragleave', e => { if (e.target.id === 'iaRoot') e.target.classList.remove('drop'); });
+$('#tareasBox').addEventListener('drop', e => {
+  const root = e.target.closest('#iaRoot'); if (!root) return;
+  e.preventDefault(); root.classList.remove('drop');
+  iaAgregar([...(e.dataTransfer?.files || [])]);
+});
+$('#tareasBox').addEventListener('click', e => {
+  const x = e.target.closest('[data-adj-x]'); if (!x) return;
+  const [a] = iaAdj.splice(Number(x.dataset.adjX), 1); if (a?.url) URL.revokeObjectURL(a.url);
+  iaAdjRender();
+});
 async function iaPreguntar(q) {
-  q = q.trim(); if (!q || iaBusy) return;
+  q = q.trim();
+  if (iaBusy || iaLeyendo) return;
+  if (!q && !iaAdj.length) return;
   if (!iaSample) { toast('La IA no está disponible en esta vista'); return; }
-  iaTurns.push({ role: 'user', content: q }); iaSave();
+  const adj = iaAdj; iaAdj = [];
+  const imgs = adj.filter(a => a.blob).map(a => a.blob);
+  const textos = adj.filter(a => a.texto);
+  if (!q) q = imgs.length ? 'Mirá lo que te adjunto y decime qué ves y qué me conviene hacer.' : 'Leé el archivo que te adjunto y resumime lo importante para mi cartera.';
+  iaTurns.push({ role: 'user', content: q, files: adj.map(a => ({ name: a.name, img: !!a.blob })),
+    adj: (imgs.length ? `
+
+(Adjunté ${plural(imgs.length, 'imagen', 'imágenes')}: ${adj.filter(a => a.blob).map(a => a.name).join(', ')}.)` : '')
+      + textos.map(a => `
+
+--- Archivo adjunto: ${a.name} ---
+${a.texto}`).join('') });
+  iaSave();
   iaBusy = true; iaLive = ''; $('#iaQ').value = ''; renderIA();
   iaCtl = new AbortController();
   const hist = iaTurns.slice(-9);   // últimas preguntas y respuestas; arranca siempre en una pregunta
   while (hist.length && hist[0].role !== 'user') hist.shift();
-  const input = [{ role: 'user', content: IA_REGLAS + iaContexto() }, ...hist.map(t => ({ role: t.role, content: t.content + (t.propuestas?.length ? `\n\n(Propuse ${t.propuestas.length} tareas; ella las ${t.estado === 'creadas' ? 'creó' : t.estado === 'descartadas' ? 'descartó' : 'está revisando'}.)` : '') }))];
+  const input = [{ role: 'user', content: IA_REGLAS + iaContexto() }, ...hist.map(t => ({ role: t.role, content: t.content + (t.adj || '') + (t.propuestas?.length ? `\n\n(Propuse ${t.propuestas.length} tareas; ella las ${t.estado === 'creadas' ? 'creó' : t.estado === 'descartadas' ? 'descartó' : 'está revisando'}.)` : '') }))];
   let shown = '';
   try {
     const { text, truncated } = await iaSample(input, {
-      cache: false, signal: iaCtl.signal,
+      cache: false, signal: iaCtl.signal, ...(imgs.length ? { images: imgs } : {}),
       onText: ({ text }) => { shown = text; iaLive = text; const el = $('#iaLive'); if (el) { el.classList.remove('wait'); el.innerHTML = iaMd(iaSeparar(text).texto); } },
     });
     const sep = iaSeparar(text);
