@@ -13,7 +13,7 @@
   :root {
     --bg: #efeee9; --panel: #fbfaf7; --soft: #e5e3dc; --text: #1f2a24; --muted: #6a716b;
     --border: #dcd9d0; --accent: #2d4a3c; --on-accent: #ffffff; --accent-soft: #dde7df;
-    --late: #b0412d; --late-bg: #f4d8d1; --ok: #2f6b45; --ok-bg: #dcebdf;
+    --late: #b0412d; --late-bg: #f4d8d1; --ok: #2f6b45; --ok-bg: #dcebdf; --warn: #9a6a00; --warn-bg: #fbedc4; --warn-dot: #e2b33a;
     --danger: #a5432f; --danger-soft: #ecdcd6; --overlay: rgba(20, 28, 22, .42);
     --logo-a: #2f5a3f; --logo-b: #8c6b2c;
     --font-display: "Fraunces", Georgia, "Times New Roman", serif;
@@ -23,7 +23,7 @@
     :root:not([data-theme="light"]) {
       --bg: #141815; --panel: #1b201c; --soft: #272d28; --text: #e5e9e4; --muted: #99a29a;
       --border: #2f3730; --accent: #8fc1a2; --on-accent: #10241a; --accent-soft: #24352b;
-      --late: #f2a493; --late-bg: #4a2620; --ok: #8fd3a5; --ok-bg: #1f3a2a;
+      --late: #f2a493; --late-bg: #4a2620; --ok: #8fd3a5; --ok-bg: #1f3a2a; --warn: #f0cf6e; --warn-bg: #3d3216; --warn-dot: #e2b33a;
       --danger: #f0a08f; --danger-soft: #3d2420; --overlay: rgba(0, 0, 0, .6);
       color-scheme: dark;
     }
@@ -31,7 +31,7 @@
   :root[data-theme="dark"] {
     --bg: #141815; --panel: #1b201c; --soft: #272d28; --text: #e5e9e4; --muted: #99a29a;
     --border: #2f3730; --accent: #8fc1a2; --on-accent: #10241a; --accent-soft: #24352b;
-    --late: #f2a493; --late-bg: #4a2620; --ok: #8fd3a5; --ok-bg: #1f3a2a;
+    --late: #f2a493; --late-bg: #4a2620; --ok: #8fd3a5; --ok-bg: #1f3a2a; --warn: #f0cf6e; --warn-bg: #3d3216; --warn-dot: #e2b33a;
     --danger: #f0a08f; --danger-soft: #3d2420; --overlay: rgba(0, 0, 0, .6);
     color-scheme: dark;
   }
@@ -199,13 +199,18 @@
   .tk-cli { list-style: none; padding: 0; margin: 12px 0 0; display: flex; flex-direction: column; gap: 8px; }
   .tk-cli li { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; color: var(--text); }
   .tk-cli .btn { padding: 6px 12px; font-size: 12.5px; }
-  .aprob { display: inline-flex; align-items: center; gap: 3px; margin-left: 4px; white-space: nowrap; }
-  .aprob-l { font-size: 11.5px; color: var(--muted); margin-right: 3px; }
-  .ap { width: 24px; height: 22px; border: 1px solid var(--border); background: var(--panel); color: var(--muted); border-radius: 6px; font: 600 12px var(--font-body); cursor: pointer; line-height: 1; padding: 0; }
-  .ap:hover { border-color: var(--accent); }
-  .ap.si.on { background: var(--ok-bg); border-color: var(--ok); color: var(--ok); }
-  .ap.no.on { background: var(--late-bg); border-color: var(--late); color: var(--late); }
-  .ap.pend.on { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); }
+  .aprob { display: flex; align-items: center; gap: 6px; flex: none; }
+  .aprob-l { font-size: 11px; line-height: 1.2; color: var(--muted); text-align: right; margin-right: 2px; }
+  .ap { width: 32px; height: 32px; border-radius: 50%; border: 2px solid; background: var(--panel); font: 700 16px var(--font-body); cursor: pointer; line-height: 1; padding: 0; display: grid; place-items: center; opacity: .45; }
+  .ap:hover, .ap.on { opacity: 1; }
+  .ap.si { border-color: var(--ok); color: var(--ok); }
+  .ap.no { border-color: var(--late); color: var(--late); }
+  .ap.pend { border-color: var(--warn-dot); }
+  .ap.pend::after { content: ''; width: 14px; height: 14px; border-radius: 50%; background: var(--warn-dot); }
+  .ap.si.on { background: var(--ok); color: var(--panel); }
+  .ap.no.on { background: var(--late); color: var(--panel); }
+  .ap.pend.on { background: var(--warn-bg); }
+  @media (max-width: 600px) { .aprob-l { display: none; } .ap { width: 30px; height: 30px; font-size: 14px; } .tk { gap: 8px; flex-wrap: wrap; } .tk-body { flex: 1 1 55%; } .tk .aprob { order: 3; margin-left: auto; } .tk .x { order: 4; } }
   .tk-sub { padding: 14px 16px 8px; border-top: 1px solid var(--border); font: 600 11px var(--font-body); letter-spacing: .07em; text-transform: uppercase; color: var(--muted); }
   .hero { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 20px 22px; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.6fr); gap: 24px; }
   .hero .label { font: 600 11px var(--font-body); letter-spacing: .07em; text-transform: uppercase; color: var(--muted); }
@@ -2277,7 +2282,7 @@ const TASK_FIELDS = ['texto', 'cuentaId', 'cliente', 'vence', 'estado', 'hecha',
 const APROB = [
   { id: 'si', icon: '✓', label: 'Aprobado por el cliente' },
   { id: 'no', icon: '✗', label: 'No aprobado por el cliente' },
-  { id: 'pend', icon: '…', label: 'Aprobación pendiente' },
+  { id: 'pend', icon: '', label: 'Aprobación pendiente' },
 ];
 const aprobTxt = t => ({ si: 'aprobado por el cliente', no: 'no aprobado rechazado por el cliente', pend: 'aprobacion pendiente del cliente' })[t.aprobacion] || '';
 // Estados de una tarea; tocar el estado pasa al siguiente
@@ -2316,7 +2321,6 @@ function tareaItem(t) {
   const i = ESTADOS.findIndex(e => e.id === estadoDe(t)), est = ESTADOS[i], sig = ESTADOS[(i + 1) % ESTADOS.length];
   const meta = [
     cli ? `<span class="chip">${esc(cli)}</span>` : '',
-    `<span class="aprob" role="group" aria-label="Aprobado por el cliente"><span class="aprob-l">Aprobado por el cliente</span>${APROB.map(a => `<button class="ap ${a.id} ${t.aprobacion === a.id ? 'on' : ''}" data-tact="aprob" data-ap="${a.id}" title="${a.label}" aria-pressed="${t.aprobacion === a.id}">${a.icon}</button>`).join('')}</span>`,
     v && !t.hecha ? `<span class="tk-due ${v.cls}">${esc(v.text)}</span>` : '',
     t.hecha && t.hechaEl ? `<span>Hecha el ${esc(fmtDate(t.hechaEl))}</span>` : '',
   ].join('');
@@ -2326,6 +2330,7 @@ function tareaItem(t) {
       <button class="tk-text" data-tact="edit" title="Editar tarea">${esc(t.texto)}</button>
       ${meta ? `<div class="tk-meta">${meta}</div>` : ''}
     </div>
+    <div class="aprob" role="group" aria-label="Aprobado por el cliente"><span class="aprob-l">Aprobado por<br>el cliente</span>${APROB.map(a => `<button class="ap ${a.id} ${t.aprobacion === a.id ? 'on' : ''}" data-tact="aprob" data-ap="${a.id}" title="${a.label}" aria-label="${a.label}" aria-pressed="${t.aprobacion === a.id}">${a.icon}</button>`).join('')}</div>
     <button class="x" data-tact="remove" title="Eliminar tarea" aria-label="Eliminar tarea">×</button>
   </li>`;
 }
