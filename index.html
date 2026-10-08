@@ -188,6 +188,8 @@
   .ia-card ul { margin: 6px 0 8px; } .ia-card .btn { padding: 6px 12px; font-size: 12.5px; }
   .ia-card-act { display: flex; gap: 8px; flex-wrap: wrap; }
   .ia-hint { padding: 0 16px 10px; color: var(--muted); font-size: 12.5px; }
+  .tk-search { padding: 14px 16px 2px; }
+  .tk-search .search { width: 100%; max-width: 420px; }
   .tk-sub { padding: 14px 16px 8px; border-top: 1px solid var(--border); font: 600 11px var(--font-body); letter-spacing: .07em; text-transform: uppercase; color: var(--muted); }
   .hero { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 20px 22px; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.6fr); gap: 24px; }
   .hero .label { font: 600 11px var(--font-body); letter-spacing: .07em; text-transform: uppercase; color: var(--muted); }
@@ -2298,18 +2300,31 @@ function tareaItem(t) {
     <button class="x" data-tact="remove" title="Eliminar tarea" aria-label="Eliminar tarea">×</button>
   </li>`;
 }
+// Buscador de Tareas pendientes (lo comparten Mis tareas y Tomar ganancia)
+let tkQ = '';
+const tkSearch = ph => `<div class="tk-search"><input id="tkQ" class="search" type="search" placeholder="${esc(ph)}" value="${esc(tkQ)}" autocomplete="off"></div>`;
+// Redibuja #tareasBox sin perder el foco ni el cursor del buscador
+function setTareasBox(html) {
+  const ae = document.activeElement, keep = ae?.id === 'tkQ' ? ae.selectionStart : null;
+  $('#tareasBox').innerHTML = html;
+  if (keep !== null) { const el = $('#tkQ'); el.focus(); try { el.setSelectionRange(keep, keep); } catch {} }
+}
+document.addEventListener('input', e => { if (e.target.id === 'tkQ') { tkQ = e.target.value; render(); } });
 function renderTareas() {
   // Pendientes: primero las que tienen fecha (la más próxima arriba), después las sin fecha por orden de carga
-  const pend = tareas.filter(t => !t.hecha).sort((a, b) => (a.vence || '9999').localeCompare(b.vence || '9999') || (a.creado || '').localeCompare(b.creado || ''));
-  const hechas = tareas.filter(t => t.hecha).sort((a, b) => (b.hechaEl || '').localeCompare(a.hechaEl || ''));
+  const q = norm(tkQ);
+  const pasa = t => !q || norm([t.texto, tareaCliente(t), ESTADOS.find(e => e.id === estadoDe(t))?.label, t.vence ? fmtDate(t.vence) : ''].join(' ')).includes(q);
+  const pend = tareas.filter(t => !t.hecha && pasa(t)).sort((a, b) => (a.vence || '9999').localeCompare(b.vence || '9999') || (a.creado || '').localeCompare(b.creado || ''));
+  const hechas = tareas.filter(t => t.hecha && pasa(t)).sort((a, b) => (b.hechaEl || '').localeCompare(a.hechaEl || ''));
   const vencidas = pend.filter(t => t.vence && t.vence < today()).length;
   const conCuentas = cuentas.some(c => inTab(c, TASKS_TAB));
-  $('#tareasBox').innerHTML = `
-    <div class="tk-head"><h2>Tareas</h2><span>${plural(pend.filter(t => estadoDe(t) === 'sin').length, 'sin hacer', 'sin hacer')} · ${plural(pend.filter(t => estadoDe(t) === 'pend').length, 'pendiente', 'pendientes')} · ${plural(hechas.length, 'hecha', 'hechas')}${vencidas ? ` · ${plural(vencidas, 'vencida', 'vencidas')}` : ''}</span></div>
+  setTareasBox(`
+    ${tareas.length ? tkSearch('Buscar tarea, cliente o estado…') : ''}
+    <div class="tk-head"><h2>Tareas</h2><span>${q ? `${plural(pend.length + hechas.length, 'resultado', 'resultados')} · ` : ''}${plural(pend.filter(t => estadoDe(t) === 'sin').length, 'sin hacer', 'sin hacer')} · ${plural(pend.filter(t => estadoDe(t) === 'pend').length, 'pendiente', 'pendientes')} · ${plural(hechas.length, 'hecha', 'hechas')}${vencidas ? ` · ${plural(vencidas, 'vencida', 'vencidas')}` : ''}</span></div>
     ${pend.length ? `<ul class="tk-list">${pend.map(tareaItem).join('')}</ul>`
-      : `<div class="tk-empty">${loading ? 'Cargando…' : 'No tenés tareas pendientes. Anotá una con <b>+ Nueva tarea</b>.'}</div>`}
-    ${hechas.length ? `<details class="tk-done"><summary>Hechas (${hechas.length})</summary><ul class="tk-list">${hechas.map(tareaItem).join('')}</ul></details>` : ''}
-    ${conCuentas ? `<div class="tk-sub">Cuentas marcadas en ${esc(tabLabel(TASKS_TAB))}</div>` : ''}`;
+      : `<div class="tk-empty">${loading ? 'Cargando…' : q ? 'Ninguna tarea pendiente coincide con la búsqueda.' : 'No tenés tareas pendientes. Anotá una con <b>+ Nueva tarea</b>.'}</div>`}
+    ${hechas.length ? `<details class="tk-done"${q ? ' open' : ''}><summary>Hechas (${hechas.length})</summary><ul class="tk-list">${hechas.map(tareaItem).join('')}</ul></details>` : ''}
+    ${conCuentas ? `<div class="tk-sub">Cuentas marcadas en ${esc(tabLabel(TASKS_TAB))}</div>` : ''}`);
 }
 const taskForm = $('#taskForm');
 let editingTask = null;
@@ -2440,12 +2455,21 @@ function renderGanancias() {
       <div class="tk-empty">Subí con <b>Importar rendimientos</b> el Excel de rendimientos por posición (con Comitente, Ticker, Pppc Mep y Precio Actual Mep) y acá vas a ver qué clientes tienen activos ${ganUmbral}% o más arriba de su precio de compra.</div>`;
     return;
   }
-  const list = ganClientes(), modelo = tickersModelo();
+  const q = norm(tkQ), modelo = tickersModelo();
+  // Filtra por cliente o N° de cuenta (muestra todos sus activos) o por activo (muestra solo esos activos)
+  const list = ganClientes().map(e => {
+    if (!q || norm(e.nombre + ' ' + e.cuenta).includes(q)) return e;
+    const pos = e.pos.filter(r => norm(r.tk + ' ' + r.desc + ' ' + r.tipo).includes(q));
+    if (!pos.length) return null;
+    const ok = pos.filter(r => r.rend < 3);
+    return { ...e, pos, val: ok.reduce((a, r) => a + r.val, 0), gan: ok.reduce((a, r) => a + r.gan, 0), dudosas: pos.length - ok.length };
+  }).filter(Boolean);
   const npos = list.reduce((a, e) => a + e.pos.length, 0);
   const tot = list.reduce((a, e) => a + e.gan, 0);
   const dud = list.reduce((a, e) => a + e.dudosas, 0);
-  $('#tareasBox').innerHTML = `
-    <div class="tk-head"><h2>Tomar ganancia</h2><span>${plural(list.length, 'cliente', 'clientes')} · ${plural(npos, 'posición', 'posiciones')} · USD ${fmtUSD(tot)} de ganancia${dud ? ` · ${plural(dud, 'posición', 'posiciones')} para revisar (no se suman)` : ''}</span></div>
+  setTareasBox(`
+    ${tkSearch('Buscar cliente, N° de cuenta o activo (ej. SPY)…')}
+    <div class="tk-head"><h2>Tomar ganancia</h2><span>${q ? 'Búsqueda: ' : ''}${plural(list.length, 'cliente', 'clientes')} · ${plural(npos, 'posición', 'posiciones')} · USD ${fmtUSD(tot)} de ganancia${dud ? ` · ${plural(dud, 'posición', 'posiciones')} para revisar (no se suman)` : ''}</span></div>
     <div class="gan-ctl"><label>Avisar desde <input id="ganUmbral" type="number" min="1" max="500" step="1" value="${ganUmbral}"> % de suba desde la compra</label>
       <span>Rendimientos en USD MEP · informe del ${esc(fmtDate(ganancias.fecha))} (${esc(ganancias.fileName)}) · sin fondos ni posiciones de menos de USD ${GAN_MIN_USD}</span></div>
     ${list.length ? `<div class="scroll"><table class="gan"><thead><tr><th class="nosort">Activo</th><th class="nosort">Comprado</th><th class="nosort num">Compra USD</th><th class="nosort num">Hoy USD</th><th class="nosort num">Suba</th><th class="nosort num">Valor USD</th><th class="nosort num">Ganancia USD</th></tr></thead><tbody>
@@ -2457,7 +2481,7 @@ function renderGanancias() {
           ${modelo.has(String(r.tk).toUpperCase()) ? ' <span class="chip keep" title="Está en la cartera recomendada del research">En cartera recomendada: vender solo una parte</span>' : ''}</td>
         <td class="muted">${r.compra ? esc(fmtDate(r.compra)) : '—'}</td><td class="num">${fmtPrecio(r.ppc)}</td><td class="num">${fmtPrecio(r.precio)}</td>
         <td class="num pos"><b>${fmtRend(r.rend)}</b></td><td class="num">${fmtUSD(r.val)}</td><td class="num pos">${fmtUSD(r.gan)}</td></tr>`).join(''); }).join('')}
-    </tbody></table></div>` : `<div class="tk-empty">Ningún cliente tiene activos ${ganUmbral}% o más arriba del precio de compra.</div>`}`;
+    </tbody></table></div>` : `<div class="tk-empty">${q ? 'Ningún cliente o activo coincide con la búsqueda.' : `Ningún cliente tiene activos ${ganUmbral}% o más arriba del precio de compra.`}</div>`}`);
 }
 const fmtPrecio = v => v >= 100 ? fmtUSD(v) : v.toLocaleString('es-AR', { maximumFractionDigits: v >= 1 ? 2 : 4 });
 document.addEventListener('change', e => {
