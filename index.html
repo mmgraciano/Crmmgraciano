@@ -196,6 +196,9 @@
   .row-task.more { color: var(--muted); }
   .tk-dot { width: 8px; height: 8px; border-radius: 50%; border: 1.5px solid var(--muted); flex: none; }
   .tk-dot.pend { background: var(--accent); border-color: var(--accent); }
+  .tk-cli { list-style: none; padding: 0; margin: 12px 0 0; display: flex; flex-direction: column; gap: 8px; }
+  .tk-cli li { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; color: var(--text); }
+  .tk-cli .btn { padding: 6px 12px; font-size: 12.5px; }
   .tk-sub { padding: 14px 16px 8px; border-top: 1px solid var(--border); font: 600 11px var(--font-body); letter-spacing: .07em; text-transform: uppercase; color: var(--muted); }
   .hero { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 20px 22px; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.6fr); gap: 24px; }
   .hero .label { font: 600 11px var(--font-body); letter-spacing: .07em; text-transform: uppercase; color: var(--muted); }
@@ -2321,6 +2324,23 @@ function setTareasBox(html) {
   if (keep !== null) { const el = $('#tkQ'); el.focus(); try { el.setSelectionRange(keep, keep); } catch {} }
 }
 document.addEventListener('input', e => { if (e.target.id === 'tkQ') { tkQ = e.target.value; render(); } });
+// Búsqueda sin tareas: si coincide con clientes, ofrece crearles una y muestra si tienen activos para tomar ganancia
+function tkSinTareas(q) {
+  const cs = cuentas.filter(c => norm(c.nombre + ' ' + c.cuenta).includes(q)).slice(0, 5);
+  if (!cs.length) return 'Ninguna tarea ni cliente coincide con la búsqueda.';
+  const gan = new Map(ganClientes().map(e => [norm(e.cuenta || e.nombre), e]));
+  return `${cs.length === 1 ? 'Este cliente no tiene' : 'Estos clientes no tienen'} tareas cargadas.<ul class="tk-cli">${cs.map(c => {
+    const g = gan.get(norm(c.cuenta || c.nombre));
+    return `<li><b>${esc(c.nombre)}</b>${c.cuenta ? ` <span class="acct">${esc(c.cuenta)}</span>` : ''}
+      <button class="btn primary" data-tkcli="${esc(c.id)}">+ Tarea para este cliente</button>
+      ${g ? `<button class="btn ghost" data-tkgan="${esc(c.cuenta || c.nombre)}">${plural(g.pos.length, 'activo', 'activos')} para tomar ganancia</button>` : ''}</li>`; }).join('')}</ul>`;
+}
+$('#tareasBox').addEventListener('click', e => {
+  const n = e.target.closest('[data-tkcli]');
+  if (n) { const c = cuentas.find(x => x.id === n.dataset.tkcli); openTask(null); if (c) $('#t-cliente').value = c.nombre; return; }
+  const g = e.target.closest('[data-tkgan]');
+  if (g) { tkView = 'ganancias'; tkQ = g.dataset.tkgan; render(); }
+});
 function renderTareas() {
   // Pendientes: primero las que tienen fecha (la más próxima arriba), después las sin fecha por orden de carga
   const q = norm(tkQ);
@@ -2333,7 +2353,7 @@ function renderTareas() {
     ${tareas.length ? tkSearch('Buscar tarea, cliente o estado…') : ''}
     <div class="tk-head"><h2>Tareas</h2><span>${q ? `${plural(pend.length + hechas.length, 'resultado', 'resultados')} · ` : ''}${plural(pend.filter(t => estadoDe(t) === 'sin').length, 'sin hacer', 'sin hacer')} · ${plural(pend.filter(t => estadoDe(t) === 'pend').length, 'pendiente', 'pendientes')} · ${plural(hechas.length, 'hecha', 'hechas')}${vencidas ? ` · ${plural(vencidas, 'vencida', 'vencidas')}` : ''}</span></div>
     ${pend.length ? `<ul class="tk-list">${pend.map(tareaItem).join('')}</ul>`
-      : `<div class="tk-empty">${loading ? 'Cargando…' : q ? 'Ninguna tarea pendiente coincide con la búsqueda.' : 'No tenés tareas pendientes. Anotá una con <b>+ Nueva tarea</b>.'}</div>`}
+      : `<div class="tk-empty">${loading ? 'Cargando…' : q ? (hechas.length ? 'Ninguna tarea pendiente coincide con la búsqueda.' : tkSinTareas(q)) : 'No tenés tareas pendientes. Anotá una con <b>+ Nueva tarea</b>.'}</div>`}
     ${hechas.length ? `<details class="tk-done"${q ? ' open' : ''}><summary>Hechas (${hechas.length})</summary><ul class="tk-list">${hechas.map(tareaItem).join('')}</ul></details>` : ''}
     ${conCuentas ? `<div class="tk-sub">Cuentas marcadas en ${esc(tabLabel(TASKS_TAB))}</div>` : ''}`);
 }
