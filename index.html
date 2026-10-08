@@ -168,6 +168,22 @@
   .gan .chip.warn { background: var(--late-bg); color: var(--late); }
   .gan .chip.keep { background: var(--soft); color: var(--muted); border: 1px solid var(--border); }
   .gan .btn { padding: 6px 12px; font-size: 12.5px; }
+  .ia-log { display: flex; flex-direction: column; gap: 12px; padding: 4px 16px 14px; }
+  .ia-msg { max-width: 100%; padding: 10px 14px; border-radius: 12px; line-height: 1.5; overflow-wrap: anywhere; }
+  .ia-msg.user { align-self: flex-end; background: var(--accent); color: var(--on-accent); max-width: 80%; white-space: pre-wrap; }
+  .ia-msg.bot { align-self: stretch; background: var(--bg); border: 1px solid var(--border); }
+  .ia-msg.bot p { margin: 0 0 8px; } .ia-msg.bot p:last-child { margin-bottom: 0; }
+  .ia-msg.bot ul { margin: 4px 0 8px; padding-left: 20px; } .ia-msg.bot li { margin: 2px 0; }
+  .ia-msg.bot h4 { margin: 10px 0 4px; font: 600 14px var(--font-body); }
+  .ia-msg.wait { color: var(--muted); font-style: italic; }
+  .ia-msg .note { margin-top: 8px; font-size: 12px; color: var(--muted); }
+  .ia-sug { display: flex; flex-wrap: wrap; gap: 6px; padding: 0 16px 12px; }
+  .ia-sug button { border: 1px solid var(--border); background: var(--panel); color: var(--text); border-radius: 999px; padding: 6px 12px; font: 12.5px var(--font-body); cursor: pointer; text-align: left; }
+  .ia-sug button:hover { border-color: var(--accent); }
+  .ia-form { display: flex; gap: 8px; padding: 12px 16px 16px; border-top: 1px solid var(--border); align-items: flex-end; }
+  .ia-form textarea { flex: 1; min-height: 44px; max-height: 160px; font: 14px var(--font-body); padding: 10px 12px; border: 1px solid var(--border); border-radius: 10px; background: var(--bg); color: var(--text); resize: vertical; }
+  .ia-form textarea:focus { outline: none; border-color: var(--accent); }
+  .ia-hint { padding: 0 16px 10px; color: var(--muted); font-size: 12.5px; }
   .tk-sub { padding: 14px 16px 8px; border-top: 1px solid var(--border); font: 600 11px var(--font-body); letter-spacing: .07em; text-transform: uppercase; color: var(--muted); }
   .hero { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 20px 22px; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.6fr); gap: 24px; }
   .hero .label { font: 600 11px var(--font-body); letter-spacing: .07em; text-transform: uppercase; color: var(--muted); }
@@ -1012,7 +1028,8 @@ function render() {
   $('#subtabs').innerHTML = tab === TASKS_TAB ? [
     { id: 'tareas', label: 'Mis tareas', n: tareas.filter(x => !x.hecha).length },
     { id: 'ganancias', label: `Tomar ganancia (+${ganUmbral}%)`, n: ganClientes().length },
-  ].map(t => `<button data-tkv="${t.id}" class="${tkView === t.id ? 'on' : ''}">${esc(t.label)}<span class="n">${t.n}</span></button>`).join('')
+    { id: 'ia', label: 'Preguntale a la IA', n: null },
+  ].map(t => `<button data-tkv="${t.id}" class="${tkView === t.id ? 'on' : ''}">${esc(t.label)}${t.n === null ? '' : `<span class="n">${t.n}</span>`}</button>`).join('')
   : inGroup ? sub.map(t => {
     const n = t.id === SUMMARY_TAB ? null : t.id === HOLD_TAB ? holdCuentas().size : cuentas.filter(c => inTab(c, t.id)).length;
     return `<button data-tab="${esc(t.id)}" class="${t.id === tab ? 'on' : ''}">${t.id === SUMMARY_TAB ? 'Resumen' : esc(t.label)}${n === null ? '' : `<span class="n">${n}</span>`}</button>`;
@@ -1029,10 +1046,10 @@ function render() {
   const tasks = tab === TASKS_TAB;
   $('#stats').hidden = $('#btnExport').hidden = false;
   $('#btnNew').hidden = hold || summary || income || tasks;
-  const gan = tasks && tkView === 'ganancias';
-  $('#btnTask').hidden = !tasks || gan;
+  const gan = tasks && tkView === 'ganancias', ia = tasks && tkView === 'ia';
+  $('#btnTask').hidden = !tasks || gan || ia;
   $('#tareasBox').hidden = !tasks;
-  if (tasks) gan ? renderGanancias() : renderTareas();
+  if (tasks) ia ? renderIA() : gan ? renderGanancias() : renderTareas();
   $('#btnAjustes').hidden = !(hold || summary);
   $('#btnImport').hidden = summary;
   $('#btnImport').textContent = hold ? 'Importar tenencias' : income ? 'Importar facturación' : 'Importar Excel';
@@ -1050,12 +1067,13 @@ function render() {
   const base = currentRows();
   if (tasks) {
     // La tabla de cuentas solo aparece si hay cuentas marcadas en esta pestaña
-    const conCuentas = cuentas.some(c => inTab(c, TASKS_TAB)) && !gan;
+    const conCuentas = cuentas.some(c => inTab(c, TASKS_TAB)) && !gan && !ia;
     $('#tableWrap').hidden = !conCuentas;
     $('#searches').hidden = !conCuentas;
     for (const id of ['#stats', '#btnSinCuenta', '#btnExport', '#btnImport']) $(id).hidden = !conCuentas;
     if (gan) { $('#btnImport').hidden = false; $('#btnImport').textContent = 'Importar rendimientos'; }
-  }
+    $('.bar').hidden = ia;
+  } else $('.bar').hidden = res;
   const late = base.filter(c => alarma(c).late).length;
   $('#stats').innerHTML = `
     <span class="stat"><b>${base.length}</b>cuentas cargadas</span>
@@ -2456,6 +2474,173 @@ $('#tareasBox').addEventListener('click', async e => {
   render();
   await saveTarea(t);
   toast('Tarea agregada en Mis tareas');
+});
+
+// ---------- Preguntale a la IA ----------
+// La conversación vive en este navegador (comodidad); cada pregunta manda los datos actuales del panel
+const LOCAL_IA = 'panel-wm-ia-v1';
+let iaTurns = (() => { try { return JSON.parse(localStorage.getItem(LOCAL_IA)) || []; } catch { return []; } })();
+let iaCtl = null, iaBusy = false, iaSample, iaLive = '';
+const iaSave = () => { try { localStorage.setItem(LOCAL_IA, JSON.stringify(iaTurns.slice(-20))); } catch {} };
+const IA_SUGERENCIAS = [
+  '¿Qué clientes tienen QQQ, SPY o NVDA y por qué convendría rotarlos?',
+  '¿A qué 5 clientes les conviene tomar ganancia primero y a qué rotarlos?',
+  '¿Qué clientes facturaron en septiembre y todavía no en octubre?',
+  '¿Qué vence este mes y a quién tengo que llamar primero?',
+  '¿Qué clientes tienen más de 20% en un solo activo?',
+];
+const r0 = v => Math.round(v);
+function iaContexto() {
+  const L = [];
+  const nombreDe = cta => cuentas.find(c => norm(c.cuenta) === norm(cta))?.nombre || '';
+  L.push(`Fecha de hoy: ${fmtDate(today())}.`);
+  // Tenencias por cliente
+  const v = valuar(tenencias);
+  if (v?.ok) {
+    L.push(`\n## TENENCIAS (USD MEP, informe ${tenencias.updatedAt ? fmtDate(String(tenencias.updatedAt).slice(0, 10)) : ''}). Total USD ${r0(v.total)}. Formato: cuenta nombre: activo(tipo) USD; ...`);
+    const por = new Map();
+    for (const pos of v.pos.values()) { const k = norm(pos.cuenta); (por.get(k) || por.set(k, []).get(k)).push(pos); }
+    for (const [k, list] of por) {
+      const pc = v.porCuenta.get(k);
+      list.sort((a, b) => b.usd - a.usd);
+      L.push(`${pc.cuenta} ${pc.nombre || nombreDe(pc.cuenta)} (total ${r0(pc.usd)}): ` + list.filter(x => Math.abs(x.usd) >= 1).map(x => { const inf = v.espInfo.get(x.especie) || {}; return `${/^\d+$/.test(x.especie) && inf.desc ? inf.desc.slice(0, 30) : x.especie}(${inf.tipo || ''}) ${r0(x.usd)}`; }).join('; '));
+    }
+  } else L.push('\n## TENENCIAS: no hay informe de tenencias cargado.');
+  // Rendimientos desde la compra
+  if (ganancias?.rows?.length) {
+    L.push(`\n## RENDIMIENTO DESDE LA COMPRA (USD MEP, informe ${fmtDate(ganancias.fecha)}; solo posiciones +5% o más; +300% o más suele ser un precio de compra mal cargado). Formato: cuenta nombre: activo +x% (comprado dd/mm/aaaa, valor USD, ganancia USD)`);
+    for (const r of ganancias.rows.slice().sort((a, b) => b.gan - a.gan))
+      L.push(`${r.cuenta} ${r.nombre}: ${r.tk} ${fmtRend(r.rend)} (comprado ${r.compra ? fmtDate(r.compra) : '?'}, valor ${r0(r.val)}, ganancia ${r0(r.gan)})`);
+  }
+  // Research del día
+  const rs = research[0];
+  if (rs) {
+    L.push(`\n## RESEARCH INTERNO del ${fmtDate(rs.fecha)}`);
+    if (rs.resumen) L.push('Resumen: ' + rs.resumen);
+    for (const x of rs.contextoLocal || []) L.push('Argentina: ' + x);
+    for (const x of rs.contextoInternacional || []) L.push('Internacional: ' + x);
+    for (const t of rs.titulares || []) L.push(`Agenda: ${t.titulo} (${t.fecha || ''}) ${t.detalle || ''}`);
+    for (const a of rs.alertas || []) L.push(`Alerta ${a.accion || ''} ${a.activo || ''}: ${String(a.titulo || '')} ${String(a.motivo || a.porque || a.explicacion || '').slice(0, 400)}`);
+    for (const [perfil, pf] of Object.entries(rs.carteraModelo?.perfiles || {}))
+      L.push(`Cartera nueva ${perfil}: ` + (pf.lineas || []).map(l => `${l.activo} ${l.pct}%${l.consenso ? ' consenso ' + l.consenso : ''}${l.potencial != null ? ' potencial ' + l.potencial + '%' : ''}${l.porque ? ' (' + String(l.porque).slice(0, 160) + ')' : ''}`).join('; ')
+        + ((pf.descartados || []).length ? ' | Descartados: ' + pf.descartados.map(d => `${d.activo || d.ticker || ''}: ${String(d.porque || d.motivo || '').slice(0, 140)}`).join('; ') : ''));
+  }
+  // Facturación por mes
+  const meses = mesesCargados();
+  if (meses.length) {
+    L.push(`\n## FACTURACIÓN (comisiones USD). Meta mensual USD ${config.metaMes || 10000}; objetivo ${config.objetivo?.desde || ''} a ${config.objetivo?.hasta || ''}: USD ${config.objetivo?.monto || ''}.`);
+    for (const p of meses.slice().reverse()) {
+      const top = factClientes(p).sort((a, b) => b.total - a.total).filter(e => e.total >= 1);
+      L.push(`${perLabel(p)}: total ${r0(totalPer(p))}. Por comitente: ` + top.map(e => `${e.nombre} ${r0(e.total)}`).join('; '));
+    }
+  }
+  // Clientes: contacto, pestañas y tareas
+  L.push(`\n## CLIENTES DE ${config.principal} (cuenta nombre · último contacto · pestañas)`);
+  for (const c of cuentas) L.push(`${c.cuenta || 's/c'} ${c.nombre} · ${c.ultimoContacto ? fmtDate(c.ultimoContacto) : 'sin contacto'}${validTags(c).length ? ' · ' + validTags(c).map(tabLabel).join(', ') : ''}`);
+  const pend = tareas.filter(t => !t.hecha);
+  if (pend.length) L.push('\n## TAREAS PENDIENTES\n' + pend.map(t => `- ${t.texto}${t.cliente ? ' (' + t.cliente + ')' : ''}${t.vence ? ' para ' + fmtDate(t.vence) : ''}`).join('\n'));
+  return L.join('\n').slice(0, 200000);
+}
+const IA_REGLAS = `Sos el asistente de research interno de Micaela Graciano, asesora financiera en MAX Capital (Argentina). Le respondés en español rioplatense, claro y corto.
+Reglas:
+- Usá SOLO los datos del panel que vienen abajo. No inventes cifras, precios ni clientes. Si un dato no está, decilo y explicá qué archivo haría falta.
+- Cuando nombres clientes, poné su N° de cuenta y los montos en USD.
+- Si recomendás vender, comprar o rotar, explicá el porqué con el research interno y los rendimientos desde la compra; aclará riesgos. Para carteras moderadas ella usa 80% ONs (en lo posible AAA) y 20% CEDEARs/acciones elegidas por consenso de analistas; evita índices en máximos (como SPY) y no supera 10% de Telecom por cliente.
+- Formato: párrafos cortos y listas con "- ". Podés usar **negrita**. No uses tablas.
+- Es información de apoyo: ella decide qué hacer.
+
+DATOS DEL PANEL:
+`;
+function iaMd(t) {
+  const out = []; let ul = false;
+  const inl = x => esc(x).replace(/\*\*(.+?)\*\*/g, '<b>$1</b>');
+  for (const raw of String(t).split('\n')) {
+    const line = raw.trimEnd();
+    const li = line.match(/^\s*(?:[-*•]|\d+[.)])\s+(.*)$/);
+    if (li) { if (!ul) { out.push('<ul>'); ul = true; } out.push(`<li>${inl(li[1])}</li>`); continue; }
+    if (ul) { out.push('</ul>'); ul = false; }
+    const h = line.match(/^#{1,4}\s+(.*)$/);
+    if (h) out.push(`<h4>${inl(h[1])}</h4>`);
+    else if (line.trim()) out.push(`<p>${inl(line)}</p>`);
+  }
+  if (ul) out.push('</ul>');
+  return out.join('');
+}
+const IA_ERR = {
+  not_granted: 'No diste permiso para que el panel consulte a Claude. Podés habilitarlo desde el menú de permisos del artifact.',
+  sampling_disabled: 'Claude no está disponible para esta cuenta.',
+  rate_limited: 'Hiciste muchas preguntas seguidas o llegaste al límite de uso. Probá de nuevo en un rato.',
+  session_expired: 'Tu sesión venció: volvé a iniciar sesión en Claude.',
+  prompt_too_large: 'La conversación quedó muy larga. Tocá "Nueva conversación".',
+  refused: 'Claude no respondió esa pregunta. Probá reformularla.',
+  empty_completion: 'No llegó respuesta. Probá preguntarlo de otra forma.',
+};
+function iaLogHtml() {
+  const msgs = iaTurns.map(t => t.role === 'user' ? `<div class="ia-msg user">${esc(t.content)}</div>` : `<div class="ia-msg bot">${iaMd(t.content)}</div>`);
+  if (iaBusy) msgs.push(iaLive ? `<div class="ia-msg bot" id="iaLive">${iaMd(iaLive)}</div>` : `<div class="ia-msg bot wait" id="iaLive">Pensando… (revisa tus tenencias, rendimientos y el research)</div>`);
+  return msgs.join('') || `<div class="ia-hint" style="padding:0">Preguntale lo que quieras sobre tus clientes. Responde con los datos que tenés cargados en el panel.</div>`;
+}
+async function renderIA() {
+  const box = $('#tareasBox');
+  if (!box.querySelector('#iaRoot')) {
+    box.innerHTML = `<div id="iaRoot">
+      <div class="tk-head"><h2>Preguntale a la IA</h2><span>Responde con tus tenencias, rendimientos, research, facturación y clientes</span></div>
+      <div class="ia-log" id="iaLog"></div>
+      <div class="ia-sug" id="iaSug">${IA_SUGERENCIAS.map(q => `<button type="button" data-q="${esc(q)}">${esc(q)}</button>`).join('')}</div>
+      <form class="ia-form" id="iaForm"><textarea id="iaQ" rows="2" placeholder="Ej: ¿Qué clientes tienen QQQ, SPY o NVDA y por qué rotarlo?"></textarea>
+        <button class="btn primary" id="iaSend" type="submit">Preguntar</button><button class="btn ghost" id="iaStop" type="button" hidden>Frenar</button></form>
+      <div class="ia-hint"><button class="btn ghost" id="iaNew" type="button" style="padding:5px 10px;font-size:12px">Nueva conversación</button>
+        Cada pregunta usa tu cuenta de Claude. Es información de apoyo: revisá los números antes de operar.</div></div>`;
+  }
+  $('#iaLog').innerHTML = iaLogHtml();
+  $('#iaSug').hidden = iaTurns.length > 0;
+  $('#iaSend').hidden = iaBusy; $('#iaStop').hidden = !iaBusy;
+  if (iaSample === undefined) {
+    iaSample = null;
+    const s = window.claude?.use ? await window.claude.use('sample') : null;
+    iaSample = s || false;
+    if (!s && tab === TASKS_TAB && tkView === 'ia') $('#iaLog').innerHTML = `<div class="ia-hint" style="padding:0">La IA no está disponible en esta vista. Abrí el panel desde claude.ai para usarla.</div>`;
+  }
+}
+async function iaPreguntar(q) {
+  q = q.trim(); if (!q || iaBusy) return;
+  if (!iaSample) { toast('La IA no está disponible en esta vista'); return; }
+  iaTurns.push({ role: 'user', content: q }); iaSave();
+  iaBusy = true; iaLive = ''; $('#iaQ').value = ''; renderIA();
+  iaCtl = new AbortController();
+  const hist = iaTurns.slice(-9);   // últimas preguntas y respuestas; arranca siempre en una pregunta
+  while (hist.length && hist[0].role !== 'user') hist.shift();
+  const input = [{ role: 'user', content: IA_REGLAS + iaContexto() }, ...hist];
+  let shown = '';
+  try {
+    const { text, truncated } = await iaSample(input, {
+      cache: false, signal: iaCtl.signal,
+      onText: ({ text }) => { shown = text; iaLive = text; const el = $('#iaLive'); if (el) { el.classList.remove('wait'); el.innerHTML = iaMd(text); } },
+    });
+    iaTurns.push({ role: 'assistant', content: text + (truncated ? '\n\n(La respuesta quedó cortada: pedí menos cosas a la vez.)' : '') });
+  } catch (e) {
+    if (e?.code === 'cancelled') { if (e.text || shown) iaTurns.push({ role: 'assistant', content: (e.text || shown) + '\n\n(Frenada)' }); else iaTurns.pop(); }
+    else {
+      const keep = e?.code === 'refused' ? '' : (e?.text || '');
+      iaTurns.push({ role: 'assistant', content: (keep ? keep + '\n\n' : '') + '⚠ ' + (IA_ERR[e?.code] || 'Hubo un problema de conexión con Claude. Probá de nuevo.') });
+      if (e?.code === 'not_granted' || e?.code === 'sampling_disabled') iaSample = false;
+    }
+  } finally {
+    iaBusy = false; iaCtl = null; iaLive = ''; iaSave();
+    if (tab === TASKS_TAB && tkView === 'ia') { renderIA(); $('#iaLog').lastElementChild?.scrollIntoView({ block: 'nearest' }); }
+  }
+}
+$('#tareasBox').addEventListener('submit', e => {
+  if (e.target.id !== 'iaForm') return;
+  e.preventDefault(); iaPreguntar($('#iaQ').value);
+});
+$('#tareasBox').addEventListener('keydown', e => {
+  if (e.target.id === 'iaQ' && e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); iaPreguntar(e.target.value); }
+});
+$('#tareasBox').addEventListener('click', e => {
+  const s = e.target.closest('#iaSug [data-q]'); if (s) return iaPreguntar(s.dataset.q);
+  if (e.target.closest('#iaStop')) iaCtl?.abort();
+  if (e.target.closest('#iaNew')) { if (iaBusy) iaCtl?.abort(); iaTurns = []; iaSave(); renderIA(); }
 });
 
 // ---------- Confirmación ----------

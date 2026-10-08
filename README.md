@@ -19,6 +19,10 @@ Panel para registrar tu base de cuentas, en un solo archivo (`index.html`).
   por posición (Comitente, Ticker, Pppc Mep, Precio Actual Mep) y lista, por cliente, los activos 10% o más arriba del precio de
   compra en USD MEP (el % se puede cambiar). **+ Tarea** crea la tarea en Mis tareas. Las subas de 300% o más se marcan para revisar
   el precio de compra y no se suman. Se guarda en la base del panel (documento `ganancias/actual`).
+- **Preguntale a la IA:** tercera solapa de Tareas pendientes. Se le pregunta en lenguaje natural (por ejemplo "¿qué clientes
+  tienen QQQ, SPY o NVDA y por qué rotarlos?") y responde Claude con los datos del panel: tenencias, rendimientos desde la compra,
+  research del día, facturación por mes, clientes y tareas. Usa la cuenta de Claude de quien pregunta (capacidad `sample`); la
+  conversación queda solo en ese navegador.
 - **Asignar pestañas:** tocá **+ pestaña** debajo del nombre de la cuenta, o marcalas al editarla.
 - **Agregar, renombrar o quitar pestañas:** botón **+** al final de las pestañas. Ahí también se cambian los días de la alarma.
 - **Alarma:** se pone en rojo cuando pasaron más de 21 días desde el último contacto (o si no hay fecha).
