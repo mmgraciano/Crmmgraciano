@@ -177,6 +177,7 @@
   .gan-tk .ok { color: var(--ok); font-weight: 600; }
   .gan-tk .pend { color: var(--late); font-weight: 600; }
   .cli-row span.pos { color: var(--ok); } .cli-row span.neg { color: var(--late); }
+  .tk-head b.pos { color: var(--ok); } .tk-head b.neg { color: var(--late); }
   .gan-cli-img { padding: 4px 9px; font-size: 13px; line-height: 1; }
   .gan .chip.warn { background: var(--late-bg); color: var(--late); }
   .gan .chip.keep { background: var(--soft); color: var(--muted); border: 1px solid var(--border); }
@@ -2766,6 +2767,9 @@ const ganTareaDe = e => {
   // Si hay una abierta manda esa; si no, la última hecha (así queda a la vista que ya se hizo)
   return ts.filter(t => !t.hecha).pop() || ts.sort((a, b) => String(a.hechaEl || a.creado).localeCompare(String(b.hechaEl || b.creado))).pop() || null;
 };
+// % histórico (desde la compra) de una lista de clientes: resultado / costo, sin las posiciones para revisar
+const ganPctDe = lst => { let g = 0, c = 0; for (const e of lst) for (const p of e.pos) if (p.rend < 3) { g += p.gan; c += p.val - p.gan; } return c > 0 ? g / c : null; };
+const fmtHist = (gan, pct) => `USD ${fmtUSD(gan)}${pct == null ? '' : ` (${fmtRend(pct)})`}`;
 const fmtRend = v => (v >= 0 ? '+' : '') + (v * 100).toLocaleString('es-AR', { maximumFractionDigits: v >= 1 ? 0 : 1 }) + '%';
 function renderGanancias() {
   const cart = tkView === 'cartera', titulo = cart ? 'Cartera completa' : 'Tomar ganancia';
@@ -2796,7 +2800,7 @@ function renderGanancias() {
   const tks = list.map(ganTareaDe), tkHechas = tks.filter(t => t?.hecha).length, tkPend = tks.filter(t => t && !t.hecha).length;
   setTareasBox(`
     ${tkSearch('Buscar cliente, N° de cuenta o activo (ej. SPY)…')}
-    <div class="tk-head"><h2>${titulo}</h2>${list.length ? `<span class="gan-dl"><button class="btn ghost gan-xls" data-gxls="todos" title="Descargar en Excel el % de ganancia en USD de cada cliente">⬇ Excel</button><button class="btn ghost gan-xls" data-gimg="todos" title="Descargar una imagen con el resumen por cliente">⬇ Imagen</button></span>` : ''}<span>${q ? 'Búsqueda: ' : ''}${plural(list.length, 'cliente', 'clientes')} · ${plural(npos, 'posición', 'posiciones')}${cart ? ` · USD ${fmtUSD(tval)} en cartera` : ''} · USD ${fmtUSD(tot)} de ${cart ? 'resultado' : 'ganancia'}${dud ? ` · ${plural(dud, 'posición', 'posiciones')} para revisar (no se suman)` : ''}</span></div>
+    <div class="tk-head"><h2>${titulo}</h2>${list.length ? `<span class="gan-dl"><button class="btn ghost gan-xls" data-gxls="todos" title="Descargar en Excel el % de ganancia en USD de cada cliente">⬇ Excel</button><button class="btn ghost gan-xls" data-gimg="todos" title="Descargar una imagen con el resumen por cliente">⬇ Imagen</button></span>` : ''}<span>${q ? 'Búsqueda: ' : ''}${plural(list.length, 'cliente', 'clientes')} · ${plural(npos, 'posición', 'posiciones')}${cart ? ` · USD ${fmtUSD(tval)} en cartera · histórico <b class="${sg(tot)}">${fmtHist(tot, ganPctDe(list))}</b>` : ` · USD ${fmtUSD(tot)} de ganancia`}${dud ? ` · ${plural(dud, 'posición', 'posiciones')} para revisar (no se suman)` : ''}</span></div>
     <div class="gan-ctl">${cart ? '' : `<label>Avisar desde <input id="ganUmbral" type="number" min="1" max="500" step="1" value="${ganUmbral}"> % de suba desde la compra</label>`}
       ${list.length && !cart ? `<span class="gan-tk">Tareas armadas: <b>${tkHechas + tkPend}</b> · <span class="ok">✓ ${plural(tkHechas, 'hecha', 'hechas')}</span> · <span class="pend">${plural(tkPend, 'pendiente', 'pendientes')}</span> · ${plural(list.length - tkHechas - tkPend, 'cliente', 'clientes')} sin tarea</span>` : ''}
       <span>Rendimientos en USD MEP · informe del ${esc(fmtDate(ganancias.fecha))} (${esc(ganancias.fileName)}) · ${cart ? 'todos los activos de cada cliente' : `sin fondos ni posiciones de menos de USD ${GAN_MIN_USD}`}</span></div>
@@ -2804,7 +2808,7 @@ function renderGanancias() {
       const tabla = lst => `<div class="scroll"><table class="gan"><thead><tr><th class="nosort">Activo</th><th class="nosort">Comprado</th><th class="nosort num">Compra USD</th><th class="nosort num">Hoy USD</th><th class="nosort num">${cart ? 'Rend.' : 'Suba'}</th><th class="nosort num">Valor USD</th><th class="nosort num">${cart ? 'Resultado USD' : 'Ganancia USD'}</th></tr></thead><tbody>
     ${lst.map((e, i) => { const t = cart ? null : ganTareaDe(e), h = hechoDe(e);
       return (h && i === lst.filter(x => !hechoDe(x)).length ? `<tr class="gan-sep"><td colspan="7">Hechos (${lst.filter(x => hechoDe(x)).length})</td></tr>` : '') +
-      `<tr class="cli ${h ? 'hecho' : ''}" data-gan="${esc(e.key)}"><td colspan="7"><div class="cli-row"><span><b>${esc(e.nombre)}</b>${e.cuenta ? ` <span class="acct">${esc(e.cuenta)}</span>` : ''} · ${plural(e.pos.length, 'activo', 'activos')} · ${cart ? `USD ${fmtUSD(e.val)} · resultado <span class="${sg(e.gan)}">USD ${fmtUSD(e.gan)}</span>` : `ganancia USD ${fmtUSD(e.gan)}`}${h ? ` · <span class="pos">hecho el ${esc(fmtDate(h))}</span>` : ''}</span>
+      `<tr class="cli ${h ? 'hecho' : ''}" data-gan="${esc(e.key)}"><td colspan="7"><div class="cli-row"><span><b>${esc(e.nombre)}</b>${e.cuenta ? ` <span class="acct">${esc(e.cuenta)}</span>` : ''} · ${plural(e.pos.length, 'activo', 'activos')} · ${cart ? `USD ${fmtUSD(e.val)} · ${e.gan >= 0 ? 'arriba' : 'abajo'} en el histórico <span class="${sg(e.gan)}"><b>${fmtHist(e.gan, ganPctDe([e]))}</b></span>` : `ganancia USD ${fmtUSD(e.gan)}`}${h ? ` · <span class="pos">hecho el ${esc(fmtDate(h))}</span>` : ''}</span>
         <span class="cli-act">${cart ? '' : t ? `<button class="chip ${t.hecha ? 'tk-ok' : 'tk-abierta'}" data-gact="ver" title="Ver en Mis tareas">${t.hecha ? `Tarea hecha ✓${t.hechaEl ? ' ' + esc(fmtDate(t.hechaEl)) : ''}` : 'Tarea creada · pendiente'}</button>` : h ? '' : `<button class="btn primary" data-gact="tarea">+ Tarea</button>`}
         <button class="btn ghost gan-cli-img" data-gimg="cliente" title="Descargar la imagen de este cliente" aria-label="Descargar la imagen de ${esc(e.nombre)}">⬇ Imagen</button>
         ${cart ? '' : `<button class="reu-ok ${h ? 'on' : ''}" data-gact="hecho" title="${h ? 'Volver a pendiente' : 'Marcar como hecho'}" aria-label="${h ? 'Hecho: volver a pendiente' : 'Marcar como hecho'}" aria-pressed="${!!h}">✓</button>`}</span></div></td></tr>` +
@@ -2816,7 +2820,7 @@ function renderGanancias() {
 </tbody></table></div>`;
       const sp = separarGrupos(list, e => e.cuenta);
       return sp.grupos.map(({ g, items }) => grupoBloque('g-' + g.id, g, items.length,
-        `${plural(items.length, 'cliente', 'clientes')} · ${cart ? `USD ${fmtUSD(items.reduce((a, e) => a + e.val, 0))} · resultado` : 'ganancia'} USD ${fmtUSD(items.reduce((a, e) => a + e.gan, 0))}`,
+        `${plural(items.length, 'cliente', 'clientes')} · ${cart ? `USD ${fmtUSD(items.reduce((a, e) => a + e.val, 0))} · histórico ${fmtHist(items.reduce((a, e) => a + e.gan, 0), ganPctDe(items))}` : `ganancia USD ${fmtUSD(items.reduce((a, e) => a + e.gan, 0))}`}`,
         `<div class="gan-gxls"><button class="btn ghost gan-xls" data-gxls="${esc(g.id)}">⬇ Excel de ${esc(g.nombre)}</button><button class="btn ghost gan-xls" data-gimg="${esc(g.id)}">⬇ Imagen de ${esc(g.nombre)}</button></div>` + tabla(items), !!q)).join('') + (sp.resto.length ? tabla(sp.resto) : '');
     })() : `<div class="tk-empty">${q ? 'Ningún cliente o activo coincide con la búsqueda.' : cart ? 'El informe de rendimientos no tiene posiciones.' : `Ningún cliente tiene activos ${ganUmbral}% o más arriba del precio de compra.`}</div>`}`);
 }
@@ -2873,9 +2877,9 @@ async function ganImagen(lista, titulo, nombreArchivo, cart = false) {
   const pad = 32, rowH = 30, headY = 116, nameW = 470;
   const xPct = pad + nameW + 90, xUsd = xPct + 140;
   const tot = rows.reduce((a, r) => a + r.gan, 0);
-  const tval = lista.reduce((a, e) => a + e.val, 0), resLab = cart ? 'resultado' : 'ganancia';
+  const tval = lista.reduce((a, e) => a + e.val, 0), resLab = cart ? 'histórico' : 'ganancia', tpct = cart ? ganPctDe(lista) : null;
   const sub = cart
-    ? `${rows.length === 1 ? '' : plural(rows.length, 'cliente', 'clientes') + ' · '}Cartera USD ${fmtUSD(tval)} · ${resLab} USD ${fmtUSD(tot)} · en USD MEP desde la compra · informe del ${fmtDate(ganancias?.fecha || today())}`
+    ? `${rows.length === 1 ? '' : plural(rows.length, 'cliente', 'clientes') + ' · '}Cartera USD ${fmtUSD(tval)} · ${resLab} ${fmtHist(tot, tpct)} · en USD MEP desde la compra · informe del ${fmtDate(ganancias?.fecha || today())}`
     : `${rows.length === 1 ? 'Ganancia' : plural(rows.length, 'cliente', 'clientes') + ' · ganancia'} USD ${fmtUSD(tot)} · en USD MEP desde la compra, posiciones +${ganUmbral}% · informe del ${fmtDate(ganancias?.fecha || today())}`;
   const mc = document.createElement('canvas').getContext('2d'); mc.font = `400 14px ${body}`;
   const W = Math.ceil(Math.max(xUsd + pad + 12, pad * 2 + mc.measureText(sub).width));
@@ -2904,7 +2908,9 @@ async function ganImagen(lista, titulo, nombreArchivo, cart = false) {
     if (nom !== r.nombre) nom = nom.trimEnd() + '…';
     g.fillText(nom, pad, y0);
     g.fillStyle = C.muted; g.font = `400 12px ${body}`; right(r.cuenta || '', pad + nameW);
-    g.font = `700 13.5px ${body}`; g.fillStyle = C.text; right(fmtUSD(r.gan), xUsd);
+    g.font = `700 13.5px ${body}`;
+    if (cart) { const pc = ganPctDe([r.e]); g.fillStyle = r.gan < 0 ? C.bad : C.ok; if (pc != null) right(fmtRend(pc), xPct); }
+    g.fillStyle = cart && r.gan < 0 ? C.bad : C.text; right(fmtUSD(r.gan), xUsd);
     r.e.pos.forEach((p, j) => {
       y0 = y + rowH + j * posH + 16;
       const dud = p.rend >= 3;
@@ -2923,6 +2929,7 @@ async function ganImagen(lista, titulo, nombreArchivo, cart = false) {
   const yT = yB; y0 = yT + 28;
   g.strokeStyle = C.accent; g.lineWidth = 1.5; g.beginPath(); g.moveTo(pad - 12, yT + 4); g.lineTo(W - pad + 12, yT + 4); g.stroke();
   g.fillStyle = C.text; g.font = `700 13.5px ${body}`; g.fillText('Total', pad, y0); right(fmtUSD(tot), xUsd);
+  if (cart && tpct != null) { g.fillStyle = tot < 0 ? C.bad : C.ok; right(fmtRend(tpct), xPct); }
   const blob = await new Promise(ok => cv.toBlob(ok, 'image/png'));
   await guardarArchivo(nombreArchivo, blob);
 }

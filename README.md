@@ -30,7 +30,7 @@ Panel para registrar tu base de cuentas, en un solo archivo (`index.html`).
   "Wealth Management" con el desglose activo por activo (suba % y ganancia USD). Se guarda en `ganancias/hechas` y se mantiene con informes nuevos. Las subas de 300% o más se marcan para revisar
   el precio de compra y no se suman. Se guarda en la base del panel (documento `ganancias/actual`).
 - **Cartera completa:** igual que Tomar ganancia (que no incluye a los clientes Lang; acá sí están) pero con todos los activos de cada cliente (sin filtro de suba, tipo ni monto),
-  con rendimiento % y resultado USD de cada uno. Cada cliente tiene su **⬇ Imagen** (Wealth Management) y arriba están el Excel y la imagen general.
+  con rendimiento % y resultado USD de cada uno, y cuánto está arriba o abajo cada cliente en el histórico (USD y %). Cada cliente tiene su **⬇ Imagen** (Wealth Management) y arriba están el Excel y la imagen general.
 - **Reuniones:** solapa de Tareas pendientes con las reuniones de la semana (lunes a domingo) agrupadas por día, más las próximas y
   las anteriores. **+ Nueva reunión** agenda una (cliente, día, hora y tema); a la derecha, el tilde verde la marca como hecha, y
   debajo de cada una hay un cuadro de notas que se guarda solo. Colección `reuniones`.
