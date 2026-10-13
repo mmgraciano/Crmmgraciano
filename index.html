@@ -242,6 +242,9 @@
   .reu-ok.on { background: var(--ok); color: var(--panel); opacity: 1; }
   .reu .x { flex: none; }
   .reu-otras summary { padding: 11px 16px; border-top: 1px solid var(--border); cursor: pointer; color: var(--muted); font-size: 13px; }
+  .gan-xls { padding: 5px 12px; font-size: 12.5px; }
+  .tk-head .gan-xls { order: 3; margin-left: auto; }
+  .gan-gxls { padding: 10px 16px; }
   .tk-grupo { border-top: 1px solid var(--border); border-bottom: 2px solid var(--border); }
   .tk-grupo > summary { list-style: none; display: flex; align-items: center; gap: 10px; padding: 12px 16px; cursor: pointer; background: var(--accent-soft); }
   .tk-grupo > summary::-webkit-details-marker { display: none; }
@@ -2695,12 +2698,13 @@ function renderGanancias() {
   // Los ya hechos van abajo
   const pendientes = list.filter(e => !ganHechas[e.key]), hechos = list.filter(e => ganHechas[e.key]);
   list.length = 0; list.push(...pendientes, ...hechos);
+  ganVista = list;
   const npos = list.reduce((a, e) => a + e.pos.length, 0);
   const tot = list.reduce((a, e) => a + e.gan, 0);
   const dud = list.reduce((a, e) => a + e.dudosas, 0);
   setTareasBox(`
     ${tkSearch('Buscar cliente, N° de cuenta o activo (ej. SPY)…')}
-    <div class="tk-head"><h2>Tomar ganancia</h2><span>${q ? 'Búsqueda: ' : ''}${plural(list.length, 'cliente', 'clientes')} · ${plural(npos, 'posición', 'posiciones')} · USD ${fmtUSD(tot)} de ganancia${dud ? ` · ${plural(dud, 'posición', 'posiciones')} para revisar (no se suman)` : ''}</span></div>
+    <div class="tk-head"><h2>Tomar ganancia</h2>${list.length ? `<button class="btn ghost gan-xls" data-gxls="todos" title="Descargar en Excel el % de ganancia en USD de cada cliente">⬇ Descargar Excel</button>` : ''}<span>${q ? 'Búsqueda: ' : ''}${plural(list.length, 'cliente', 'clientes')} · ${plural(npos, 'posición', 'posiciones')} · USD ${fmtUSD(tot)} de ganancia${dud ? ` · ${plural(dud, 'posición', 'posiciones')} para revisar (no se suman)` : ''}</span></div>
     <div class="gan-ctl"><label>Avisar desde <input id="ganUmbral" type="number" min="1" max="500" step="1" value="${ganUmbral}"> % de suba desde la compra</label>
       <span>Rendimientos en USD MEP · informe del ${esc(fmtDate(ganancias.fecha))} (${esc(ganancias.fileName)}) · sin fondos ni posiciones de menos de USD ${GAN_MIN_USD}</span></div>
     ${list.length ? (() => {
@@ -2718,9 +2722,42 @@ function renderGanancias() {
 </tbody></table></div>`;
       const sp = separarGrupos(list, e => e.cuenta);
       return sp.grupos.map(({ g, items }) => grupoBloque('g-' + g.id, g, items.length,
-        `${plural(items.length, 'cliente', 'clientes')} · ganancia USD ${fmtUSD(items.reduce((a, e) => a + e.gan, 0))}`, tabla(items), !!q)).join('') + (sp.resto.length ? tabla(sp.resto) : '');
+        `${plural(items.length, 'cliente', 'clientes')} · ganancia USD ${fmtUSD(items.reduce((a, e) => a + e.gan, 0))}`,
+        `<div class="gan-gxls"><button class="btn ghost gan-xls" data-gxls="${esc(g.id)}">⬇ Descargar Excel de ${esc(g.nombre)}</button></div>` + tabla(items), !!q)).join('') + (sp.resto.length ? tabla(sp.resto) : '');
     })() : `<div class="tk-empty">${q ? 'Ningún cliente o activo coincide con la búsqueda.' : `Ningún cliente tiene activos ${ganUmbral}% o más arriba del precio de compra.`}</div>`}`);
 }
+// ---- Excel de Tomar ganancia: hoja por cliente (% de ganancia en USD) y hoja con el detalle por activo ----
+let ganVista = [];
+async function ganExcel(lista, nombreArchivo) {
+  if (!lista.length) return toast('No hay clientes para descargar');
+  const r2 = v => Math.round(v * 100) / 100, pct = v => Math.round(v * 10000) / 100;
+  const porCliente = lista.map(e => {
+    const ok = e.pos.filter(p => p.rend < 3), costo = ok.reduce((a, p) => a + (p.val - p.gan), 0);
+    return { 'N° de cuenta': e.cuenta, 'Cliente': e.nombre, 'Activos': e.pos.length, 'Valor USD': r2(ok.reduce((a, p) => a + p.val, 0)),
+      'Costo USD': r2(costo), 'Ganancia USD': r2(e.gan), 'Ganancia %': costo > 0 ? pct(e.gan / costo) : null,
+      'Hecho': ganHechas[e.key] ? fmtDate(ganHechas[e.key]) : '', 'Para revisar': e.dudosas ? plural(e.dudosas, 'posición', 'posiciones') + ' con precio de compra a revisar (no suman)' : '' };
+  });
+  const detalle = lista.flatMap(e => e.pos.map(p => ({ 'N° de cuenta': e.cuenta, 'Cliente': e.nombre, 'Activo': p.tk, 'Descripción': p.desc, 'Tipo': p.tipo,
+    'Comprado': p.compra ? fmtDate(p.compra) : '', 'Precio compra USD': Math.round(p.ppc * 1e4) / 1e4, 'Precio hoy USD': Math.round(p.precio * 1e4) / 1e4, 'Ganancia %': pct(p.rend),
+    'Valor USD': r2(p.val), 'Ganancia USD': r2(p.gan), 'Nota': p.rend >= 3 ? 'Revisar precio de compra' : '' })));
+  const hoja = (rows, ancho) => { const ws = XLSX.utils.json_to_sheet(rows); ws['!cols'] = Object.keys(rows[0]).map(h => ({ wch: ancho[h] || Math.max(h.length + 2, 14) })); return ws; };
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, hoja(porCliente, { 'Cliente': 42, 'Para revisar': 50 }), 'Por cliente');
+  XLSX.utils.book_append_sheet(wb, hoja(detalle, { 'Cliente': 42, 'Descripción': 40 }), 'Por activo');
+  const dl = window.claude?.use ? await window.claude.use('downloads') : null;
+  try {
+    if (!dl) XLSX.writeFile(wb, nombreArchivo);
+    else await dl.save({ filename: nombreArchivo, data: new Uint8Array(XLSX.write(wb, { type: 'array', bookType: 'xlsx' })) });
+    toast('Excel descargado');
+  } catch (e) { if (e?.code !== 'declined') toast('No se pudo descargar el archivo'); }
+}
+$('#tareasBox').addEventListener('click', e => {
+  const b = e.target.closest('[data-gxls]'); if (!b) return;
+  const id = b.dataset.gxls, fecha = (ganancias?.fecha || today());
+  if (id === 'todos') return ganExcel(ganVista, `tomar_ganancia_${ganUmbral}pct_${fecha}.xlsx`);
+  const g = (config.grupos || []).find(x => x.id === id); if (!g) return;
+  ganExcel(ganVista.filter(c => g.cuentas.includes(String(c.cuenta))), `tomar_ganancia_${slug(g.nombre)}_${fecha}.xlsx`);
+});
 const fmtPrecio = v => v >= 100 ? fmtUSD(v) : v.toLocaleString('es-AR', { maximumFractionDigits: v >= 1 ? 2 : 4 });
 document.addEventListener('change', e => {
   if (e.target.id !== 'ganUmbral') return;
