@@ -243,7 +243,8 @@
   .reu .x { flex: none; }
   .reu-otras summary { padding: 11px 16px; border-top: 1px solid var(--border); cursor: pointer; color: var(--muted); font-size: 13px; }
   .gan-xls { padding: 5px 12px; font-size: 12.5px; }
-  .tk-head .gan-xls { order: 3; margin-left: auto; }
+  .tk-head .gan-dl { order: 3; margin-left: auto; display: inline-flex; gap: 6px; }
+  .gan-gxls { display: flex; flex-wrap: wrap; gap: 6px; }
   .gan-gxls { padding: 10px 16px; }
   .tk-grupo { border-top: 1px solid var(--border); border-bottom: 2px solid var(--border); }
   .tk-grupo > summary { list-style: none; display: flex; align-items: center; gap: 10px; padding: 12px 16px; cursor: pointer; background: var(--accent-soft); }
@@ -2704,7 +2705,7 @@ function renderGanancias() {
   const dud = list.reduce((a, e) => a + e.dudosas, 0);
   setTareasBox(`
     ${tkSearch('Buscar cliente, N° de cuenta o activo (ej. SPY)…')}
-    <div class="tk-head"><h2>Tomar ganancia</h2>${list.length ? `<button class="btn ghost gan-xls" data-gxls="todos" title="Descargar en Excel el % de ganancia en USD de cada cliente">⬇ Descargar Excel</button>` : ''}<span>${q ? 'Búsqueda: ' : ''}${plural(list.length, 'cliente', 'clientes')} · ${plural(npos, 'posición', 'posiciones')} · USD ${fmtUSD(tot)} de ganancia${dud ? ` · ${plural(dud, 'posición', 'posiciones')} para revisar (no se suman)` : ''}</span></div>
+    <div class="tk-head"><h2>Tomar ganancia</h2>${list.length ? `<span class="gan-dl"><button class="btn ghost gan-xls" data-gxls="todos" title="Descargar en Excel el % de ganancia en USD de cada cliente">⬇ Excel</button><button class="btn ghost gan-xls" data-gimg="todos" title="Descargar una imagen con el resumen por cliente">⬇ Imagen</button></span>` : ''}<span>${q ? 'Búsqueda: ' : ''}${plural(list.length, 'cliente', 'clientes')} · ${plural(npos, 'posición', 'posiciones')} · USD ${fmtUSD(tot)} de ganancia${dud ? ` · ${plural(dud, 'posición', 'posiciones')} para revisar (no se suman)` : ''}</span></div>
     <div class="gan-ctl"><label>Avisar desde <input id="ganUmbral" type="number" min="1" max="500" step="1" value="${ganUmbral}"> % de suba desde la compra</label>
       <span>Rendimientos en USD MEP · informe del ${esc(fmtDate(ganancias.fecha))} (${esc(ganancias.fileName)}) · sin fondos ni posiciones de menos de USD ${GAN_MIN_USD}</span></div>
     ${list.length ? (() => {
@@ -2723,40 +2724,112 @@ function renderGanancias() {
       const sp = separarGrupos(list, e => e.cuenta);
       return sp.grupos.map(({ g, items }) => grupoBloque('g-' + g.id, g, items.length,
         `${plural(items.length, 'cliente', 'clientes')} · ganancia USD ${fmtUSD(items.reduce((a, e) => a + e.gan, 0))}`,
-        `<div class="gan-gxls"><button class="btn ghost gan-xls" data-gxls="${esc(g.id)}">⬇ Descargar Excel de ${esc(g.nombre)}</button></div>` + tabla(items), !!q)).join('') + (sp.resto.length ? tabla(sp.resto) : '');
+        `<div class="gan-gxls"><button class="btn ghost gan-xls" data-gxls="${esc(g.id)}">⬇ Excel de ${esc(g.nombre)}</button><button class="btn ghost gan-xls" data-gimg="${esc(g.id)}">⬇ Imagen de ${esc(g.nombre)}</button></div>` + tabla(items), !!q)).join('') + (sp.resto.length ? tabla(sp.resto) : '');
     })() : `<div class="tk-empty">${q ? 'Ningún cliente o activo coincide con la búsqueda.' : `Ningún cliente tiene activos ${ganUmbral}% o más arriba del precio de compra.`}</div>`}`);
 }
 // ---- Excel de Tomar ganancia: hoja por cliente (% de ganancia en USD) y hoja con el detalle por activo ----
 let ganVista = [];
-async function ganExcel(lista, nombreArchivo) {
-  if (!lista.length) return toast('No hay clientes para descargar');
-  const r2 = v => Math.round(v * 100) / 100, pct = v => Math.round(v * 10000) / 100;
-  const porCliente = lista.map(e => {
+// Resumen por cliente con la ganancia separada por tipo de activo (lo usan el Excel y la imagen)
+function ganResumen(lista) {
+  const totTipo = new Map();
+  for (const e of lista) for (const p of e.pos) if (p.rend < 3) totTipo.set(p.tipo || 'Otros', (totTipo.get(p.tipo || 'Otros') || 0) + p.gan);
+  const tipos = [...totTipo.keys()].sort((a, b) => totTipo.get(b) - totTipo.get(a));
+  const rows = lista.map(e => {
     const ok = e.pos.filter(p => p.rend < 3), costo = ok.reduce((a, p) => a + (p.val - p.gan), 0);
-    return { 'N° de cuenta': e.cuenta, 'Cliente': e.nombre, 'Activos': e.pos.length, 'Valor USD': r2(ok.reduce((a, p) => a + p.val, 0)),
-      'Costo USD': r2(costo), 'Ganancia USD': r2(e.gan), 'Ganancia %': costo > 0 ? pct(e.gan / costo) : null,
-      'Hecho': ganHechas[e.key] ? fmtDate(ganHechas[e.key]) : '', 'Para revisar': e.dudosas ? plural(e.dudosas, 'posición', 'posiciones') + ' con precio de compra a revisar (no suman)' : '' };
+    const porTipo = Object.fromEntries(tipos.map(t => [t, ok.filter(p => (p.tipo || 'Otros') === t).reduce((a, p) => a + p.gan, 0)]));
+    return { e, cuenta: e.cuenta, nombre: e.nombre, n: e.pos.length, gan: e.gan, pct: costo > 0 ? e.gan / costo : null, porTipo };
   });
-  const detalle = lista.flatMap(e => e.pos.map(p => ({ 'N° de cuenta': e.cuenta, 'Cliente': e.nombre, 'Activo': p.tk, 'Descripción': p.desc, 'Tipo': p.tipo,
-    'Comprado': p.compra ? fmtDate(p.compra) : '', 'Precio compra USD': Math.round(p.ppc * 1e4) / 1e4, 'Precio hoy USD': Math.round(p.precio * 1e4) / 1e4, 'Ganancia %': pct(p.rend),
-    'Valor USD': r2(p.val), 'Ganancia USD': r2(p.gan), 'Nota': p.rend >= 3 ? 'Revisar precio de compra' : '' })));
-  const hoja = (rows, ancho) => { const ws = XLSX.utils.json_to_sheet(rows); ws['!cols'] = Object.keys(rows[0]).map(h => ({ wch: ancho[h] || Math.max(h.length + 2, 14) })); return ws; };
-  const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, hoja(porCliente, { 'Cliente': 42, 'Para revisar': 50 }), 'Por cliente');
-  XLSX.utils.book_append_sheet(wb, hoja(detalle, { 'Cliente': 42, 'Descripción': 40 }), 'Por activo');
+  return { tipos, totTipo, rows };
+}
+const gr2 = v => Math.round(v * 100) / 100, gpct = v => v == null ? null : Math.round(v * 10000) / 100;
+async function guardarArchivo(nombre, data) {
   const dl = window.claude?.use ? await window.claude.use('downloads') : null;
   try {
-    if (!dl) XLSX.writeFile(wb, nombreArchivo);
-    else await dl.save({ filename: nombreArchivo, data: new Uint8Array(XLSX.write(wb, { type: 'array', bookType: 'xlsx' })) });
-    toast('Excel descargado');
-  } catch (e) { if (e?.code !== 'declined') toast('No se pudo descargar el archivo'); }
+    if (dl) await dl.save({ filename: nombre, data });
+    else { const a = document.createElement('a'); a.href = URL.createObjectURL(data instanceof Blob ? data : new Blob([data])); a.download = nombre; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 4000); }
+    toast('Archivo descargado'); return true;
+  } catch (e) { if (e?.code !== 'declined') toast('No se pudo descargar el archivo'); return false; }
+}
+async function ganExcel(lista, nombreArchivo) {
+  if (!lista.length) return toast('No hay clientes para descargar');
+  const { tipos, totTipo, rows } = ganResumen(lista);
+  const porCliente = rows.map(r => ({ 'N° de cuenta': r.cuenta, 'Cliente': r.nombre, 'Activos': r.n, 'Ganancia USD': gr2(r.gan), 'Ganancia %': gpct(r.pct),
+    ...Object.fromEntries(tipos.map(t => [`${t} (USD)`, r.porTipo[t] ? gr2(r.porTipo[t]) : null])),
+    'Hecho': ganHechas[r.e.key] ? fmtDate(ganHechas[r.e.key]) : '', 'Para revisar': r.e.dudosas ? plural(r.e.dudosas, 'posición', 'posiciones') + ' con precio de compra a revisar (no suman)' : '' }));
+  const porTipo = tipos.map(t => {
+    const ps = lista.flatMap(e => e.pos.filter(p => (p.tipo || 'Otros') === t && p.rend < 3).map(p => ({ ...p, cli: e.key })));
+    const costo = ps.reduce((a, p) => a + (p.val - p.gan), 0);
+    return { 'Tipo de activo': t, 'Clientes': new Set(ps.map(p => p.cli)).size, 'Posiciones': ps.length, 'Ganancia USD': gr2(totTipo.get(t)), 'Ganancia %': costo > 0 ? gpct(totTipo.get(t) / costo) : null };
+  });
+  const detalle = lista.flatMap(e => e.pos.slice().sort((a, b) => (a.tipo || '').localeCompare(b.tipo || '') || b.gan - a.gan).map(p => ({ 'N° de cuenta': e.cuenta, 'Cliente': e.nombre, 'Tipo': p.tipo, 'Activo': p.tk, 'Descripción': p.desc,
+    'Comprado': p.compra ? fmtDate(p.compra) : '', 'Precio compra USD': Math.round(p.ppc * 1e4) / 1e4, 'Precio hoy USD': Math.round(p.precio * 1e4) / 1e4, 'Ganancia %': gpct(p.rend),
+    'Ganancia USD': gr2(p.gan), 'Nota': p.rend >= 3 ? 'Revisar precio de compra' : '' })));
+  const hoja = (data, ancho) => { const ws = XLSX.utils.json_to_sheet(data); ws['!cols'] = Object.keys(data[0]).map(h => ({ wch: ancho[h] || Math.max(h.length + 2, 12) })); return ws; };
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, hoja(porCliente, { 'Cliente': 42, 'Para revisar': 50 }), 'Por cliente');
+  XLSX.utils.book_append_sheet(wb, hoja(porTipo, { 'Tipo de activo': 26 }), 'Por tipo de activo');
+  XLSX.utils.book_append_sheet(wb, hoja(detalle, { 'Cliente': 42, 'Descripción': 40, 'Tipo': 20 }), 'Por activo');
+  await guardarArchivo(nombreArchivo, new Uint8Array(XLSX.write(wb, { type: 'array', bookType: 'xlsx' })));
+}
+// Imagen PNG con el resumen por cliente y por tipo de activo, para mandar por WhatsApp o mail (siempre en colores claros)
+async function ganImagen(lista, titulo, nombreArchivo) {
+  if (!lista.length) return toast('No hay clientes para descargar');
+  const { tipos, totTipo, rows } = ganResumen(lista);
+  const cols = tipos.slice(0, 4), otros = tipos.slice(4), tipoCols = [...cols, ...(otros.length ? ['Otros'] : [])];
+  const valTipo = (pt, t) => t === 'Otros' ? otros.reduce((a, o) => a + (pt[o] || 0), 0) : pt[t] || 0;
+  const C = { bg: '#fbfaf7', soft: '#efeee9', zebra: '#f5f4f0', text: '#1f2a24', muted: '#6a716b', accent: '#2d4a3c', ok: '#2f6b45' };
+  const body = 'DM Sans, system-ui, -apple-system, Segoe UI, Roboto, sans-serif', disp = 'Fraunces, Georgia, serif';
+  const pad = 32, rowH = 30, headY = 116, nameW = 380;
+  const xPct = pad + nameW + 90, xUsd = xPct + 130, tipoW = 130, xT = k => xUsd + tipoW * (k + 1);
+  const W = Math.max(900, xT(tipoCols.length - 1) + pad + 12);
+  const CORTO = { 'acciones locales': 'Acciones arg.', 'obligaciones negociables': 'ONs', 'titulo publicos': 'Bonos', 'titulos publicos': 'Bonos', 'titulos provinciales': 'Provinciales', 'letras del tesoro': 'Letras', 'acciones internacionales': 'Acciones ext.' };
+  const H = headY + 34 + rows.length * rowH + 60;
+  const cv = document.createElement('canvas'), sc = 2; cv.width = W * sc; cv.height = H * sc;
+  const g = cv.getContext('2d'); g.scale(sc, sc);
+  let y0 = 0;
+  const right = (t, x) => { g.textAlign = 'right'; g.fillText(t, x, y0); g.textAlign = 'left'; };
+  g.fillStyle = C.bg; g.fillRect(0, 0, W, H);
+  g.fillStyle = C.text; g.font = `600 26px ${disp}`; g.fillText(titulo, pad, 46);
+  const tot = rows.reduce((a, r) => a + r.gan, 0);
+  g.fillStyle = C.muted; g.font = `400 14px ${body}`;
+  g.fillText(`${plural(rows.length, 'cliente', 'clientes')} · ganancia USD ${fmtUSD(tot)} · en USD MEP desde la compra, posiciones +${ganUmbral}% · informe del ${fmtDate(ganancias?.fecha || today())}`, pad, 74);
+  g.fillText('Panel WM · Micaela Graciano', pad, 94);
+  g.fillStyle = C.soft; g.fillRect(pad - 12, headY, W - 2 * pad + 24, 34);
+  g.fillStyle = C.muted; g.font = `600 11px ${body}`; y0 = headY + 21;
+  g.fillText('CLIENTE', pad, y0); right('GANANCIA %', xPct); right('GANANCIA USD', xUsd);
+  tipoCols.forEach((t, k) => { let lab = (CORTO[norm(t)] || t).toUpperCase(); while (g.measureText(lab).width > tipoW - 12 && lab.length > 4) lab = lab.slice(0, -1); right(lab, xT(k)); });
+  rows.forEach((r, i) => {
+    const y = headY + 34 + i * rowH; y0 = y + 20;
+    if (i % 2) { g.fillStyle = C.zebra; g.fillRect(pad - 12, y, W - 2 * pad + 24, rowH); }
+    g.fillStyle = C.text; g.font = `600 13.5px ${body}`;
+    let nom = r.nombre; while (g.measureText(nom).width > nameW - 76 && nom.length > 4) nom = nom.slice(0, -1);
+    if (nom !== r.nombre) nom = nom.trimEnd() + '…';
+    g.fillText(nom, pad, y0);
+    g.fillStyle = C.muted; g.font = `400 12px ${body}`; right(r.cuenta || '', pad + nameW);
+    g.font = `700 13.5px ${body}`; g.fillStyle = C.ok;
+    right(r.pct == null ? '—' : '+' + (r.pct * 100).toLocaleString('es-AR', { maximumFractionDigits: 1 }) + '%', xPct);
+    g.fillStyle = C.text; right(fmtUSD(r.gan), xUsd);
+    g.font = `400 13px ${body}`; g.fillStyle = C.muted;
+    tipoCols.forEach((t, k) => { const v = valTipo(r.porTipo, t); right(v ? fmtUSD(v) : '—', xT(k)); });
+  });
+  const yT = headY + 34 + rows.length * rowH; y0 = yT + 28;
+  g.strokeStyle = C.accent; g.lineWidth = 1.5; g.beginPath(); g.moveTo(pad - 12, yT + 4); g.lineTo(W - pad + 12, yT + 4); g.stroke();
+  g.fillStyle = C.text; g.font = `700 13.5px ${body}`; g.fillText('Total', pad, y0); right(fmtUSD(tot), xUsd);
+  g.font = `600 13px ${body}`;
+  const totObj = Object.fromEntries(totTipo);
+  tipoCols.forEach((t, k) => right(fmtUSD(valTipo(totObj, t)), xT(k)));
+  const blob = await new Promise(ok => cv.toBlob(ok, 'image/png'));
+  await guardarArchivo(nombreArchivo, blob);
 }
 $('#tareasBox').addEventListener('click', e => {
-  const b = e.target.closest('[data-gxls]'); if (!b) return;
-  const id = b.dataset.gxls, fecha = (ganancias?.fecha || today());
-  if (id === 'todos') return ganExcel(ganVista, `tomar_ganancia_${ganUmbral}pct_${fecha}.xlsx`);
-  const g = (config.grupos || []).find(x => x.id === id); if (!g) return;
-  ganExcel(ganVista.filter(c => g.cuentas.includes(String(c.cuenta))), `tomar_ganancia_${slug(g.nombre)}_${fecha}.xlsx`);
+  const b = e.target.closest('[data-gxls], [data-gimg]'); if (!b) return;
+  const id = b.dataset.gxls || b.dataset.gimg, img = !!b.dataset.gimg, fecha = (ganancias?.fecha || today());
+  const g = id === 'todos' ? null : (config.grupos || []).find(x => x.id === id);
+  if (id !== 'todos' && !g) return;
+  const lista = g ? ganVista.filter(c => g.cuentas.includes(String(c.cuenta))) : ganVista;
+  const base = g ? `tomar_ganancia_${slug(g.nombre)}_${fecha}` : `tomar_ganancia_${ganUmbral}pct_${fecha}`;
+  if (img) ganImagen(lista, g ? `Tomar ganancia · ${g.nombre}` : 'Tomar ganancia · todos los clientes', base + '.png');
+  else ganExcel(lista, base + '.xlsx');
 });
 const fmtPrecio = v => v >= 100 ? fmtUSD(v) : v.toLocaleString('es-AR', { maximumFractionDigits: v >= 1 ? 2 : 4 });
 document.addEventListener('change', e => {
