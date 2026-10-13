@@ -2455,14 +2455,15 @@ async function importGanancias(file) {
     const wb = XLSX.read(await file.arrayBuffer());
     grid = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1, defval: '', raw: true, blankrows: false });
   } catch { return toast('No se pudo leer el archivo. Tiene que ser un Excel (.xlsx o .xls) o un CSV.'); }
-  const hi = grid.slice(0, 20).findIndex(r => r.some(h => normHeader(h) === 'comitente') && r.some(h => /pppc|ppc|precio de compra/.test(normHeader(h))));
+  const hi = grid.slice(0, 20).findIndex(r => r.some(h => /comitente/.test(normHeader(h))) && r.some(h => /pppc|ppc|precio de compra/.test(normHeader(h))));
   if (hi < 0) return toast('No encontré las columnas "Comitente" y "Pppc" (precio promedio de compra) en el archivo');
   const hs = grid[hi].map(normHeader);
-  const col = (...res) => { for (const re of res) { const i = hs.findIndex(h => re.test(h)); if (i >= 0) return i; } return -1; };
+  // Primera columna que coincide, en orden de preferencia; se ignoran las versiones "pesificadas" (en pesos)
+  const col = (...res) => { for (const re of res) { const i = hs.findIndex(h => re.test(h) && !/pesific/.test(h)); if (i >= 0) return i; } return -1; };
   const c = {
-    com: col(/^comitente$/), tk: col(/^ticker$/, /especie|abreviatura/), desc: col(/desc/), tipo: col(/^tipo$/, /tipo/),
-    fecha: col(/fecha/), q: col(/cant/), precio: col(/precio actual mep/, /precio.*mep/), ppc: col(/^pppc mep$/, /pp?pc.*mep/),
-    rend: col(/^rendim mep$/, /rendim.*mep/), gan: col(/rendimientos en dolares/, /ganancia.*(usd|dolar)/),
+    com: col(/^comitente$/, /comitente/), tk: col(/^ticker$/, /^abreviatura/, /especie|abreviatura/), desc: col(/^desc.*instrumento$/, /^desc(?!.*comitente)/), tipo: col(/^tipo$/, /tipo/),
+    fecha: col(/fecha.*(primera|compra)/, /fecha/), q: col(/cant/), precio: col(/precio actual mep/, /precio last day mep/, /precio.*mep/), ppc: col(/^pppc mep$/, /pp?pc.*mep/),
+    rend: col(/^rendim mep$/, /^rendimiento pct mep$/, /rendim.*mep/), gan: col(/rendimientos en dolares/, /diferencia valoracion actual vs pppc mep/, /ganancia.*(usd|dolar)/),
   };
   if (c.precio < 0 || c.ppc < 0) return toast('Faltan las columnas de precio actual y precio de compra en USD MEP');
   const rows = [];
@@ -2479,7 +2480,9 @@ async function importGanancias(file) {
       compra: c.fecha >= 0 ? isoDeCelda(r[c.fecha]) : '', q: isNaN(q) ? 0 : q, ppc, precio, rend: Math.round(rend * 10000) / 10000,
       val: Math.round(val * 100) / 100, gan: Math.round((c.gan >= 0 && !isNaN(toNumber(r[c.gan])) ? toNumber(r[c.gan]) : (precio - ppc) * q) * 100) / 100 });
   }
-  const doc = { fecha: today(), fileName: file.name, rows };
+  const posCol = hs.findIndex(h => /fecha posicion/.test(h));   // fecha del informe, si el archivo la trae
+  const fechaInf = posCol >= 0 ? grid.slice(hi + 1).map(r => isoDeCelda(r[posCol])).filter(Boolean).sort().pop() : '';
+  const doc = { fecha: fechaInf || today(), fileName: file.name, rows };
   ganancias = doc; render();
   try {
     if (tenDb) await write(() => tenDb.doc('ganancias/actual').set(doc)); else saveLocal();
