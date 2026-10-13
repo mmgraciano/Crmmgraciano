@@ -2461,7 +2461,16 @@ function setEstado(t, id) {
   t.hechaEl = t.hecha ? (t.hechaEl || today()) : '';
 }
 // Una tarea "Tomar ganancia" hecha marca al cliente como hecho en esa solapa (y si se reabre, vuelve a pendiente)
-const esTareaGan = t => /^Tomar ganancia/i.test(t.texto || '');
+const esTareaGan = t => /Tomar ganancia/i.test(t.texto || '');
+// Una sola tarea abierta por cliente: lo nuevo se suma a la que ya tiene (devuelve la tarea guardable y si se unió)
+function sumarTarea(t) {
+  const ex = (t.cuentaId || t.cliente) && tareas.find(x => !x.hecha && x.id !== t.id && (t.cuentaId ? x.cuentaId === t.cuentaId : !x.cuentaId && norm(x.cliente) === norm(t.cliente)));
+  if (!ex) { tareas = [...tareas, t]; return { t, unida: false }; }
+  const venc = [ex.vence, t.vence].filter(Boolean).sort()[0] || '';
+  const u = { ...ex, texto: norm(ex.texto).includes(norm(t.texto)) ? ex.texto : ex.texto + ' · ' + t.texto, vence: venc };
+  tareas = tareas.map(x => x.id === ex.id ? u : x);
+  return { t: u, unida: true };
+}
 function syncGanDesdeTarea(t) {
   if (!esTareaGan(t)) return null;
   const c = cuentas.find(x => x.id === t.cuentaId);
@@ -2598,12 +2607,14 @@ taskForm.addEventListener('submit', async () => {
   const prev = editingTask ? tareas.find(x => x.id === editingTask) : null;
   const t = { ...(prev || { id: uid(), hechaEl: '', creado: new Date().toISOString() }), texto, cuentaId: c?.id || '', cliente: c ? c.nombre : cliente, vence: $('#t-vence').value };
   setEstado(t, $('#t-estado').value);
-  tareas = [...tareas.filter(x => x.id !== t.id), t];
-  const gan = syncGanDesdeTarea(t);
+  let fin = t, unida = false;
+  if (prev || t.hecha) tareas = [...tareas.filter(x => x.id !== t.id), t];
+  else ({ t: fin, unida } = sumarTarea(t));
+  const gan = syncGanDesdeTarea(fin);
   render();
-  await saveTarea(t);
+  await saveTarea(fin);
   if (gan) await gan;
-  toast(prev ? 'Tarea actualizada' : 'Tarea agregada');
+  toast(prev ? 'Tarea actualizada' : unida ? `Se sumó a la tarea que ya tenía ${fin.cliente}` : 'Tarea agregada');
 });
 $('#tareasBox').addEventListener('click', async e => {
   const el = e.target.closest('[data-tact]');
@@ -2891,10 +2902,10 @@ $('#tareasBox').addEventListener('click', async e => {
   const detalle = e2.pos.map(r => `${r.tk} ${fmtRend(r.rend)}${r.rend >= 3 ? ' (revisar precio de compra)' : ''}`).join(', ');
   const t = { id: uid(), texto: `Tomar ganancia: ${detalle} (USD ${fmtUSD(e2.gan)} de ganancia)`, cuentaId: c?.id || '', cliente: c ? c.nombre : e2.nombre, vence: today(), creado: new Date().toISOString(), hechaEl: '' };
   setEstado(t, 'sin');
-  tareas = [...tareas, t];
+  const r = sumarTarea(t);
   render();
-  await saveTarea(t);
-  toast('Tarea agregada en Mis tareas');
+  await saveTarea(r.t);
+  toast(r.unida ? 'Se sumó a la tarea que ya tenía este cliente en Mis tareas' : 'Tarea agregada en Mis tareas');
 });
 
 // ---------- Preguntale a la IA ----------
@@ -3187,17 +3198,20 @@ ${a.texto}`).join('') });
 async function iaCrearTareas(i) {
   const turn = iaTurns[i]; if (!turn?.propuestas?.length || turn.estado !== 'pendiente') return;
   turn.estado = 'creadas'; iaSave();
-  const nuevas = turn.propuestas.map(x => {
+  const props = turn.propuestas.map(x => {
     const c = x.cuenta ? cuentas.find(k => norm(k.cuenta) === norm(x.cuenta)) : x.cliente ? cuentas.find(k => norm(k.nombre) === norm(x.cliente)) : null;
     const t = { id: uid(), texto: x.texto, cuentaId: c?.id || '', cliente: c ? c.nombre : x.cliente, vence: x.vence || '', creado: new Date().toISOString(), hechaEl: '' };
     setEstado(t, 'sin');
     return t;
   });
-  tareas = [...tareas, ...nuevas];
+  // Si el cliente ya tiene una tarea abierta (o viene dos veces en la propuesta), se suma a esa
+  const porId = new Map(); let unidas = 0;
+  for (const t of props) { const r = sumarTarea(t); if (r.unida) unidas++; porId.set(r.t.id, r.t); }
+  const nuevas = [...porId.keys()].map(id => tareas.find(x => x.id === id));
   render();
   try {
     for (const t of nuevas) await saveTarea(t);
-    toast(`Se crearon ${plural(nuevas.length, 'tarea', 'tareas')} en Mis tareas`);
+    toast(unidas ? `Listo: ${plural(props.length - unidas, 'tarea nueva', 'tareas nuevas')} y ${unidas} sumada${unidas > 1 ? 's' : ''} a tareas que ya tenían esos clientes` : `Se crearon ${plural(nuevas.length, 'tarea', 'tareas')} en Mis tareas`);
   } catch {}
 }
 $('#tareasBox').addEventListener('submit', e => {

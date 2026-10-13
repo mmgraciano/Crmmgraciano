@@ -14,7 +14,8 @@ Panel para registrar tu base de cuentas, en un solo archivo (`index.html`).
   muestran solo las cuentas asignadas a cada una. Una cuenta puede estar en varias pestañas.
 - **Tareas pendientes:** con **+ Nueva tarea** anotás una tarea, con un cliente y una fecha si querés. Cada tarea tiene un
   estado (**Sin hacer**, **Pendiente** o **Hecha ✓**): tocá el estado para pasar al siguiente. Las vencidas se marcan en rojo
-  y las hechas quedan guardadas abajo, en **Hechas**. Arriba hay un buscador (por texto, cliente o estado; en Tomar ganancia,
+  y las hechas quedan guardadas abajo, en **Hechas**. Cada cliente tiene una sola tarea abierta: si se agrega otra para el mismo cliente
+  (a mano, desde Tomar ganancia o desde la IA) se suma a la que ya tenía. Arriba hay un buscador (por texto, cliente o estado; en Tomar ganancia,
   por cliente, N° de cuenta o activo). En WM3 y las demás pestañas de cuentas, debajo de cada cliente se ven sus tareas abiertas;
   al tocarlas se abre Mis tareas filtrado por ese cliente. A la derecha de cada tarea, "Aprobado por el cliente": ✓ verde, ✗ roja
   o punto amarillo (pendiente);
