@@ -170,6 +170,7 @@
   .gan-tk { color: var(--text); }
   .gan-tk .ok { color: var(--ok); font-weight: 600; }
   .gan-tk .pend { color: var(--late); font-weight: 600; }
+  .cli-row span.pos { color: var(--ok); } .cli-row span.neg { color: var(--late); }
   .gan-cli-img { padding: 4px 9px; font-size: 13px; line-height: 1; }
   .gan .chip.warn { background: var(--late-bg); color: var(--late); }
   .gan .chip.keep { background: var(--soft); color: var(--muted); border: 1px solid var(--border); }
@@ -1175,6 +1176,7 @@ function render() {
   $('#subtabs').innerHTML = tab === TASKS_TAB ? [
     { id: 'tareas', label: 'Mis tareas', n: tareas.filter(x => !x.hecha).length },
     { id: 'ganancias', label: `Tomar ganancia (+${ganUmbral}%)`, n: ganClientes().length },
+    { id: 'cartera', label: 'Cartera completa', n: ganancias?.rows?.length ? ganClientes(true).length : null },
     { id: 'reuniones', label: 'Reuniones', n: reunionesSemana().filter(r => !r.hecha).length },
     { id: 'ia', label: 'Preguntale a la IA', n: null },
   ].map(t => `<button data-tkv="${t.id}" class="${tkView === t.id ? 'on' : ''}">${esc(t.label)}${t.n === null ? '' : `<span class="n">${t.n}</span>`}</button>`).join('')
@@ -1194,7 +1196,7 @@ function render() {
   const tasks = tab === TASKS_TAB;
   $('#stats').hidden = $('#btnExport').hidden = false;
   $('#btnNew').hidden = hold || summary || income || tasks;
-  const gan = tasks && tkView === 'ganancias', ia = tasks && tkView === 'ia', reu = tasks && tkView === 'reuniones';
+  const gan = tasks && (tkView === 'ganancias' || tkView === 'cartera'), ia = tasks && tkView === 'ia', reu = tasks && tkView === 'reuniones';
   $('#btnTask').hidden = !tasks || gan || ia || reu;
   $('#btnReu').hidden = !reu;
   $('#tareasBox').hidden = !tasks;
@@ -2698,21 +2700,22 @@ function tickersModelo() {
   for (const p of Object.values(perf)) for (const l of p?.lineas || []) if (l.activo || l.ticker) set.add(String(l.activo || l.ticker).toUpperCase());
   return set;
 }
-function ganClientes() {
+// todos = true: toda la cartera de cada cliente (solapa Cartera completa), sin filtrar por suba, tipo ni monto
+function ganClientes(todos = false) {
   if (!ganancias?.rows?.length) return [];
   const u = ganUmbral / 100;
   const by = new Map();
   for (const r of ganancias.rows) {
-    if (r.rend < u || r.val < GAN_MIN_USD || /fondo/i.test(r.tipo)) continue;
+    if (!todos && (r.rend < u || r.val < GAN_MIN_USD || /fondo/i.test(r.tipo))) continue;
     const k = r.cuenta || norm(r.nombre);
     const e = by.get(k) || { key: k, cuenta: r.cuenta, nombre: r.nombre, pos: [], val: 0, gan: 0, dudosas: 0 };
     e.pos.push(r);
     // Una suba de 300% o más suele ser un precio de compra mal cargado: se muestra, pero no se suma
-    if (r.rend >= 3) e.dudosas++; else { e.val += r.val; e.gan += r.gan; }
+    if (r.rend >= 3) { e.dudosas++; if (todos) e.val += r.val; } else { e.val += r.val; e.gan += r.gan; }
     by.set(k, e);
   }
-  for (const e of by.values()) e.pos.sort((a, b) => (a.rend >= 3) - (b.rend >= 3) || b.gan - a.gan);
-  return [...by.values()].sort((a, b) => b.gan - a.gan);
+  for (const e of by.values()) e.pos.sort((a, b) => (a.rend >= 3) - (b.rend >= 3) || (todos ? b.val - a.val : b.gan - a.gan));
+  return [...by.values()].sort((a, b) => todos ? b.val - a.val : b.gan - a.gan);
 }
 const ganTareaDe = e => {
   const c = findCuenta(e.cuenta, e.nombre);
@@ -2722,53 +2725,57 @@ const ganTareaDe = e => {
 };
 const fmtRend = v => (v >= 0 ? '+' : '') + (v * 100).toLocaleString('es-AR', { maximumFractionDigits: v >= 1 ? 0 : 1 }) + '%';
 function renderGanancias() {
+  const cart = tkView === 'cartera', titulo = cart ? 'Cartera completa' : 'Tomar ganancia';
   if (!ganancias?.rows) {
-    $('#tareasBox').innerHTML = `<div class="tk-head"><h2>Tomar ganancia</h2></div>
+    $('#tareasBox').innerHTML = `<div class="tk-head"><h2>${titulo}</h2></div>
       <div class="tk-empty">Subí con <b>Importar rendimientos</b> el Excel de rendimientos por posición (con Comitente, Ticker, Pppc Mep y Precio Actual Mep) y acá vas a ver qué clientes tienen activos ${ganUmbral}% o más arriba de su precio de compra.</div>`;
     return;
   }
   const q = norm(tkQ), modelo = tickersModelo();
   // Filtra por cliente o N° de cuenta (muestra todos sus activos) o por activo (muestra solo esos activos)
-  const list = ganClientes().map(e => {
+  const list = ganClientes(cart).map(e => {
     if (!q || norm(e.nombre + ' ' + e.cuenta).includes(q)) return e;
     const pos = e.pos.filter(r => norm(r.tk + ' ' + r.desc + ' ' + r.tipo).includes(q));
     if (!pos.length) return null;
     const ok = pos.filter(r => r.rend < 3);
-    return { ...e, pos, val: ok.reduce((a, r) => a + r.val, 0), gan: ok.reduce((a, r) => a + r.gan, 0), dudosas: pos.length - ok.length };
+    return { ...e, pos, val: (cart ? pos : ok).reduce((a, r) => a + r.val, 0), gan: ok.reduce((a, r) => a + r.gan, 0), dudosas: pos.length - ok.length };
   }).filter(Boolean);
   // Los ya hechos van abajo
-  const pendientes = list.filter(e => !ganHechas[e.key]), hechos = list.filter(e => ganHechas[e.key]);
+  const hechoDe = e => cart ? '' : ganHechas[e.key];
+  const pendientes = list.filter(e => !hechoDe(e)), hechos = list.filter(e => hechoDe(e));
   list.length = 0; list.push(...pendientes, ...hechos);
   ganVista = list;
+  const tval = list.reduce((a, e) => a + e.val, 0);
+  const sg = v => v < 0 ? 'neg' : 'pos';
   const npos = list.reduce((a, e) => a + e.pos.length, 0);
   const tot = list.reduce((a, e) => a + e.gan, 0);
   const dud = list.reduce((a, e) => a + e.dudosas, 0);
   const tks = list.map(ganTareaDe), tkHechas = tks.filter(t => t?.hecha).length, tkPend = tks.filter(t => t && !t.hecha).length;
   setTareasBox(`
     ${tkSearch('Buscar cliente, N° de cuenta o activo (ej. SPY)…')}
-    <div class="tk-head"><h2>Tomar ganancia</h2>${list.length ? `<span class="gan-dl"><button class="btn ghost gan-xls" data-gxls="todos" title="Descargar en Excel el % de ganancia en USD de cada cliente">⬇ Excel</button><button class="btn ghost gan-xls" data-gimg="todos" title="Descargar una imagen con el resumen por cliente">⬇ Imagen</button></span>` : ''}<span>${q ? 'Búsqueda: ' : ''}${plural(list.length, 'cliente', 'clientes')} · ${plural(npos, 'posición', 'posiciones')} · USD ${fmtUSD(tot)} de ganancia${dud ? ` · ${plural(dud, 'posición', 'posiciones')} para revisar (no se suman)` : ''}</span></div>
-    <div class="gan-ctl"><label>Avisar desde <input id="ganUmbral" type="number" min="1" max="500" step="1" value="${ganUmbral}"> % de suba desde la compra</label>
-      ${list.length ? `<span class="gan-tk">Tareas armadas: <b>${tkHechas + tkPend}</b> · <span class="ok">✓ ${plural(tkHechas, 'hecha', 'hechas')}</span> · <span class="pend">${plural(tkPend, 'pendiente', 'pendientes')}</span> · ${plural(list.length - tkHechas - tkPend, 'cliente', 'clientes')} sin tarea</span>` : ''}
-      <span>Rendimientos en USD MEP · informe del ${esc(fmtDate(ganancias.fecha))} (${esc(ganancias.fileName)}) · sin fondos ni posiciones de menos de USD ${GAN_MIN_USD}</span></div>
+    <div class="tk-head"><h2>${titulo}</h2>${list.length ? `<span class="gan-dl"><button class="btn ghost gan-xls" data-gxls="todos" title="Descargar en Excel el % de ganancia en USD de cada cliente">⬇ Excel</button><button class="btn ghost gan-xls" data-gimg="todos" title="Descargar una imagen con el resumen por cliente">⬇ Imagen</button></span>` : ''}<span>${q ? 'Búsqueda: ' : ''}${plural(list.length, 'cliente', 'clientes')} · ${plural(npos, 'posición', 'posiciones')}${cart ? ` · USD ${fmtUSD(tval)} en cartera` : ''} · USD ${fmtUSD(tot)} de ${cart ? 'resultado' : 'ganancia'}${dud ? ` · ${plural(dud, 'posición', 'posiciones')} para revisar (no se suman)` : ''}</span></div>
+    <div class="gan-ctl">${cart ? '' : `<label>Avisar desde <input id="ganUmbral" type="number" min="1" max="500" step="1" value="${ganUmbral}"> % de suba desde la compra</label>`}
+      ${list.length && !cart ? `<span class="gan-tk">Tareas armadas: <b>${tkHechas + tkPend}</b> · <span class="ok">✓ ${plural(tkHechas, 'hecha', 'hechas')}</span> · <span class="pend">${plural(tkPend, 'pendiente', 'pendientes')}</span> · ${plural(list.length - tkHechas - tkPend, 'cliente', 'clientes')} sin tarea</span>` : ''}
+      <span>Rendimientos en USD MEP · informe del ${esc(fmtDate(ganancias.fecha))} (${esc(ganancias.fileName)}) · ${cart ? 'todos los activos de cada cliente' : `sin fondos ni posiciones de menos de USD ${GAN_MIN_USD}`}</span></div>
     ${list.length ? (() => {
-      const tabla = lst => `<div class="scroll"><table class="gan"><thead><tr><th class="nosort">Activo</th><th class="nosort">Comprado</th><th class="nosort num">Compra USD</th><th class="nosort num">Hoy USD</th><th class="nosort num">Suba</th><th class="nosort num">Valor USD</th><th class="nosort num">Ganancia USD</th></tr></thead><tbody>
-    ${lst.map((e, i) => { const t = ganTareaDe(e), h = ganHechas[e.key];
-      return (h && i === lst.filter(x => !ganHechas[x.key]).length ? `<tr class="gan-sep"><td colspan="7">Hechos (${lst.filter(x => ganHechas[x.key]).length})</td></tr>` : '') +
-      `<tr class="cli ${h ? 'hecho' : ''}" data-gan="${esc(e.key)}"><td colspan="7"><div class="cli-row"><span><b>${esc(e.nombre)}</b>${e.cuenta ? ` <span class="acct">${esc(e.cuenta)}</span>` : ''} · ${plural(e.pos.length, 'activo', 'activos')} · ganancia USD ${fmtUSD(e.gan)}${h ? ` · <span class="pos">hecho el ${esc(fmtDate(h))}</span>` : ''}</span>
-        <span class="cli-act">${t ? `<button class="chip ${t.hecha ? 'tk-ok' : 'tk-abierta'}" data-gact="ver" title="Ver en Mis tareas">${t.hecha ? `Tarea hecha ✓${t.hechaEl ? ' ' + esc(fmtDate(t.hechaEl)) : ''}` : 'Tarea creada · pendiente'}</button>` : h ? '' : `<button class="btn primary" data-gact="tarea">+ Tarea</button>`}
+      const tabla = lst => `<div class="scroll"><table class="gan"><thead><tr><th class="nosort">Activo</th><th class="nosort">Comprado</th><th class="nosort num">Compra USD</th><th class="nosort num">Hoy USD</th><th class="nosort num">${cart ? 'Rend.' : 'Suba'}</th><th class="nosort num">Valor USD</th><th class="nosort num">${cart ? 'Resultado USD' : 'Ganancia USD'}</th></tr></thead><tbody>
+    ${lst.map((e, i) => { const t = cart ? null : ganTareaDe(e), h = hechoDe(e);
+      return (h && i === lst.filter(x => !hechoDe(x)).length ? `<tr class="gan-sep"><td colspan="7">Hechos (${lst.filter(x => hechoDe(x)).length})</td></tr>` : '') +
+      `<tr class="cli ${h ? 'hecho' : ''}" data-gan="${esc(e.key)}"><td colspan="7"><div class="cli-row"><span><b>${esc(e.nombre)}</b>${e.cuenta ? ` <span class="acct">${esc(e.cuenta)}</span>` : ''} · ${plural(e.pos.length, 'activo', 'activos')} · ${cart ? `USD ${fmtUSD(e.val)} · resultado <span class="${sg(e.gan)}">USD ${fmtUSD(e.gan)}</span>` : `ganancia USD ${fmtUSD(e.gan)}`}${h ? ` · <span class="pos">hecho el ${esc(fmtDate(h))}</span>` : ''}</span>
+        <span class="cli-act">${cart ? '' : t ? `<button class="chip ${t.hecha ? 'tk-ok' : 'tk-abierta'}" data-gact="ver" title="Ver en Mis tareas">${t.hecha ? `Tarea hecha ✓${t.hechaEl ? ' ' + esc(fmtDate(t.hechaEl)) : ''}` : 'Tarea creada · pendiente'}</button>` : h ? '' : `<button class="btn primary" data-gact="tarea">+ Tarea</button>`}
         <button class="btn ghost gan-cli-img" data-gimg="cliente" title="Descargar la imagen de este cliente" aria-label="Descargar la imagen de ${esc(e.nombre)}">⬇ Imagen</button>
-        <button class="reu-ok ${h ? 'on' : ''}" data-gact="hecho" title="${h ? 'Volver a pendiente' : 'Marcar como hecho'}" aria-label="${h ? 'Hecho: volver a pendiente' : 'Marcar como hecho'}" aria-pressed="${!!h}">✓</button></span></div></td></tr>` +
+        ${cart ? '' : `<button class="reu-ok ${h ? 'on' : ''}" data-gact="hecho" title="${h ? 'Volver a pendiente' : 'Marcar como hecho'}" aria-label="${h ? 'Hecho: volver a pendiente' : 'Marcar como hecho'}" aria-pressed="${!!h}">✓</button>`}</span></div></td></tr>` +
       e.pos.map(r => `<tr class="${h ? 'hecho' : ''}"><td><b>${esc(r.tk)}</b> <span class="muted">${esc(r.tipo)}</span>${r.desc ? `<div class="acct">${esc(r.desc)}</div>` : ''}
           ${r.rend >= 3 ? ' <span class="chip warn" title="Una suba tan grande suele venir de un precio de compra viejo o mal cargado">Revisar precio de compra</span>' : ''}
-          ${modelo.has(String(r.tk).toUpperCase()) ? ' <span class="chip keep" title="Está en la cartera recomendada del research">En cartera recomendada: vender solo una parte</span>' : ''}</td>
+          ${!cart && modelo.has(String(r.tk).toUpperCase()) ? ' <span class="chip keep" title="Está en la cartera recomendada del research">En cartera recomendada: vender solo una parte</span>' : ''}</td>
         <td class="muted">${r.compra ? esc(fmtDate(r.compra)) : '—'}</td><td class="num">${fmtPrecio(r.ppc)}</td><td class="num">${fmtPrecio(r.precio)}</td>
-        <td class="num pos"><b>${fmtRend(r.rend)}</b></td><td class="num">${fmtUSD(r.val)}</td><td class="num pos">${fmtUSD(r.gan)}</td></tr>`).join(''); }).join('')}
+        <td class="num ${sg(r.rend)}"><b>${fmtRend(r.rend)}</b></td><td class="num">${fmtUSD(r.val)}</td><td class="num ${sg(r.gan)}">${fmtUSD(r.gan)}</td></tr>`).join(''); }).join('')}
 </tbody></table></div>`;
       const sp = separarGrupos(list, e => e.cuenta);
       return sp.grupos.map(({ g, items }) => grupoBloque('g-' + g.id, g, items.length,
-        `${plural(items.length, 'cliente', 'clientes')} · ganancia USD ${fmtUSD(items.reduce((a, e) => a + e.gan, 0))}`,
+        `${plural(items.length, 'cliente', 'clientes')} · ${cart ? `USD ${fmtUSD(items.reduce((a, e) => a + e.val, 0))} · resultado` : 'ganancia'} USD ${fmtUSD(items.reduce((a, e) => a + e.gan, 0))}`,
         `<div class="gan-gxls"><button class="btn ghost gan-xls" data-gxls="${esc(g.id)}">⬇ Excel de ${esc(g.nombre)}</button><button class="btn ghost gan-xls" data-gimg="${esc(g.id)}">⬇ Imagen de ${esc(g.nombre)}</button></div>` + tabla(items), !!q)).join('') + (sp.resto.length ? tabla(sp.resto) : '');
-    })() : `<div class="tk-empty">${q ? 'Ningún cliente o activo coincide con la búsqueda.' : `Ningún cliente tiene activos ${ganUmbral}% o más arriba del precio de compra.`}</div>`}`);
+    })() : `<div class="tk-empty">${q ? 'Ningún cliente o activo coincide con la búsqueda.' : cart ? 'El informe de rendimientos no tiene posiciones.' : `Ningún cliente tiene activos ${ganUmbral}% o más arriba del precio de compra.`}</div>`}`);
 }
 // ---- Excel de Tomar ganancia: hoja por cliente (% de ganancia en USD) y hoja con el detalle por activo ----
 let ganVista = [];
@@ -2815,15 +2822,18 @@ async function ganExcel(lista, nombreArchivo) {
   await guardarArchivo(nombreArchivo, new Uint8Array(XLSX.write(wb, { type: 'array', bookType: 'xlsx' })));
 }
 // Imagen PNG con el resumen por cliente y por tipo de activo, para mandar por WhatsApp o mail (siempre en colores claros)
-async function ganImagen(lista, titulo, nombreArchivo) {
+async function ganImagen(lista, titulo, nombreArchivo, cart = false) {
   if (!lista.length) return toast('No hay clientes para descargar');
   const { rows } = ganResumen(lista);
-  const C = { bg: '#fbfaf7', soft: '#efeee9', zebra: '#f5f4f0', text: '#1f2a24', muted: '#6a716b', accent: '#2d4a3c', ok: '#2f6b45' };
+  const C = { bg: '#fbfaf7', soft: '#efeee9', zebra: '#f5f4f0', text: '#1f2a24', muted: '#6a716b', accent: '#2d4a3c', ok: '#2f6b45', bad: '#b0412d' };
   const body = 'DM Sans, system-ui, -apple-system, Segoe UI, Roboto, sans-serif', disp = 'Fraunces, Georgia, serif';
   const pad = 32, rowH = 30, headY = 116, nameW = 470;
   const xPct = pad + nameW + 90, xUsd = xPct + 140;
   const tot = rows.reduce((a, r) => a + r.gan, 0);
-  const sub = `${rows.length === 1 ? 'Ganancia' : plural(rows.length, 'cliente', 'clientes') + ' · ganancia'} USD ${fmtUSD(tot)} · en USD MEP desde la compra, posiciones +${ganUmbral}% · informe del ${fmtDate(ganancias?.fecha || today())}`;
+  const tval = lista.reduce((a, e) => a + e.val, 0), resLab = cart ? 'resultado' : 'ganancia';
+  const sub = cart
+    ? `${rows.length === 1 ? '' : plural(rows.length, 'cliente', 'clientes') + ' · '}Cartera USD ${fmtUSD(tval)} · ${resLab} USD ${fmtUSD(tot)} · en USD MEP desde la compra · informe del ${fmtDate(ganancias?.fecha || today())}`
+    : `${rows.length === 1 ? 'Ganancia' : plural(rows.length, 'cliente', 'clientes') + ' · ganancia'} USD ${fmtUSD(tot)} · en USD MEP desde la compra, posiciones +${ganUmbral}% · informe del ${fmtDate(ganancias?.fecha || today())}`;
   const mc = document.createElement('canvas').getContext('2d'); mc.font = `400 14px ${body}`;
   const W = Math.ceil(Math.max(xUsd + pad + 12, pad * 2 + mc.measureText(sub).width));
   const CORTO = { 'acciones locales': 'Acciones arg.', 'obligaciones negociables': 'ONs', 'titulo publicos': 'Bonos', 'titulos publicos': 'Bonos', 'titulos provinciales': 'Provinciales', 'letras del tesoro': 'Letras', 'acciones internacionales': 'Acciones ext.' };
@@ -2841,7 +2851,7 @@ async function ganImagen(lista, titulo, nombreArchivo) {
   g.fillText('Panel WM · Micaela Graciano', pad, 94);
   g.fillStyle = C.soft; g.fillRect(pad - 12, headY, W - 2 * pad + 24, 34);
   g.fillStyle = C.muted; g.font = `600 11px ${body}`; y0 = headY + 21;
-  g.fillText('CLIENTE / ACTIVO', pad, y0); right('GANANCIA %', xPct); right('GANANCIA USD', xUsd);
+  g.fillText('CLIENTE / ACTIVO', pad, y0); right(cart ? 'RENDIMIENTO %' : 'GANANCIA %', xPct); right(cart ? 'RESULTADO USD' : 'GANANCIA USD', xUsd);
   let yB = headY + 34;
   rows.forEach((r, i) => {
     const y = yB; y0 = y + 20; yB += bloqueH(r);
@@ -2855,14 +2865,16 @@ async function ganImagen(lista, titulo, nombreArchivo) {
     r.e.pos.forEach((p, j) => {
       y0 = y + rowH + j * posH + 16;
       const dud = p.rend >= 3;
-      g.fillStyle = C.text; g.font = `600 12.5px ${body}`; g.fillText(String(p.tk), pad + 18, y0);
-      const wTk = g.measureText(String(p.tk)).width;
+      g.fillStyle = C.text; g.font = `600 12.5px ${body}`; // Los fondos vienen con un código numérico: se muestra su nombre
+      const tkL = /^\d+$/.test(String(p.tk)) && p.desc ? p.desc.slice(0, 40) : String(p.tk);
+      g.fillText(tkL, pad + 18, y0);
+      const wTk = g.measureText(tkL).width;
       g.fillStyle = C.muted; g.font = `400 11.5px ${body}`;
       let lab = (CORTO[norm(p.tipo || '')] || p.tipo || '') + (p.compra ? ` · comprado ${fmtDate(p.compra)}` : '') + (dud ? ' · revisar precio de compra (no se suma)' : '');
       while (g.measureText(lab).width > nameW - 40 - wTk && lab.length > 4) lab = lab.slice(0, -1);
       g.fillText(lab, pad + 28 + wTk, y0);
-      g.font = `600 12.5px ${body}`; g.fillStyle = dud ? C.muted : C.ok; right(fmtRend(p.rend), xPct);
-      g.font = `400 12.5px ${body}`; g.fillStyle = dud ? C.muted : C.text; right(fmtUSD(p.gan), xUsd);
+      g.font = `600 12.5px ${body}`; g.fillStyle = dud ? C.muted : p.rend < 0 ? C.bad : C.ok; right(fmtRend(p.rend), xPct);
+      g.font = `400 12.5px ${body}`; g.fillStyle = dud ? C.muted : p.gan < 0 ? C.bad : C.text; right(fmtUSD(p.gan), xUsd);
     });
   });
   const yT = yB; y0 = yT + 28;
@@ -2873,16 +2885,16 @@ async function ganImagen(lista, titulo, nombreArchivo) {
 }
 $('#tareasBox').addEventListener('click', e => {
   const b = e.target.closest('[data-gxls], [data-gimg]'); if (!b) return;
-  const id = b.dataset.gxls || b.dataset.gimg, img = !!b.dataset.gimg, fecha = (ganancias?.fecha || today());
+  const id = b.dataset.gxls || b.dataset.gimg, img = !!b.dataset.gimg, fecha = (ganancias?.fecha || today()), cart = tkView === 'cartera';
   if (id === 'cliente') {
     const cli = ganVista.find(c => c.key === b.closest('[data-gan]')?.dataset.gan); if (!cli) return;
-    return ganImagen([cli], 'Wealth Management', `wealth_management_${slug(cli.nombre)}_${fecha}.png`);
+    return ganImagen([cli], 'Wealth Management', `wealth_management_${cart ? 'cartera_' : ''}${slug(cli.nombre)}_${fecha}.png`, cart);
   }
   const g = id === 'todos' ? null : (config.grupos || []).find(x => x.id === id);
   if (id !== 'todos' && !g) return;
   const lista = g ? ganVista.filter(c => g.cuentas.includes(String(c.cuenta))) : ganVista;
-  const base = g ? `tomar_ganancia_${slug(g.nombre)}_${fecha}` : `tomar_ganancia_${ganUmbral}pct_${fecha}`;
-  if (img) ganImagen(lista, g ? `Wealth Management · ${g.nombre}` : 'Wealth Management', (g ? `wealth_management_${slug(g.nombre)}_${fecha}` : `wealth_management_${fecha}`) + '.png');
+  const base = cart ? `cartera_completa_${g ? slug(g.nombre) + '_' : ''}${fecha}` : g ? `tomar_ganancia_${slug(g.nombre)}_${fecha}` : `tomar_ganancia_${ganUmbral}pct_${fecha}`;
+  if (img) ganImagen(lista, g ? `Wealth Management · ${g.nombre}` : 'Wealth Management', `wealth_management_${cart ? 'cartera_' : ''}${g ? slug(g.nombre) + '_' : ''}${fecha}.png`, cart);
   else ganExcel(lista, base + '.xlsx');
 });
 const fmtPrecio = v => v >= 100 ? fmtUSD(v) : v.toLocaleString('es-AR', { maximumFractionDigits: v >= 1 ? 2 : 4 });
@@ -3566,7 +3578,7 @@ $('#fileInput').addEventListener('change', async e => {
   e.target.value = '';
   if (tab === HOLD_TAB || tab === SUMMARY_TAB) return importTenencias(file);
   if (tab === INCOME_TAB) return importIngresos(file);
-  if (tab === TASKS_TAB && tkView === 'ganancias') return importGanancias(file);
+  if (tab === TASKS_TAB && (tkView === 'ganancias' || tkView === 'cartera')) return importGanancias(file);
   let raw;
   try {
     const wb = XLSX.read(await file.arrayBuffer());
