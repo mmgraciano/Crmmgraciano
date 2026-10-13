@@ -23,7 +23,8 @@ Panel para registrar tu base de cuentas, en un solo archivo (`index.html`).
   por posición (Comitente, Ticker, Pppc Mep, Precio Actual Mep) y lista, por cliente, los activos 10% o más arriba del precio de
   compra en USD MEP (el % se puede cambiar). **+ Tarea** crea la tarea en Mis tareas y el tilde verde marca al cliente como hecho:
   baja a "Hechos" (y si tenía la tarea abierta, la cierra; al revés, marcar como hecha la tarea "Tomar ganancia…" en Mis tareas
-  también pasa al cliente a Hechos). Se guarda en `ganancias/hechas` y se mantiene con informes nuevos. Las subas de 300% o más se marcan para revisar
+  también pasa al cliente a Hechos). La etiqueta de la tarea queda en el cliente: "Tarea creada · pendiente" mientras está abierta y
+  "Tarea hecha ✓" cuando se hace; arriba se cuentan las tareas armadas, hechas, pendientes y los clientes sin tarea. Se guarda en `ganancias/hechas` y se mantiene con informes nuevos. Las subas de 300% o más se marcan para revisar
   el precio de compra y no se suman. Se guarda en la base del panel (documento `ganancias/actual`).
 - **Reuniones:** solapa de Tareas pendientes con las reuniones de la semana (lunes a domingo) agrupadas por día, más las próximas y
   las anteriores. **+ Nueva reunión** agenda una (cliente, día, hora y tema); a la derecha, el tilde verde la marca como hecha, y

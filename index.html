@@ -165,6 +165,11 @@
   #tareasBox .gan tr.cli td { background: var(--soft); border-top: 2px solid var(--border); padding-top: 10px; padding-bottom: 10px; }
   .gan .cli-row { display: flex; flex-wrap: wrap; gap: 6px 14px; align-items: center; justify-content: space-between; }
   .gan .cli-row b { font-size: 14px; }
+  .gan .chip.tk-ok { background: var(--ok-bg); color: var(--ok); font-weight: 600; }
+  .gan .chip.tk-abierta { background: var(--late-bg); color: var(--late); }
+  .gan-tk { color: var(--text); }
+  .gan-tk .ok { color: var(--ok); font-weight: 600; }
+  .gan-tk .pend { color: var(--late); font-weight: 600; }
   .gan .chip.warn { background: var(--late-bg); color: var(--late); }
   .gan .chip.keep { background: var(--soft); color: var(--muted); border: 1px solid var(--border); }
   .gan .btn { padding: 6px 12px; font-size: 12.5px; }
@@ -2699,7 +2704,9 @@ function ganClientes() {
 }
 const ganTareaDe = e => {
   const c = findCuenta(e.cuenta, e.nombre);
-  return tareas.find(t => !t.hecha && /^Tomar ganancia/.test(t.texto || '') && (c ? t.cuentaId === c.id : norm(t.cliente) === norm(e.nombre)));
+  const ts = tareas.filter(t => esTareaGan(t) && (c ? t.cuentaId === c.id : norm(t.cliente) === norm(e.nombre)));
+  // Si hay una abierta manda esa; si no, la última hecha (así queda a la vista que ya se hizo)
+  return ts.filter(t => !t.hecha).pop() || ts.sort((a, b) => String(a.hechaEl || a.creado).localeCompare(String(b.hechaEl || b.creado))).pop() || null;
 };
 const fmtRend = v => (v >= 0 ? '+' : '') + (v * 100).toLocaleString('es-AR', { maximumFractionDigits: v >= 1 ? 0 : 1 }) + '%';
 function renderGanancias() {
@@ -2724,17 +2731,19 @@ function renderGanancias() {
   const npos = list.reduce((a, e) => a + e.pos.length, 0);
   const tot = list.reduce((a, e) => a + e.gan, 0);
   const dud = list.reduce((a, e) => a + e.dudosas, 0);
+  const tks = list.map(ganTareaDe), tkHechas = tks.filter(t => t?.hecha).length, tkPend = tks.filter(t => t && !t.hecha).length;
   setTareasBox(`
     ${tkSearch('Buscar cliente, N° de cuenta o activo (ej. SPY)…')}
     <div class="tk-head"><h2>Tomar ganancia</h2>${list.length ? `<span class="gan-dl"><button class="btn ghost gan-xls" data-gxls="todos" title="Descargar en Excel el % de ganancia en USD de cada cliente">⬇ Excel</button><button class="btn ghost gan-xls" data-gimg="todos" title="Descargar una imagen con el resumen por cliente">⬇ Imagen</button></span>` : ''}<span>${q ? 'Búsqueda: ' : ''}${plural(list.length, 'cliente', 'clientes')} · ${plural(npos, 'posición', 'posiciones')} · USD ${fmtUSD(tot)} de ganancia${dud ? ` · ${plural(dud, 'posición', 'posiciones')} para revisar (no se suman)` : ''}</span></div>
     <div class="gan-ctl"><label>Avisar desde <input id="ganUmbral" type="number" min="1" max="500" step="1" value="${ganUmbral}"> % de suba desde la compra</label>
+      ${list.length ? `<span class="gan-tk">Tareas armadas: <b>${tkHechas + tkPend}</b> · <span class="ok">✓ ${plural(tkHechas, 'hecha', 'hechas')}</span> · <span class="pend">${plural(tkPend, 'pendiente', 'pendientes')}</span> · ${plural(list.length - tkHechas - tkPend, 'cliente', 'clientes')} sin tarea</span>` : ''}
       <span>Rendimientos en USD MEP · informe del ${esc(fmtDate(ganancias.fecha))} (${esc(ganancias.fileName)}) · sin fondos ni posiciones de menos de USD ${GAN_MIN_USD}</span></div>
     ${list.length ? (() => {
       const tabla = lst => `<div class="scroll"><table class="gan"><thead><tr><th class="nosort">Activo</th><th class="nosort">Comprado</th><th class="nosort num">Compra USD</th><th class="nosort num">Hoy USD</th><th class="nosort num">Suba</th><th class="nosort num">Valor USD</th><th class="nosort num">Ganancia USD</th></tr></thead><tbody>
     ${lst.map((e, i) => { const t = ganTareaDe(e), h = ganHechas[e.key];
       return (h && i === lst.filter(x => !ganHechas[x.key]).length ? `<tr class="gan-sep"><td colspan="7">Hechos (${lst.filter(x => ganHechas[x.key]).length})</td></tr>` : '') +
       `<tr class="cli ${h ? 'hecho' : ''}" data-gan="${esc(e.key)}"><td colspan="7"><div class="cli-row"><span><b>${esc(e.nombre)}</b>${e.cuenta ? ` <span class="acct">${esc(e.cuenta)}</span>` : ''} · ${plural(e.pos.length, 'activo', 'activos')} · ganancia USD ${fmtUSD(e.gan)}${h ? ` · <span class="pos">hecho el ${esc(fmtDate(h))}</span>` : ''}</span>
-        <span class="cli-act">${t ? `<button class="chip" data-gact="ver">Tarea creada ✓</button>` : h ? '' : `<button class="btn primary" data-gact="tarea">+ Tarea</button>`}
+        <span class="cli-act">${t ? `<button class="chip ${t.hecha ? 'tk-ok' : 'tk-abierta'}" data-gact="ver" title="Ver en Mis tareas">${t.hecha ? `Tarea hecha ✓${t.hechaEl ? ' ' + esc(fmtDate(t.hechaEl)) : ''}` : 'Tarea creada · pendiente'}</button>` : h ? '' : `<button class="btn primary" data-gact="tarea">+ Tarea</button>`}
         <button class="reu-ok ${h ? 'on' : ''}" data-gact="hecho" title="${h ? 'Volver a pendiente' : 'Marcar como hecho'}" aria-label="${h ? 'Hecho: volver a pendiente' : 'Marcar como hecho'}" aria-pressed="${!!h}">✓</button></span></div></td></tr>` +
       e.pos.map(r => `<tr class="${h ? 'hecho' : ''}"><td><b>${esc(r.tk)}</b> <span class="muted">${esc(r.tipo)}</span>${r.desc ? `<div class="acct">${esc(r.desc)}</div>` : ''}
           ${r.rend >= 3 ? ' <span class="chip warn" title="Una suba tan grande suele venir de un precio de compra viejo o mal cargado">Revisar precio de compra</span>' : ''}
@@ -2867,7 +2876,7 @@ $('#tareasBox').addEventListener('click', async e => {
     ganHechas = { ...ganHechas }; if (ganHechas[k]) delete ganHechas[k]; else ganHechas[k] = today();
     const marcado = !!ganHechas[k];
     // Si había una tarea "Tomar ganancia" abierta para ese cliente, también queda hecha
-    const cli = ganClientes().find(x => x.key === k), tk = marcado && cli ? ganTareaDe(cli) : null;
+    const cli = ganClientes().find(x => x.key === k), t0 = marcado && cli ? ganTareaDe(cli) : null, tk = t0 && !t0.hecha ? t0 : null;
     if (tk) setEstado(tk, 'hecha');
     render();
     if (tk) saveTarea(tk);
