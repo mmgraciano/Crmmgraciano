@@ -221,6 +221,21 @@
   .ap.no.on { background: var(--late); color: var(--panel); }
   .ap.pend.on { background: var(--warn-bg); }
   @media (max-width: 600px) { .aprob-l { display: none; } .ap { width: 30px; height: 30px; font-size: 14px; } .tk { gap: 8px; flex-wrap: wrap; } .tk-body { flex: 1 1 55%; } .tk .aprob { order: 3; margin-left: auto; } .tk .x { order: 4; } }
+  .reu-day { padding: 12px 16px 4px; font: 600 11px var(--font-body); letter-spacing: .07em; text-transform: uppercase; color: var(--muted); border-top: 1px solid var(--border); }
+  .reu-day.hoy { color: var(--accent); }
+  .reu { display: flex; gap: 14px; align-items: flex-start; padding: 10px 16px; }
+  .reu-hora { flex: none; width: 54px; font: 600 15px var(--font-display); font-variant-numeric: tabular-nums; padding-top: 2px; }
+  .reu-body { flex: 1; min-width: 0; }
+  .reu-cli { border: none; background: none; padding: 0; font: 600 14px var(--font-body); color: var(--text); cursor: pointer; text-align: left; }
+  .reu-tema { font-size: 13px; color: var(--muted); margin-top: 1px; overflow-wrap: anywhere; }
+  .reu-notas { width: 100%; box-sizing: border-box; margin-top: 6px; min-height: 34px; font: 13px/1.4 var(--font-body); padding: 7px 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg); color: var(--text); resize: vertical; }
+  .reu-notas:focus { outline: none; border-color: var(--accent); }
+  .reu.hecha .reu-cli { color: var(--muted); }
+  .reu-ok { flex: none; width: 38px; height: 38px; border-radius: 50%; border: 2px solid var(--ok); background: var(--panel); color: var(--ok); font: 700 18px var(--font-body); cursor: pointer; opacity: .45; display: grid; place-items: center; padding: 0; }
+  .reu-ok:hover { opacity: 1; }
+  .reu-ok.on { background: var(--ok); color: var(--panel); opacity: 1; }
+  .reu .x { flex: none; }
+  .reu-otras summary { padding: 11px 16px; border-top: 1px solid var(--border); cursor: pointer; color: var(--muted); font-size: 13px; }
   .tk-sub { padding: 14px 16px 8px; border-top: 1px solid var(--border); font: 600 11px var(--font-body); letter-spacing: .07em; text-transform: uppercase; color: var(--muted); }
   .hero { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 20px 22px; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.6fr); gap: 24px; }
   .hero .label { font: 600 11px var(--font-body); letter-spacing: .07em; text-transform: uppercase; color: var(--muted); }
@@ -436,6 +451,7 @@
       <button class="btn" id="btnAjustes" hidden>Ajustes de tenencia</button>
       <button class="btn primary" id="btnNew">+ Nueva cuenta</button>
       <button class="btn primary" id="btnTask" hidden>+ Nueva tarea</button>
+      <button class="btn primary" id="btnReu" hidden>+ Nueva reunión</button>
     </div>
   </div>
 
@@ -475,6 +491,24 @@
     </div>
     <div class="dialog-actions">
       <button type="button" class="btn ghost" id="btnCancel">Cancelar</button>
+      <button type="submit" class="btn primary">Guardar</button>
+    </div>
+  </form>
+</dialog>
+
+<!-- Alta / edición de reunión -->
+<dialog id="reuDlg">
+  <form method="dialog" id="reuForm">
+    <h2 id="reuTitle">Nueva reunión</h2>
+    <div class="grid">
+      <label class="full">Cliente<input id="r-cliente" list="taskClientes" placeholder="Buscar cliente…" autocomplete="off"></label>
+      <label>Día *<input id="r-fecha" type="date" required></label>
+      <label>Hora<input id="r-hora" type="time" step="900"></label>
+      <label class="full">Tema<input id="r-tema" placeholder="Ej: Revisión de cartera y rotación de SPY"></label>
+      <label class="full">Notas<textarea id="r-notas" placeholder="Lo que se habló, lo que quedó pendiente…"></textarea></label>
+    </div>
+    <div class="dialog-actions">
+      <button type="button" class="btn ghost" id="reuCancel">Cancelar</button>
       <button type="submit" class="btn primary">Guardar</button>
     </div>
   </form>
@@ -679,6 +713,10 @@ const LOCAL_RES = 'panel-wm-research-v1';
 let tareas = [];
 let tasksRef = null;
 const LOCAL_TASKS = 'panel-wm-tareas-v1';
+// Reuniones: un documento por reunión en "reuniones/{id}" {cliente, cuentaId, fecha, hora, tema, notas, hecha, creado}
+let reuniones = [];
+let reuRef = null;
+const LOCAL_REU = 'panel-wm-reuniones-v1';
 // Tomar ganancia: informe de rendimientos por posición en "ganancias/actual" {fecha, fileName, rows: [...]}
 let ganancias = null;
 let tkView = 'tareas';            // solapa de Tareas pendientes: 'tareas' o 'ganancias'
@@ -778,6 +816,7 @@ function saveLocal() {
     localStorage.setItem(LOCAL_FACT, JSON.stringify(periodos));
     localStorage.setItem(LOCAL_RES, JSON.stringify(research));
     localStorage.setItem(LOCAL_TASKS, JSON.stringify(tareas));
+    localStorage.setItem(LOCAL_REU, JSON.stringify(reuniones));
     localStorage.setItem(LOCAL_GAN, JSON.stringify(ganancias));
   } catch { toast('No se pudo guardar en este navegador'); }
 }
@@ -834,6 +873,7 @@ async function initStorage() {
     try { periodos = JSON.parse(localStorage.getItem(LOCAL_FACT)) || []; } catch {}
     try { research = JSON.parse(localStorage.getItem(LOCAL_RES)) || []; } catch {}
     try { tareas = JSON.parse(localStorage.getItem(LOCAL_TASKS)) || []; } catch {}
+    try { reuniones = JSON.parse(localStorage.getItem(LOCAL_REU)) || []; } catch {}
     try { ganancias = JSON.parse(localStorage.getItem(LOCAL_GAN)) || null; } catch {}
     loading = false; setSync(); render(); return;
   }
@@ -867,6 +907,11 @@ async function initStorage() {
   }, fail);
   db.doc('ganancias/actual').onSnapshot(s => {
     ganancias = s.exists ? structuredClone(s.data()) : null;
+    render();
+  }, fail);
+  reuRef = db.collection('reuniones');
+  reuRef.onSnapshot(snap => {
+    reuniones = snap.docs.map(d => ({ id: d.id, ...structuredClone(d.data()) }));
     render();
   }, fail);
   tasksRef = db.collection('tareas');
@@ -1089,6 +1134,7 @@ function render() {
   $('#subtabs').innerHTML = tab === TASKS_TAB ? [
     { id: 'tareas', label: 'Mis tareas', n: tareas.filter(x => !x.hecha).length },
     { id: 'ganancias', label: `Tomar ganancia (+${ganUmbral}%)`, n: ganClientes().length },
+    { id: 'reuniones', label: 'Reuniones', n: reunionesSemana().filter(r => !r.hecha).length },
     { id: 'ia', label: 'Preguntale a la IA', n: null },
   ].map(t => `<button data-tkv="${t.id}" class="${tkView === t.id ? 'on' : ''}">${esc(t.label)}${t.n === null ? '' : `<span class="n">${t.n}</span>`}</button>`).join('')
   : inGroup ? sub.map(t => {
@@ -1107,10 +1153,11 @@ function render() {
   const tasks = tab === TASKS_TAB;
   $('#stats').hidden = $('#btnExport').hidden = false;
   $('#btnNew').hidden = hold || summary || income || tasks;
-  const gan = tasks && tkView === 'ganancias', ia = tasks && tkView === 'ia';
-  $('#btnTask').hidden = !tasks || gan || ia;
+  const gan = tasks && tkView === 'ganancias', ia = tasks && tkView === 'ia', reu = tasks && tkView === 'reuniones';
+  $('#btnTask').hidden = !tasks || gan || ia || reu;
+  $('#btnReu').hidden = !reu;
   $('#tareasBox').hidden = !tasks;
-  if (tasks) ia ? renderIA() : gan ? renderGanancias() : renderTareas();
+  if (tasks) ia ? renderIA() : gan ? renderGanancias() : reu ? renderReuniones() : renderTareas();
   $('#btnAjustes').hidden = !(hold || summary);
   $('#btnImport').hidden = summary;
   $('#btnImport').textContent = hold ? 'Importar tenencias' : income ? 'Importar facturación' : 'Importar Excel';
@@ -1128,7 +1175,7 @@ function render() {
   const base = currentRows();
   if (tasks) {
     // La tabla de cuentas solo aparece si hay cuentas marcadas en esta pestaña
-    const conCuentas = cuentas.some(c => inTab(c, TASKS_TAB)) && !gan && !ia;
+    const conCuentas = cuentas.some(c => inTab(c, TASKS_TAB)) && !gan && !ia && !reu;
     $('#tableWrap').hidden = !conCuentas;
     $('#searches').hidden = !conCuentas;
     for (const id of ['#stats', '#btnSinCuenta', '#btnExport', '#btnImport']) $(id).hidden = !conCuentas;
@@ -2416,8 +2463,11 @@ const tkSearch = ph => `<div class="tk-search"><input id="tkQ" class="search" ty
 // Redibuja #tareasBox sin perder el foco ni el cursor del buscador
 function setTareasBox(html) {
   const ae = document.activeElement, keep = ae?.id === 'tkQ' ? ae.selectionStart : null;
+  // Si se están escribiendo notas de una reunión, se conserva lo escrito
+  const nota = ae?.matches?.('[data-rnotas]') ? { rid: ae.closest('[data-rid]')?.dataset.rid, v: ae.value, sel: ae.selectionStart } : null;
   $('#tareasBox').innerHTML = html;
   if (keep !== null) { const el = $('#tkQ'); el.focus(); try { el.setSelectionRange(keep, keep); } catch {} }
+  if (nota) { const el = document.querySelector(`[data-rid="${nota.rid}"] [data-rnotas]`); if (el) { el.value = nota.v; el.focus(); try { el.setSelectionRange(nota.sel, nota.sel); } catch {} } }
 }
 document.addEventListener('input', e => { if (e.target.id === 'tkQ') { tkQ = e.target.value; render(); } });
 // Búsqueda sin tareas: si coincide con clientes, ofrece crearles una y muestra si tienen activos para tomar ganancia
@@ -2703,6 +2753,8 @@ function iaContexto() {
   // Clientes: contacto, pestañas y tareas
   L.push(`\n## CLIENTES DE ${config.principal} (cuenta nombre · último contacto · pestañas)`);
   for (const c of cuentas) L.push(`${c.cuenta || 's/c'} ${c.nombre} · ${c.ultimoContacto ? fmtDate(c.ultimoContacto) : 'sin contacto'}${validTags(c).length ? ' · ' + validTags(c).map(tabLabel).join(', ') : ''}`);
+  const reus = reuniones.filter(r => r.fecha >= isoLocal(new Date(Date.now() - 30 * 864e5))).sort(reuOrden);
+  if (reus.length) L.push('\n## REUNIONES (últimos 30 días y próximas)\n' + reus.map(r => `- ${fmtDate(r.fecha)} ${r.hora || ''} ${reuCliente(r)}${r.tema ? ' · ' + r.tema : ''}${r.hecha ? ' · hecha' : ''}${r.notas ? ' · notas: ' + r.notas.slice(0, 300) : ''}`).join('\n'));
   const pend = tareas.filter(t => !t.hecha);
   if (pend.length) L.push('\n## TAREAS PENDIENTES\n' + pend.map(t => `- ${t.texto}${t.cliente ? ' (' + t.cliente + ')' : ''}${t.vence ? ' para ' + fmtDate(t.vence) : ''}`).join('\n'));
   return L.join('\n').slice(0, 200000);
@@ -2954,6 +3006,109 @@ $('#tareasBox').addEventListener('click', e => {
   if (ds) { const t = iaTurns[Number(ds.dataset.iaDesc)]; if (t) { t.estado = 'descartadas'; iaSave(); renderIA(); } return; }
   if (cr) { iaCrearTareas(Number(cr.dataset.iaCrear)); return; }
   if (e.target.closest('#iaNew')) { if (iaBusy) iaCtl?.abort(); iaTurns = []; iaSave(); renderIA(); }
+});
+
+// ---------- Reuniones ----------
+function semanaActual() {
+  const d = new Date(); const dow = (d.getDay() + 6) % 7;   // lunes = 0
+  const lun = new Date(d.getFullYear(), d.getMonth(), d.getDate() - dow);
+  return { desde: isoLocal(lun), hasta: isoLocal(new Date(lun.getFullYear(), lun.getMonth(), lun.getDate() + 6)) };
+}
+const reuOrden = (a, b) => (a.fecha + (a.hora || '99')).localeCompare(b.fecha + (b.hora || '99'));
+function reunionesSemana() { const w = semanaActual(); return reuniones.filter(r => r.fecha >= w.desde && r.fecha <= w.hasta).sort(reuOrden); }
+const REU_FIELDS = ['cliente', 'cuentaId', 'fecha', 'hora', 'tema', 'notas', 'hecha', 'creado'];
+function saveReunion(r) {
+  if (!reuRef) { saveLocal(); return Promise.resolve(); }
+  return write(() => reuRef.doc(r.id).set(Object.fromEntries(REU_FIELDS.map(k => [k, r[k] ?? (k === 'hecha' ? false : '')]))));
+}
+const reuCliente = r => cuentas.find(c => c.id === r.cuentaId)?.nombre || r.cliente || 'Sin cliente';
+function diaLabel(iso) {
+  const d = isoDate(iso), hoy = today();
+  const manana = isoLocal(new Date(Date.now() + 864e5));
+  const base = `${cap(DIAS[d.getDay()])} ${fmtDate(iso).slice(0, 5)}`;
+  return iso === hoy ? `Hoy · ${base}` : iso === manana ? `Mañana · ${base}` : base;
+}
+function reuItem(r) {
+  return `<div class="reu ${r.hecha ? 'hecha' : ''}" data-rid="${esc(r.id)}">
+    <div class="reu-hora">${r.hora ? esc(r.hora) : '—'}</div>
+    <div class="reu-body">
+      <button class="reu-cli" data-ract="edit" title="Editar reunión">${esc(reuCliente(r))}${(() => { const c = cuentas.find(x => x.id === r.cuentaId); return c?.cuenta ? ` <span class="acct">${esc(c.cuenta)}</span>` : ''; })()}</button>
+      ${r.tema ? `<div class="reu-tema">${esc(r.tema)}</div>` : ''}
+      <textarea class="reu-notas" data-rnotas placeholder="Notas de la reunión…" rows="${r.notas ? 2 : 1}">${esc(r.notas || '')}</textarea>
+    </div>
+    <button class="reu-ok ${r.hecha ? 'on' : ''}" data-ract="ok" title="${r.hecha ? 'Marcar como pendiente' : 'Marcar como hecha'}" aria-label="${r.hecha ? 'Reunión hecha' : 'Marcar reunión como hecha'}" aria-pressed="${!!r.hecha}">✓</button>
+    <button class="x" data-ract="remove" title="Eliminar reunión" aria-label="Eliminar reunión">×</button>
+  </div>`;
+}
+function porDia(list) {
+  const out = []; let dia = '';
+  for (const r of list) {
+    if (r.fecha !== dia) { dia = r.fecha; out.push(`<div class="reu-day ${dia === today() ? 'hoy' : ''}">${esc(diaLabel(dia))}</div>`); }
+    out.push(reuItem(r));
+  }
+  return out.join('');
+}
+function renderReuniones() {
+  const w = semanaActual(), q = norm(tkQ);
+  const pasa = r => !q || norm([reuCliente(r), r.tema, r.notas, cuentas.find(c => c.id === r.cuentaId)?.cuenta].join(' ')).includes(q);
+  const sem = reunionesSemana().filter(pasa);
+  const prox = reuniones.filter(r => r.fecha > w.hasta && pasa(r)).sort(reuOrden);
+  const pas = reuniones.filter(r => r.fecha < w.desde && pasa(r)).sort((a, b) => reuOrden(b, a));
+  const hechas = sem.filter(r => r.hecha).length;
+  setTareasBox(`
+    ${reuniones.length ? tkSearch('Buscar reunión por cliente, tema o notas…') : ''}
+    <div class="tk-head"><h2>Reuniones de la semana</h2><span>${fmtDate(w.desde).slice(0, 5)} al ${fmtDate(w.hasta).slice(0, 5)} · ${plural(sem.length, 'reunión', 'reuniones')}${sem.length ? ` · ${plural(hechas, 'hecha', 'hechas')}` : ''}</span></div>
+    ${sem.length ? porDia(sem) : `<div class="tk-empty">${q ? 'Ninguna reunión de esta semana coincide con la búsqueda.' : 'No tenés reuniones esta semana. Agendá una con <b>+ Nueva reunión</b>.'}</div>`}
+    ${prox.length ? `<details class="reu-otras" open><summary>Próximas semanas (${prox.length})</summary>${porDia(prox)}</details>` : ''}
+    ${pas.length ? `<details class="reu-otras"${q ? ' open' : ''}><summary>Reuniones anteriores (${pas.length})</summary>${porDia(pas)}</details>` : ''}`);
+}
+let editingReu = null;
+function openReu(r) {
+  editingReu = r ? r.id : null;
+  $('#reuTitle').textContent = r ? 'Editar reunión' : 'Nueva reunión';
+  $('#reuForm').reset();
+  $('#taskClientes').innerHTML = cuentas.slice().sort((a, b) => norm(a.nombre).localeCompare(norm(b.nombre), 'es'))
+    .map(c => `<option value="${esc(c.nombre)}">${esc(c.cuenta)}</option>`).join('');
+  $('#r-cliente').value = r ? reuCliente(r) : '';
+  $('#r-fecha').value = r?.fecha || today();
+  $('#r-hora').value = r?.hora || '';
+  $('#r-tema').value = r?.tema || '';
+  $('#r-notas').value = r?.notas || '';
+  $('#reuDlg').showModal();
+  $('#r-cliente').focus();
+}
+$('#btnReu').addEventListener('click', () => openReu(null));
+$('#reuCancel').addEventListener('click', () => $('#reuDlg').close());
+$('#reuForm').addEventListener('submit', async () => {
+  const fecha = $('#r-fecha').value; if (!fecha) return;
+  const cliente = $('#r-cliente').value.trim();
+  const c = cliente ? cuentas.find(x => norm(x.nombre) === norm(cliente)) : null;
+  const prev = editingReu ? reuniones.find(x => x.id === editingReu) : null;
+  const r = { ...(prev || { id: uid(), hecha: false, creado: new Date().toISOString() }), cliente: c ? c.nombre : cliente, cuentaId: c?.id || '',
+    fecha, hora: $('#r-hora').value, tema: $('#r-tema').value.trim(), notas: $('#r-notas').value.trim() };
+  reuniones = [...reuniones.filter(x => x.id !== r.id), r];
+  render();
+  await saveReunion(r);
+  toast(prev ? 'Reunión actualizada' : 'Reunión agendada');
+});
+$('#tareasBox').addEventListener('click', async e => {
+  const el = e.target.closest('[data-ract]'); const row = e.target.closest('[data-rid]');
+  if (!el || !row) return;
+  const r = reuniones.find(x => x.id === row.dataset.rid); if (!r) return;
+  if (el.dataset.ract === 'edit') openReu(r);
+  else if (el.dataset.ract === 'ok') { r.hecha = !r.hecha; render(); await saveReunion(r); if (r.hecha) toast('Reunión marcada como hecha'); }
+  else if (el.dataset.ract === 'remove') {
+    if (!await confirmAsk('Eliminar reunión', `¿Eliminar la reunión con ${reuCliente(r)} del ${fmtDate(r.fecha)}?`, 'Eliminar')) return;
+    reuniones = reuniones.filter(x => x.id !== r.id); render();
+    if (reuRef) await write(() => reuRef.doc(r.id).delete()); else saveLocal();
+  }
+});
+// Las notas se guardan al salir del cuadro; mientras se escribe no se redibuja la lista
+$('#tareasBox').addEventListener('focusout', async e => {
+  if (!e.target.matches('[data-rnotas]')) return;
+  const r = reuniones.find(x => x.id === e.target.closest('[data-rid]')?.dataset.rid); if (!r) return;
+  const v = e.target.value.trim(); if ((r.notas || '') === v) return;
+  r.notas = v; await saveReunion(r); toast('Notas guardadas');
 });
 
 // ---------- Confirmación ----------

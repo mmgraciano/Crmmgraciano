@@ -23,6 +23,9 @@ Panel para registrar tu base de cuentas, en un solo archivo (`index.html`).
   por posición (Comitente, Ticker, Pppc Mep, Precio Actual Mep) y lista, por cliente, los activos 10% o más arriba del precio de
   compra en USD MEP (el % se puede cambiar). **+ Tarea** crea la tarea en Mis tareas. Las subas de 300% o más se marcan para revisar
   el precio de compra y no se suman. Se guarda en la base del panel (documento `ganancias/actual`).
+- **Reuniones:** solapa de Tareas pendientes con las reuniones de la semana (lunes a domingo) agrupadas por día, más las próximas y
+  las anteriores. **+ Nueva reunión** agenda una (cliente, día, hora y tema); a la derecha, el tilde verde la marca como hecha, y
+  debajo de cada una hay un cuadro de notas que se guarda solo. Colección `reuniones`.
 - **Preguntale a la IA:** tercera solapa de Tareas pendientes. Se le pregunta en lenguaje natural (por ejemplo "¿qué clientes
   tienen QQQ, SPY o NVDA y por qué rotarlos?") y responde Claude con los datos del panel: tenencias, rendimientos desde la compra,
   research del día, facturación por mes, clientes y tareas. Usa la cuenta de Claude de quien pregunta (capacidad `sample`); la
