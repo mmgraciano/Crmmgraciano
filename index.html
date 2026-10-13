@@ -6,7 +6,7 @@
 <title>Panel WM Micaela Graciano</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,500;0,9..144,600;1,9..144,600&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600&display=swap">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <style>
   /* Layout: encabezado con marca y estado, pestañas por cartera, barra de resumen y acciones, tabla editable en línea */
@@ -15,7 +15,7 @@
     --border: #dcd9d0; --accent: #2d4a3c; --on-accent: #ffffff; --accent-soft: #dde7df;
     --late: #b0412d; --late-bg: #f4d8d1; --ok: #2f6b45; --ok-bg: #dcebdf; --warn: #9a6a00; --warn-bg: #fbedc4; --warn-dot: #e2b33a;
     --danger: #a5432f; --danger-soft: #ecdcd6; --overlay: rgba(20, 28, 22, .42);
-    --logo-a: #2f5a3f; --logo-b: #8c6b2c;
+    --logo-bg: #f8dce8; --logo-fg: #c2396f;
     --font-display: "Fraunces", Georgia, "Times New Roman", serif;
     --font-body: "DM Sans", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   }
@@ -23,7 +23,7 @@
     :root:not([data-theme="light"]) {
       --bg: #141815; --panel: #1b201c; --soft: #272d28; --text: #e5e9e4; --muted: #99a29a;
       --border: #2f3730; --accent: #8fc1a2; --on-accent: #10241a; --accent-soft: #24352b;
-      --late: #f2a493; --late-bg: #4a2620; --ok: #8fd3a5; --ok-bg: #1f3a2a; --warn: #f0cf6e; --warn-bg: #3d3216; --warn-dot: #e2b33a;
+      --logo-bg: #4a2236; --logo-fg: #f6a9c8; --late: #f2a493; --late-bg: #4a2620; --ok: #8fd3a5; --ok-bg: #1f3a2a; --warn: #f0cf6e; --warn-bg: #3d3216; --warn-dot: #e2b33a;
       --danger: #f0a08f; --danger-soft: #3d2420; --overlay: rgba(0, 0, 0, .6);
       color-scheme: dark;
     }
@@ -31,7 +31,7 @@
   :root[data-theme="dark"] {
     --bg: #141815; --panel: #1b201c; --soft: #272d28; --text: #e5e9e4; --muted: #99a29a;
     --border: #2f3730; --accent: #8fc1a2; --on-accent: #10241a; --accent-soft: #24352b;
-    --late: #f2a493; --late-bg: #4a2620; --ok: #8fd3a5; --ok-bg: #1f3a2a; --warn: #f0cf6e; --warn-bg: #3d3216; --warn-dot: #e2b33a;
+    --logo-bg: #4a2236; --logo-fg: #f6a9c8; --late: #f2a493; --late-bg: #4a2620; --ok: #8fd3a5; --ok-bg: #1f3a2a; --warn: #f0cf6e; --warn-bg: #3d3216; --warn-dot: #e2b33a;
     --danger: #f0a08f; --danger-soft: #3d2420; --overlay: rgba(0, 0, 0, .6);
     color-scheme: dark;
   }
@@ -42,8 +42,8 @@
   /* Encabezado */
   .top { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
   .brand { display: flex; align-items: center; gap: 12px; }
-  .logo { width: 40px; height: 40px; border-radius: 9px; display: grid; place-items: center; color: #fff;
-    background: linear-gradient(135deg, var(--logo-a), var(--logo-b)); font: 600 15px/1 var(--font-display); letter-spacing: -.02em; flex: none; }
+  .logo { width: 40px; height: 40px; border-radius: 10px; display: grid; place-items: center; color: var(--logo-fg);
+    background: var(--logo-bg); font: italic 600 19px/1 var(--font-display); letter-spacing: -.03em; padding-bottom: 2px; flex: none; }
   .brand h1 { margin: 0; font: 600 24px/1.1 var(--font-display); letter-spacing: -.01em; }
   .brand h1 span { font-weight: 500; color: var(--muted); }
   .brand .date { color: var(--muted); font-size: 12.5px; margin-top: 4px; }
@@ -465,7 +465,7 @@
 <div class="wrap">
   <header class="top">
     <div class="brand">
-      <div class="logo" aria-hidden="true">MG</div>
+      <div class="logo" aria-hidden="true">mg</div>
       <div>
         <h1>Panel WM <span>Micaela Graciano</span></h1>
         <div class="date" id="today"></div>
