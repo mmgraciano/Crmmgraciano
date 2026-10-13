@@ -2824,7 +2824,9 @@ async function ganImagen(lista, titulo, nombreArchivo) {
   const xPct = pad + nameW + 90, xUsd = xPct + 130, tipoW = 130, xT = k => xUsd + tipoW * (k + 1);
   const W = Math.max(900, xT(tipoCols.length - 1) + pad + 12);
   const CORTO = { 'acciones locales': 'Acciones arg.', 'obligaciones negociables': 'ONs', 'titulo publicos': 'Bonos', 'titulos publicos': 'Bonos', 'titulos provinciales': 'Provinciales', 'letras del tesoro': 'Letras', 'acciones internacionales': 'Acciones ext.' };
-  const H = headY + 34 + rows.length * rowH + 60;
+  // Cada cliente lleva debajo el desglose activo por activo
+  const posH = 24, bloqueH = r => rowH + r.e.pos.length * posH + 6;
+  const H = headY + 34 + rows.reduce((a, r) => a + bloqueH(r), 0) + 60;
   const cv = document.createElement('canvas'), sc = 2; cv.width = W * sc; cv.height = H * sc;
   const g = cv.getContext('2d'); g.scale(sc, sc);
   let y0 = 0;
@@ -2839,9 +2841,10 @@ async function ganImagen(lista, titulo, nombreArchivo) {
   g.fillStyle = C.muted; g.font = `600 11px ${body}`; y0 = headY + 21;
   g.fillText('CLIENTE', pad, y0); right('GANANCIA %', xPct); right('GANANCIA USD', xUsd);
   tipoCols.forEach((t, k) => { let lab = (CORTO[norm(t)] || t).toUpperCase(); while (g.measureText(lab).width > tipoW - 12 && lab.length > 4) lab = lab.slice(0, -1); right(lab, xT(k)); });
+  let yB = headY + 34;
   rows.forEach((r, i) => {
-    const y = headY + 34 + i * rowH; y0 = y + 20;
-    if (i % 2) { g.fillStyle = C.zebra; g.fillRect(pad - 12, y, W - 2 * pad + 24, rowH); }
+    const y = yB; y0 = y + 20; yB += bloqueH(r);
+    if (i % 2) { g.fillStyle = C.zebra; g.fillRect(pad - 12, y, W - 2 * pad + 24, bloqueH(r)); }
     g.fillStyle = C.text; g.font = `600 13.5px ${body}`;
     let nom = r.nombre; while (g.measureText(nom).width > nameW - 76 && nom.length > 4) nom = nom.slice(0, -1);
     if (nom !== r.nombre) nom = nom.trimEnd() + '…';
@@ -2852,8 +2855,21 @@ async function ganImagen(lista, titulo, nombreArchivo) {
     g.fillStyle = C.text; right(fmtUSD(r.gan), xUsd);
     g.font = `400 13px ${body}`; g.fillStyle = C.muted;
     tipoCols.forEach((t, k) => { const v = valTipo(r.porTipo, t); right(v ? fmtUSD(v) : '—', xT(k)); });
+    r.e.pos.forEach((p, j) => {
+      y0 = y + rowH + j * posH + 16;
+      const dud = p.rend >= 3, k = tipoCols.indexOf(cols.includes(p.tipo || 'Otros') ? (p.tipo || 'Otros') : 'Otros');
+      g.fillStyle = C.text; g.font = `600 12.5px ${body}`; g.fillText(String(p.tk), pad + 18, y0);
+      const wTk = g.measureText(String(p.tk)).width;
+      g.fillStyle = C.muted; g.font = `400 11.5px ${body}`;
+      let lab = (CORTO[norm(p.tipo || '')] || p.tipo || '') + (p.compra ? ` · comprado ${fmtDate(p.compra)}` : '') + (dud ? ' · revisar precio de compra (no se suma)' : '');
+      while (g.measureText(lab).width > nameW - 40 - wTk && lab.length > 4) lab = lab.slice(0, -1);
+      g.fillText(lab, pad + 28 + wTk, y0);
+      g.font = `600 12.5px ${body}`; g.fillStyle = dud ? C.muted : C.ok; right(fmtRend(p.rend), xPct);
+      g.font = `400 12.5px ${body}`; g.fillStyle = dud ? C.muted : C.text; right(fmtUSD(p.gan), xUsd);
+      if (!dud && k >= 0) { g.fillStyle = C.muted; right(fmtUSD(p.gan), xT(k)); }
+    });
   });
-  const yT = headY + 34 + rows.length * rowH; y0 = yT + 28;
+  const yT = yB; y0 = yT + 28;
   g.strokeStyle = C.accent; g.lineWidth = 1.5; g.beginPath(); g.moveTo(pad - 12, yT + 4); g.lineTo(W - pad + 12, yT + 4); g.stroke();
   g.fillStyle = C.text; g.font = `700 13.5px ${body}`; g.fillText('Total', pad, y0); right(fmtUSD(tot), xUsd);
   g.font = `600 13px ${body}`;
