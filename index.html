@@ -2455,6 +2455,18 @@ function setEstado(t, id) {
   t.hecha = id === 'hecha';
   t.hechaEl = t.hecha ? (t.hechaEl || today()) : '';
 }
+// Una tarea "Tomar ganancia" hecha marca al cliente como hecho en esa solapa (y si se reabre, vuelve a pendiente)
+const esTareaGan = t => /^Tomar ganancia/i.test(t.texto || '');
+function syncGanDesdeTarea(t) {
+  if (!esTareaGan(t)) return null;
+  const c = cuentas.find(x => x.id === t.cuentaId);
+  const key = c?.cuenta || (t.cliente ? (ganancias?.rows || []).find(r => norm(r.nombre) === norm(t.cliente))?.cuenta || norm(t.cliente) : '');
+  if (!key || !!ganHechas[key] === !!t.hecha) return null;
+  ganHechas = { ...ganHechas };
+  if (t.hecha) ganHechas[key] = t.hechaEl || today(); else delete ganHechas[key];
+  if (!ganHechasRef) { saveLocal(); return null; }
+  return write(() => ganHechasRef.set({ items: ganHechas })).catch(() => {});
+}
 function saveTarea(t) {
   if (!tasksRef) { saveLocal(); return Promise.resolve(); }
   return write(() => tasksRef.doc(t.id).set(Object.fromEntries(TASK_FIELDS.map(k => [k, t[k] ?? (k === 'hecha' ? false : '')]))));
@@ -2582,8 +2594,10 @@ taskForm.addEventListener('submit', async () => {
   const t = { ...(prev || { id: uid(), hechaEl: '', creado: new Date().toISOString() }), texto, cuentaId: c?.id || '', cliente: c ? c.nombre : cliente, vence: $('#t-vence').value };
   setEstado(t, $('#t-estado').value);
   tareas = [...tareas.filter(x => x.id !== t.id), t];
+  const gan = syncGanDesdeTarea(t);
   render();
   await saveTarea(t);
+  if (gan) await gan;
   toast(prev ? 'Tarea actualizada' : 'Tarea agregada');
 });
 $('#tareasBox').addEventListener('click', async e => {
@@ -2601,9 +2615,11 @@ $('#tareasBox').addEventListener('click', async e => {
     const i = ESTADOS.findIndex(x => x.id === estadoDe(t));
     const sig = ESTADOS[(i + 1) % ESTADOS.length];
     setEstado(t, sig.id);
+    const gan = syncGanDesdeTarea(t);
     render();
     await saveTarea(t);
-    toast('Tarea: ' + sig.label);
+    if (gan) await gan;
+    toast('Tarea: ' + sig.label + (t.hecha && esTareaGan(t) ? ' · el cliente pasó a Hechos en Tomar ganancia' : ''));
   } else if (el.dataset.tact === 'remove') {
     if (!await confirmAsk('Eliminar tarea', `¿Eliminar "${t.texto.slice(0, 80)}"?`, 'Eliminar')) return;
     await deleteTarea(t.id);
