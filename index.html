@@ -2720,6 +2720,7 @@ function ganClientes(todos = false) {
   const by = new Map();
   for (const r of ganancias.rows) {
     if (!todos && (r.rend < u || r.val < GAN_MIN_USD || /fondo/i.test(r.tipo))) continue;
+    if (!todos && grupoDeCuenta(r.cuenta)?.id === 'lang') continue;   // Los clientes Lang no van en Tomar ganancia (sí en Cartera completa)
     const k = r.cuenta || norm(r.nombre);
     const e = by.get(k) || { key: k, cuenta: r.cuenta, nombre: r.nombre, pos: [], val: 0, gan: 0, dudosas: 0 };
     e.pos.push(r);
