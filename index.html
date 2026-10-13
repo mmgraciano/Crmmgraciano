@@ -654,8 +654,8 @@ const DEFAULT_CONFIG = {
   umbral: 10000,
   metaMes: 10000,  // facturación mínima por mes que se busca, en USD
   objetivo: { monto: 60000, desde: '2026-07', hasta: '2026-12' },  // objetivo de facturación del período
-  // Clientes que se llevan en conjunto: en Tareas aparecen aparte, en un grupo desplegable
-  grupos: [{ id: 'lang', nombre: 'Clientes Lang', cuentas: ['150080', '150666', '150151', '151460', '151224', '151649', '150401', '150485', '151562', '150589', '12915', '150310', '151128'] }],
+  // Clientes que se llevan en conjunto: en Tareas aparecen aparte, en un grupo desplegable (sinGanancia: no van en Tomar ganancia)
+  grupos: [{ id: 'lang', nombre: 'Clientes Lang', sinGanancia: true, cuentas: ['150080', '150666', '150151', '151460', '151224', '151649', '150401', '150485', '151562', '150589', '12915', '150310', '151128'] }],
   ten: {},   // columnas elegidas para valuar las tenencias (por nombre de columna)
   tabs: [
     { id: 'total', label: 'Tenencia total' },
@@ -777,6 +777,8 @@ const tagTabs = () => config.tabs.filter(t => !AUTO_TABS.has(t.id));
 // Suma las pestañas nuevas a configuraciones guardadas antes de que existieran
 function migrateConfig(c) {
   c = { ...structuredClone(DEFAULT_CONFIG), ...c };
+  // Los clientes Lang salen de Tomar ganancia (también si el grupo ya estaba guardado sin esa marca)
+  for (const g of c.grupos || []) if (g.id === 'lang' && g.sinGanancia === undefined) g.sinGanancia = true;
   if ((c.v || 1) < 2) {
     if (!c.tabs.some(t => t.id === SUMMARY_TAB)) c.tabs.unshift({ id: SUMMARY_TAB, label: 'Tenencia total' });
     if (!c.tabs.some(t => t.id === ZERO_TAB)) c.tabs.push({ id: ZERO_TAB, label: 'En 0' });
@@ -2718,8 +2720,9 @@ function ganClientes(todos = false) {
   if (!ganancias?.rows?.length) return [];
   const u = ganUmbral / 100;
   const by = new Map();
+  const fuera = new Set((config.grupos || []).filter(g => g.sinGanancia).flatMap(g => g.cuentas));
   for (const r of ganancias.rows) {
-    if (!todos && (r.rend < u || r.val < GAN_MIN_USD || /fondo/i.test(r.tipo))) continue;
+    if (!todos && (r.rend < u || r.val < GAN_MIN_USD || /fondo/i.test(r.tipo) || fuera.has(String(r.cuenta).trim()))) continue;
     const k = r.cuenta || norm(r.nombre);
     const e = by.get(k) || { key: k, cuenta: r.cuenta, nombre: r.nombre, pos: [], val: 0, gan: 0, dudosas: 0 };
     e.pos.push(r);
