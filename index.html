@@ -2562,7 +2562,7 @@ $('#tareasBox').addEventListener('click', e => {
   if (g) { tkView = 'ganancias'; tkQ = g.dataset.tkgan; render(); }
 });
 // ---- Grupos de clientes (por ejemplo, los que se llevan con Lang) ----
-const grupoOpen = new Set();
+const grupoOpen = new Set(['t-mias']);   // "Mis tareas" arranca abierto
 const grupoDeCuenta = cta => cta ? (config.grupos || []).find(g => g.cuentas.includes(String(cta).trim())) || null : null;
 const grupoDeTarea = t => grupoDeCuenta(cuentas.find(c => c.id === t.cuentaId)?.cuenta);
 // Separa una lista en {resto, grupos: [{g, items}]} según a qué grupo pertenece cada elemento
@@ -2589,8 +2589,8 @@ function renderTareas() {
     ${tareas.length ? tkSearch('Buscar tarea, cliente o estado…') : ''}
     <div class="tk-head"><h2>Tareas</h2><span>${q ? `${plural(pend.length + hechas.length, 'resultado', 'resultados')} · ` : ''}${plural(pend.filter(t => estadoDe(t) === 'sin').length, 'sin hacer', 'sin hacer')} · ${plural(pend.filter(t => estadoDe(t) === 'pend').length, 'pendiente', 'pendientes')} · ${plural(hechas.length, 'hecha', 'hechas')}${vencidas ? ` · ${plural(vencidas, 'vencida', 'vencidas')}` : ''}</span></div>
     ${pend.length ? (() => { const sp = separarGrupos(pend, t => cuentas.find(c => c.id === t.cuentaId)?.cuenta);
-        return sp.grupos.map(({ g, items }) => grupoBloque('t-' + g.id, g, items.length, `${plural(items.length, 'tarea pendiente', 'tareas pendientes')}`, `<ul class="tk-list">${items.map(tareaItem).join('')}</ul>`, !!q)).join('')
-          + (sp.resto.length ? `<ul class="tk-list">${sp.resto.map(tareaItem).join('')}</ul>` : ''); })()
+        return (sp.resto.length ? grupoBloque('t-mias', { nombre: 'Mis tareas' }, sp.resto.length, `${plural(sp.resto.length, 'tarea pendiente', 'tareas pendientes')}`, `<ul class="tk-list">${sp.resto.map(tareaItem).join('')}</ul>`, !!q) : '')
+          + sp.grupos.map(({ g, items }) => grupoBloque('t-' + g.id, g, items.length, `${plural(items.length, 'tarea pendiente', 'tareas pendientes')}`, `<ul class="tk-list">${items.map(tareaItem).join('')}</ul>`, !!q)).join(''); })()
       : `<div class="tk-empty">${loading ? 'Cargando…' : q ? (hechas.length ? 'Ninguna tarea pendiente coincide con la búsqueda.' : tkSinTareas(q)) : 'No tenés tareas pendientes. Anotá una con <b>+ Nueva tarea</b>.'}</div>`}
     ${hechas.length ? `<details class="tk-done"${q ? ' open' : ''}><summary>Hechas (${hechas.length})</summary><ul class="tk-list">${hechas.map(tareaItem).join('')}</ul></details>` : ''}
     ${conCuentas ? `<div class="tk-sub">Cuentas marcadas en ${esc(tabLabel(TASKS_TAB))}</div>` : ''}`);
