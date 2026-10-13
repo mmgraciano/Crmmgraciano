@@ -168,6 +168,12 @@
   .gan .chip.warn { background: var(--late-bg); color: var(--late); }
   .gan .chip.keep { background: var(--soft); color: var(--muted); border: 1px solid var(--border); }
   .gan .btn { padding: 6px 12px; font-size: 12.5px; }
+  .gan .cli-act { display: inline-flex; align-items: center; gap: 8px; }
+  .gan .reu-ok { width: 32px; height: 32px; font-size: 15px; }
+  #tareasBox .gan tr.gan-sep td { padding: 14px 12px 8px; font: 600 11px var(--font-body); letter-spacing: .07em; text-transform: uppercase; color: var(--muted); border-top: 2px solid var(--border); }
+  .gan tr.hecho td { opacity: .55; }
+  .gan tr.cli.hecho td { opacity: 1; }
+  .gan tr.cli.hecho b { color: var(--muted); }
   .ia-log { display: flex; flex-direction: column; gap: 12px; padding: 4px 16px 14px; }
   .ia-msg { max-width: 100%; padding: 10px 14px; border-radius: 12px; line-height: 1.5; overflow-wrap: anywhere; }
   .ia-msg.user { align-self: flex-end; background: var(--accent); color: var(--on-accent); max-width: 80%; white-space: pre-wrap; }
@@ -723,6 +729,9 @@ let tkView = 'tareas';            // solapa de Tareas pendientes: 'tareas' o 'ga
 let ganUmbral = 10;               // % de suba desde la compra a partir del cual se sugiere tomar ganancia
 const GAN_MIN_USD = 100;          // posiciones más chicas no se listan
 const LOCAL_GAN = 'panel-wm-ganancias-v1';
+// Clientes ya trabajados en Tomar ganancia: {clave (N° de cuenta o nombre): fecha}, en "ganancias/hechas"; sobrevive a un informe nuevo
+let ganHechas = {}, ganHechasRef = null;
+const LOCAL_GAN_H = 'panel-wm-ganancias-hechas-v1';
 let tenDb = null;
 
 const $ = s => document.querySelector(s);
@@ -818,6 +827,7 @@ function saveLocal() {
     localStorage.setItem(LOCAL_TASKS, JSON.stringify(tareas));
     localStorage.setItem(LOCAL_REU, JSON.stringify(reuniones));
     localStorage.setItem(LOCAL_GAN, JSON.stringify(ganancias));
+    localStorage.setItem(LOCAL_GAN_H, JSON.stringify(ganHechas));
   } catch { toast('No se pudo guardar en este navegador'); }
 }
 async function write(fn) {
@@ -875,6 +885,7 @@ async function initStorage() {
     try { tareas = JSON.parse(localStorage.getItem(LOCAL_TASKS)) || []; } catch {}
     try { reuniones = JSON.parse(localStorage.getItem(LOCAL_REU)) || []; } catch {}
     try { ganancias = JSON.parse(localStorage.getItem(LOCAL_GAN)) || null; } catch {}
+    try { ganHechas = JSON.parse(localStorage.getItem(LOCAL_GAN_H)) || {}; } catch {}
     loading = false; setSync(); render(); return;
   }
   tenDb = db;
@@ -907,6 +918,11 @@ async function initStorage() {
   }, fail);
   db.doc('ganancias/actual').onSnapshot(s => {
     ganancias = s.exists ? structuredClone(s.data()) : null;
+    render();
+  }, fail);
+  ganHechasRef = db.doc('ganancias/hechas');
+  ganHechasRef.onSnapshot(s => {
+    ganHechas = s.exists ? structuredClone(s.data().items || {}) : {};
     render();
   }, fail);
   reuRef = db.collection('reuniones');
@@ -2648,6 +2664,9 @@ function renderGanancias() {
     const ok = pos.filter(r => r.rend < 3);
     return { ...e, pos, val: ok.reduce((a, r) => a + r.val, 0), gan: ok.reduce((a, r) => a + r.gan, 0), dudosas: pos.length - ok.length };
   }).filter(Boolean);
+  // Los ya hechos van abajo
+  const pendientes = list.filter(e => !ganHechas[e.key]), hechos = list.filter(e => ganHechas[e.key]);
+  list.length = 0; list.push(...pendientes, ...hechos);
   const npos = list.reduce((a, e) => a + e.pos.length, 0);
   const tot = list.reduce((a, e) => a + e.gan, 0);
   const dud = list.reduce((a, e) => a + e.dudosas, 0);
@@ -2657,10 +2676,12 @@ function renderGanancias() {
     <div class="gan-ctl"><label>Avisar desde <input id="ganUmbral" type="number" min="1" max="500" step="1" value="${ganUmbral}"> % de suba desde la compra</label>
       <span>Rendimientos en USD MEP · informe del ${esc(fmtDate(ganancias.fecha))} (${esc(ganancias.fileName)}) · sin fondos ni posiciones de menos de USD ${GAN_MIN_USD}</span></div>
     ${list.length ? `<div class="scroll"><table class="gan"><thead><tr><th class="nosort">Activo</th><th class="nosort">Comprado</th><th class="nosort num">Compra USD</th><th class="nosort num">Hoy USD</th><th class="nosort num">Suba</th><th class="nosort num">Valor USD</th><th class="nosort num">Ganancia USD</th></tr></thead><tbody>
-    ${list.map(e => { const t = ganTareaDe(e);
-      return `<tr class="cli" data-gan="${esc(e.key)}"><td colspan="7"><div class="cli-row"><span><b>${esc(e.nombre)}</b>${e.cuenta ? ` <span class="acct">${esc(e.cuenta)}</span>` : ''} · ${plural(e.pos.length, 'activo', 'activos')} · ganancia USD ${fmtUSD(e.gan)}</span>
-        ${t ? `<button class="chip" data-gact="ver">Tarea creada ✓</button>` : `<button class="btn primary" data-gact="tarea">+ Tarea</button>`}</div></td></tr>` +
-      e.pos.map(r => `<tr><td><b>${esc(r.tk)}</b> <span class="muted">${esc(r.tipo)}</span>${r.desc ? `<div class="acct">${esc(r.desc)}</div>` : ''}
+    ${list.map((e, i) => { const t = ganTareaDe(e), h = ganHechas[e.key];
+      return (h && i === pendientes.length ? `<tr class="gan-sep"><td colspan="7">Hechos (${hechos.length})</td></tr>` : '') +
+      `<tr class="cli ${h ? 'hecho' : ''}" data-gan="${esc(e.key)}"><td colspan="7"><div class="cli-row"><span><b>${esc(e.nombre)}</b>${e.cuenta ? ` <span class="acct">${esc(e.cuenta)}</span>` : ''} · ${plural(e.pos.length, 'activo', 'activos')} · ganancia USD ${fmtUSD(e.gan)}${h ? ` · <span class="pos">hecho el ${esc(fmtDate(h))}</span>` : ''}</span>
+        <span class="cli-act">${t ? `<button class="chip" data-gact="ver">Tarea creada ✓</button>` : h ? '' : `<button class="btn primary" data-gact="tarea">+ Tarea</button>`}
+        <button class="reu-ok ${h ? 'on' : ''}" data-gact="hecho" title="${h ? 'Volver a pendiente' : 'Marcar como hecho'}" aria-label="${h ? 'Hecho: volver a pendiente' : 'Marcar como hecho'}" aria-pressed="${!!h}">✓</button></span></div></td></tr>` +
+      e.pos.map(r => `<tr class="${h ? 'hecho' : ''}"><td><b>${esc(r.tk)}</b> <span class="muted">${esc(r.tipo)}</span>${r.desc ? `<div class="acct">${esc(r.desc)}</div>` : ''}
           ${r.rend >= 3 ? ' <span class="chip warn" title="Una suba tan grande suele venir de un precio de compra viejo o mal cargado">Revisar precio de compra</span>' : ''}
           ${modelo.has(String(r.tk).toUpperCase()) ? ' <span class="chip keep" title="Está en la cartera recomendada del research">En cartera recomendada: vender solo una parte</span>' : ''}</td>
         <td class="muted">${r.compra ? esc(fmtDate(r.compra)) : '—'}</td><td class="num">${fmtPrecio(r.ppc)}</td><td class="num">${fmtPrecio(r.precio)}</td>
@@ -2677,6 +2698,21 @@ document.addEventListener('change', e => {
 $('#tareasBox').addEventListener('click', async e => {
   const b = e.target.closest('[data-gact]'); if (!b) return;
   if (b.dataset.gact === 'ver') { tkView = 'tareas'; render(); return; }
+  if (b.dataset.gact === 'hecho') {
+    const k = b.closest('[data-gan]').dataset.gan;
+    ganHechas = { ...ganHechas }; if (ganHechas[k]) delete ganHechas[k]; else ganHechas[k] = today();
+    const marcado = !!ganHechas[k];
+    // Si había una tarea "Tomar ganancia" abierta para ese cliente, también queda hecha
+    const cli = ganClientes().find(x => x.key === k), tk = marcado && cli ? ganTareaDe(cli) : null;
+    if (tk) setEstado(tk, 'hecha');
+    render();
+    if (tk) saveTarea(tk);
+    try {
+      if (ganHechasRef) await write(() => ganHechasRef.set({ items: ganHechas })); else saveLocal();
+      if (marcado) toast('Listo: pasó abajo, a Hechos');
+    } catch {}
+    return;
+  }
   const e2 = ganClientes().find(x => x.key === b.closest('[data-gan]').dataset.gan); if (!e2) return;
   const c = findCuenta(e2.cuenta, e2.nombre);
   const detalle = e2.pos.map(r => `${r.tk} ${fmtRend(r.rend)}${r.rend >= 3 ? ' (revisar precio de compra)' : ''}`).join(', ');
