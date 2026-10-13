@@ -170,6 +170,7 @@
   .gan-tk { color: var(--text); }
   .gan-tk .ok { color: var(--ok); font-weight: 600; }
   .gan-tk .pend { color: var(--late); font-weight: 600; }
+  .gan-cli-img { padding: 4px 9px; font-size: 13px; line-height: 1; }
   .gan .chip.warn { background: var(--late-bg); color: var(--late); }
   .gan .chip.keep { background: var(--soft); color: var(--muted); border: 1px solid var(--border); }
   .gan .btn { padding: 6px 12px; font-size: 12.5px; }
@@ -2755,6 +2756,7 @@ function renderGanancias() {
       return (h && i === lst.filter(x => !ganHechas[x.key]).length ? `<tr class="gan-sep"><td colspan="7">Hechos (${lst.filter(x => ganHechas[x.key]).length})</td></tr>` : '') +
       `<tr class="cli ${h ? 'hecho' : ''}" data-gan="${esc(e.key)}"><td colspan="7"><div class="cli-row"><span><b>${esc(e.nombre)}</b>${e.cuenta ? ` <span class="acct">${esc(e.cuenta)}</span>` : ''} · ${plural(e.pos.length, 'activo', 'activos')} · ganancia USD ${fmtUSD(e.gan)}${h ? ` · <span class="pos">hecho el ${esc(fmtDate(h))}</span>` : ''}</span>
         <span class="cli-act">${t ? `<button class="chip ${t.hecha ? 'tk-ok' : 'tk-abierta'}" data-gact="ver" title="Ver en Mis tareas">${t.hecha ? `Tarea hecha ✓${t.hechaEl ? ' ' + esc(fmtDate(t.hechaEl)) : ''}` : 'Tarea creada · pendiente'}</button>` : h ? '' : `<button class="btn primary" data-gact="tarea">+ Tarea</button>`}
+        <button class="btn ghost gan-cli-img" data-gimg="cliente" title="Descargar la imagen de este cliente" aria-label="Descargar la imagen de ${esc(e.nombre)}">⬇ Imagen</button>
         <button class="reu-ok ${h ? 'on' : ''}" data-gact="hecho" title="${h ? 'Volver a pendiente' : 'Marcar como hecho'}" aria-label="${h ? 'Hecho: volver a pendiente' : 'Marcar como hecho'}" aria-pressed="${!!h}">✓</button></span></div></td></tr>` +
       e.pos.map(r => `<tr class="${h ? 'hecho' : ''}"><td><b>${esc(r.tk)}</b> <span class="muted">${esc(r.tipo)}</span>${r.desc ? `<div class="acct">${esc(r.desc)}</div>` : ''}
           ${r.rend >= 3 ? ' <span class="chip warn" title="Una suba tan grande suele venir de un precio de compra viejo o mal cargado">Revisar precio de compra</span>' : ''}
@@ -2815,14 +2817,15 @@ async function ganExcel(lista, nombreArchivo) {
 // Imagen PNG con el resumen por cliente y por tipo de activo, para mandar por WhatsApp o mail (siempre en colores claros)
 async function ganImagen(lista, titulo, nombreArchivo) {
   if (!lista.length) return toast('No hay clientes para descargar');
-  const { tipos, totTipo, rows } = ganResumen(lista);
-  const cols = tipos.slice(0, 4), otros = tipos.slice(4), tipoCols = [...cols, ...(otros.length ? ['Otros'] : [])];
-  const valTipo = (pt, t) => t === 'Otros' ? otros.reduce((a, o) => a + (pt[o] || 0), 0) : pt[t] || 0;
+  const { rows } = ganResumen(lista);
   const C = { bg: '#fbfaf7', soft: '#efeee9', zebra: '#f5f4f0', text: '#1f2a24', muted: '#6a716b', accent: '#2d4a3c', ok: '#2f6b45' };
   const body = 'DM Sans, system-ui, -apple-system, Segoe UI, Roboto, sans-serif', disp = 'Fraunces, Georgia, serif';
-  const pad = 32, rowH = 30, headY = 116, nameW = 380;
-  const xPct = pad + nameW + 90, xUsd = xPct + 130, tipoW = 130, xT = k => xUsd + tipoW * (k + 1);
-  const W = Math.max(900, xT(tipoCols.length - 1) + pad + 12);
+  const pad = 32, rowH = 30, headY = 116, nameW = 470;
+  const xPct = pad + nameW + 90, xUsd = xPct + 140;
+  const tot = rows.reduce((a, r) => a + r.gan, 0);
+  const sub = `${rows.length === 1 ? 'Ganancia' : plural(rows.length, 'cliente', 'clientes') + ' · ganancia'} USD ${fmtUSD(tot)} · en USD MEP desde la compra, posiciones +${ganUmbral}% · informe del ${fmtDate(ganancias?.fecha || today())}`;
+  const mc = document.createElement('canvas').getContext('2d'); mc.font = `400 14px ${body}`;
+  const W = Math.ceil(Math.max(xUsd + pad + 12, pad * 2 + mc.measureText(sub).width));
   const CORTO = { 'acciones locales': 'Acciones arg.', 'obligaciones negociables': 'ONs', 'titulo publicos': 'Bonos', 'titulos publicos': 'Bonos', 'titulos provinciales': 'Provinciales', 'letras del tesoro': 'Letras', 'acciones internacionales': 'Acciones ext.' };
   // Cada cliente lleva debajo el desglose activo por activo
   const posH = 24, bloqueH = r => rowH + r.e.pos.length * posH + 6;
@@ -2833,14 +2836,12 @@ async function ganImagen(lista, titulo, nombreArchivo) {
   const right = (t, x) => { g.textAlign = 'right'; g.fillText(t, x, y0); g.textAlign = 'left'; };
   g.fillStyle = C.bg; g.fillRect(0, 0, W, H);
   g.fillStyle = C.text; g.font = `600 26px ${disp}`; g.fillText(titulo, pad, 46);
-  const tot = rows.reduce((a, r) => a + r.gan, 0);
   g.fillStyle = C.muted; g.font = `400 14px ${body}`;
-  g.fillText(`${plural(rows.length, 'cliente', 'clientes')} · ganancia USD ${fmtUSD(tot)} · en USD MEP desde la compra, posiciones +${ganUmbral}% · informe del ${fmtDate(ganancias?.fecha || today())}`, pad, 74);
+  g.fillText(sub, pad, 74);
   g.fillText('Panel WM · Micaela Graciano', pad, 94);
   g.fillStyle = C.soft; g.fillRect(pad - 12, headY, W - 2 * pad + 24, 34);
   g.fillStyle = C.muted; g.font = `600 11px ${body}`; y0 = headY + 21;
-  g.fillText('CLIENTE', pad, y0); right('GANANCIA %', xPct); right('GANANCIA USD', xUsd);
-  tipoCols.forEach((t, k) => { let lab = (CORTO[norm(t)] || t).toUpperCase(); while (g.measureText(lab).width > tipoW - 12 && lab.length > 4) lab = lab.slice(0, -1); right(lab, xT(k)); });
+  g.fillText('CLIENTE / ACTIVO', pad, y0); right('GANANCIA %', xPct); right('GANANCIA USD', xUsd);
   let yB = headY + 34;
   rows.forEach((r, i) => {
     const y = yB; y0 = y + 20; yB += bloqueH(r);
@@ -2850,14 +2851,10 @@ async function ganImagen(lista, titulo, nombreArchivo) {
     if (nom !== r.nombre) nom = nom.trimEnd() + '…';
     g.fillText(nom, pad, y0);
     g.fillStyle = C.muted; g.font = `400 12px ${body}`; right(r.cuenta || '', pad + nameW);
-    g.font = `700 13.5px ${body}`; g.fillStyle = C.ok;
-    right(r.pct == null ? '—' : '+' + (r.pct * 100).toLocaleString('es-AR', { maximumFractionDigits: 1 }) + '%', xPct);
-    g.fillStyle = C.text; right(fmtUSD(r.gan), xUsd);
-    g.font = `400 13px ${body}`; g.fillStyle = C.muted;
-    tipoCols.forEach((t, k) => { const v = valTipo(r.porTipo, t); right(v ? fmtUSD(v) : '—', xT(k)); });
+    g.font = `700 13.5px ${body}`; g.fillStyle = C.text; right(fmtUSD(r.gan), xUsd);
     r.e.pos.forEach((p, j) => {
       y0 = y + rowH + j * posH + 16;
-      const dud = p.rend >= 3, k = tipoCols.indexOf(cols.includes(p.tipo || 'Otros') ? (p.tipo || 'Otros') : 'Otros');
+      const dud = p.rend >= 3;
       g.fillStyle = C.text; g.font = `600 12.5px ${body}`; g.fillText(String(p.tk), pad + 18, y0);
       const wTk = g.measureText(String(p.tk)).width;
       g.fillStyle = C.muted; g.font = `400 11.5px ${body}`;
@@ -2866,21 +2863,21 @@ async function ganImagen(lista, titulo, nombreArchivo) {
       g.fillText(lab, pad + 28 + wTk, y0);
       g.font = `600 12.5px ${body}`; g.fillStyle = dud ? C.muted : C.ok; right(fmtRend(p.rend), xPct);
       g.font = `400 12.5px ${body}`; g.fillStyle = dud ? C.muted : C.text; right(fmtUSD(p.gan), xUsd);
-      if (!dud && k >= 0) { g.fillStyle = C.muted; right(fmtUSD(p.gan), xT(k)); }
     });
   });
   const yT = yB; y0 = yT + 28;
   g.strokeStyle = C.accent; g.lineWidth = 1.5; g.beginPath(); g.moveTo(pad - 12, yT + 4); g.lineTo(W - pad + 12, yT + 4); g.stroke();
   g.fillStyle = C.text; g.font = `700 13.5px ${body}`; g.fillText('Total', pad, y0); right(fmtUSD(tot), xUsd);
-  g.font = `600 13px ${body}`;
-  const totObj = Object.fromEntries(totTipo);
-  tipoCols.forEach((t, k) => right(fmtUSD(valTipo(totObj, t)), xT(k)));
   const blob = await new Promise(ok => cv.toBlob(ok, 'image/png'));
   await guardarArchivo(nombreArchivo, blob);
 }
 $('#tareasBox').addEventListener('click', e => {
   const b = e.target.closest('[data-gxls], [data-gimg]'); if (!b) return;
   const id = b.dataset.gxls || b.dataset.gimg, img = !!b.dataset.gimg, fecha = (ganancias?.fecha || today());
+  if (id === 'cliente') {
+    const cli = ganVista.find(c => c.key === b.closest('[data-gan]')?.dataset.gan); if (!cli) return;
+    return ganImagen([cli], 'Wealth Management', `wealth_management_${slug(cli.nombre)}_${fecha}.png`);
+  }
   const g = id === 'todos' ? null : (config.grupos || []).find(x => x.id === id);
   if (id !== 'todos' && !g) return;
   const lista = g ? ganVista.filter(c => g.cuentas.includes(String(c.cuenta))) : ganVista;
