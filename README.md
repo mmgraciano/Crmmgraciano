@@ -28,7 +28,7 @@ Panel para registrar tu base de cuentas, en un solo archivo (`index.html`).
   las anteriores. **+ Nueva reunión** agenda una (cliente, día, hora y tema); a la derecha, el tilde verde la marca como hecha, y
   debajo de cada una hay un cuadro de notas que se guarda solo. Colección `reuniones`.
 - **Clientes Lang:** en Mis tareas y en Tomar ganancia, los clientes que se llevan en conjunto con Lang (Victorel, Lang Esteban,
-  Lang Carlos, Tassisto, Barchiesi y D Amico) aparecen arriba en un grupo desplegable "Clientes Lang" (`config.grupos`).
+  Lang Carlos, Tassisto, Barchiesi, D Amico, Morassi Luciano, Haidar y Bengoechea) aparecen arriba en un grupo desplegable "Clientes Lang" (`config.grupos`).
 - **Preguntale a la IA:** tercera solapa de Tareas pendientes. Se le pregunta en lenguaje natural (por ejemplo "¿qué clientes
   tienen QQQ, SPY o NVDA y por qué rotarlos?") y responde Claude con los datos del panel: tenencias, rendimientos desde la compra,
   research del día, facturación por mes, clientes y tareas. Usa la cuenta de Claude de quien pregunta (capacidad `sample`); la
