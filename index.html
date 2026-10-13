@@ -2484,6 +2484,16 @@ function syncGanDesdeTarea(t) {
   if (!ganHechasRef) { saveLocal(); return null; }
   return write(() => ganHechasRef.set({ items: ganHechas })).catch(() => {});
 }
+// Marcar la aprobación (le mandé mensaje / me respondió) o hacer la tarea cuenta como contacto con el cliente: actualiza "Última vez contactado"
+function contactoDesdeTarea(t, cuenta) {
+  if (!cuenta && !(t && (t.aprobacion || t.hecha))) return null;
+  const c = cuenta || cuentas.find(x => x.id === t.cuentaId) || (t.cliente ? cuentas.find(x => norm(x.nombre) === norm(t.cliente)) : null);
+  const hoy = today();
+  if (!c || (c.ultimoContacto || '') >= hoy) return null;
+  c.ultimoContacto = hoy;
+  saveCuenta(c)?.catch?.(() => {});
+  return c;
+}
 function saveTarea(t) {
   if (!tasksRef) { saveLocal(); return Promise.resolve(); }
   return write(() => tasksRef.doc(t.id).set(Object.fromEntries(TASK_FIELDS.map(k => [k, t[k] ?? (k === 'hecha' ? false : '')]))));
@@ -2614,6 +2624,7 @@ taskForm.addEventListener('submit', async () => {
   if (prev || t.hecha) tareas = [...tareas.filter(x => x.id !== t.id), t];
   else ({ t: fin, unida } = sumarTarea(t));
   const gan = syncGanDesdeTarea(fin);
+  if (fin.hecha && !prev?.hecha) contactoDesdeTarea(fin);
   render();
   await saveTarea(fin);
   if (gan) await gan;
@@ -2628,17 +2639,19 @@ $('#tareasBox').addEventListener('click', async e => {
   if (el.dataset.tact === 'edit') openTask(t);
   else if (el.dataset.tact === 'aprob') {
     t.aprobacion = t.aprobacion === el.dataset.ap ? '' : el.dataset.ap;   // tocar el marcado lo desmarca
+    const cc = contactoDesdeTarea(t);
     render();
     await saveTarea(t);
+    if (cc) toast(`${cc.nombre}: último contacto hoy`);
   } else if (el.dataset.tact === 'estado') {
     const i = ESTADOS.findIndex(x => x.id === estadoDe(t));
     const sig = ESTADOS[(i + 1) % ESTADOS.length];
     setEstado(t, sig.id);
-    const gan = syncGanDesdeTarea(t);
+    const gan = syncGanDesdeTarea(t), cc = t.hecha ? contactoDesdeTarea(t) : null;
     render();
     await saveTarea(t);
     if (gan) await gan;
-    toast('Tarea: ' + sig.label + (t.hecha && esTareaGan(t) ? ' · el cliente pasó a Hechos en Tomar ganancia' : ''));
+    toast('Tarea: ' + sig.label + (t.hecha && esTareaGan(t) ? ' · el cliente pasó a Hechos en Tomar ganancia' : '') + (cc ? ' · último contacto hoy' : ''));
   } else if (el.dataset.tact === 'remove') {
     if (!await confirmAsk('Eliminar tarea', `¿Eliminar "${t.texto.slice(0, 80)}"?`, 'Eliminar')) return;
     await deleteTarea(t.id);
@@ -2914,6 +2927,7 @@ $('#tareasBox').addEventListener('click', async e => {
     // Si había una tarea "Tomar ganancia" abierta para ese cliente, también queda hecha
     const cli = ganClientes().find(x => x.key === k), t0 = marcado && cli ? ganTareaDe(cli) : null, tk = t0 && !t0.hecha ? t0 : null;
     if (tk) setEstado(tk, 'hecha');
+    if (marcado && cli) contactoDesdeTarea(tk, tk ? null : findCuenta(cli.cuenta, cli.nombre));
     render();
     if (tk) saveTarea(tk);
     try {
