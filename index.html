@@ -242,6 +242,14 @@
   .reu-ok.on { background: var(--ok); color: var(--panel); opacity: 1; }
   .reu .x { flex: none; }
   .reu-otras summary { padding: 11px 16px; border-top: 1px solid var(--border); cursor: pointer; color: var(--muted); font-size: 13px; }
+  .tk-grupo { border-top: 1px solid var(--border); border-bottom: 2px solid var(--border); }
+  .tk-grupo > summary { list-style: none; display: flex; align-items: center; gap: 10px; padding: 12px 16px; cursor: pointer; background: var(--accent-soft); }
+  .tk-grupo > summary::-webkit-details-marker { display: none; }
+  .tk-grupo .tg-t { font: 600 14px var(--font-body); color: var(--accent); }
+  .tk-grupo .tg-n { font: 600 11px var(--font-body); background: var(--panel); color: var(--accent); padding: 1px 7px; border-radius: 5px; }
+  .tk-grupo .tg-x { font-size: 12.5px; color: var(--muted); }
+  .tk-grupo .chev { margin-left: auto; font-style: normal; color: var(--accent); transition: transform .15s; }
+  .tk-grupo[open] .chev { transform: rotate(180deg); }
   .tk-sub { padding: 14px 16px 8px; border-top: 1px solid var(--border); font: 600 11px var(--font-body); letter-spacing: .07em; text-transform: uppercase; color: var(--muted); }
   .hero { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 20px 22px; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.6fr); gap: 24px; }
   .hero .label { font: 600 11px var(--font-body); letter-spacing: .07em; text-transform: uppercase; color: var(--muted); }
@@ -630,6 +638,8 @@ const DEFAULT_CONFIG = {
   umbral: 10000,
   metaMes: 10000,  // facturación mínima por mes que se busca, en USD
   objetivo: { monto: 60000, desde: '2026-07', hasta: '2026-12' },  // objetivo de facturación del período
+  // Clientes que se llevan en conjunto: en Tareas aparecen aparte, en un grupo desplegable
+  grupos: [{ id: 'lang', nombre: 'Clientes Lang', cuentas: ['150080', '150666', '150151', '151460', '151224', '151649'] }],
   ten: {},   // columnas elegidas para valuar las tenencias (por nombre de columna)
   tabs: [
     { id: 'total', label: 'Tenencia total' },
@@ -2503,6 +2513,22 @@ $('#tareasBox').addEventListener('click', e => {
   const g = e.target.closest('[data-tkgan]');
   if (g) { tkView = 'ganancias'; tkQ = g.dataset.tkgan; render(); }
 });
+// ---- Grupos de clientes (por ejemplo, los que se llevan con Lang) ----
+const grupoOpen = new Set();
+const grupoDeCuenta = cta => cta ? (config.grupos || []).find(g => g.cuentas.includes(String(cta).trim())) || null : null;
+const grupoDeTarea = t => grupoDeCuenta(cuentas.find(c => c.id === t.cuentaId)?.cuenta);
+// Separa una lista en {resto, grupos: [{g, items}]} según a qué grupo pertenece cada elemento
+function separarGrupos(list, cuentaDe) {
+  const resto = [], por = new Map();
+  for (const x of list) { const g = grupoDeCuenta(cuentaDe(x)); if (!g) resto.push(x); else (por.get(g.id) || por.set(g.id, { g, items: [] }).get(g.id)).items.push(x); }
+  return { resto, grupos: [...por.values()] };
+}
+const grupoBloque = (key, g, n, extra, cuerpo, abierto) => `<details class="tk-grupo" data-grupo="${esc(key)}" ${abierto || grupoOpen.has(key) ? 'open' : ''}>
+  <summary><span class="tg-t">${esc(g.nombre)}</span><span class="tg-n">${n}</span>${extra ? `<span class="tg-x">${extra}</span>` : ''}<i class="chev" aria-hidden="true">▾</i></summary>${cuerpo}</details>`;
+document.addEventListener('toggle', e => {
+  const dd = e.target.closest?.('[data-grupo]'); if (!dd) return;
+  if (dd.open) grupoOpen.add(dd.dataset.grupo); else grupoOpen.delete(dd.dataset.grupo);
+}, true);
 function renderTareas() {
   // Pendientes: primero las que tienen fecha (la más próxima arriba), después las sin fecha por orden de carga
   const q = norm(tkQ);
@@ -2514,7 +2540,9 @@ function renderTareas() {
   setTareasBox(`
     ${tareas.length ? tkSearch('Buscar tarea, cliente o estado…') : ''}
     <div class="tk-head"><h2>Tareas</h2><span>${q ? `${plural(pend.length + hechas.length, 'resultado', 'resultados')} · ` : ''}${plural(pend.filter(t => estadoDe(t) === 'sin').length, 'sin hacer', 'sin hacer')} · ${plural(pend.filter(t => estadoDe(t) === 'pend').length, 'pendiente', 'pendientes')} · ${plural(hechas.length, 'hecha', 'hechas')}${vencidas ? ` · ${plural(vencidas, 'vencida', 'vencidas')}` : ''}</span></div>
-    ${pend.length ? `<ul class="tk-list">${pend.map(tareaItem).join('')}</ul>`
+    ${pend.length ? (() => { const sp = separarGrupos(pend, t => cuentas.find(c => c.id === t.cuentaId)?.cuenta);
+        return sp.grupos.map(({ g, items }) => grupoBloque('t-' + g.id, g, items.length, `${plural(items.length, 'tarea pendiente', 'tareas pendientes')}`, `<ul class="tk-list">${items.map(tareaItem).join('')}</ul>`, !!q)).join('')
+          + (sp.resto.length ? `<ul class="tk-list">${sp.resto.map(tareaItem).join('')}</ul>` : ''); })()
       : `<div class="tk-empty">${loading ? 'Cargando…' : q ? (hechas.length ? 'Ninguna tarea pendiente coincide con la búsqueda.' : tkSinTareas(q)) : 'No tenés tareas pendientes. Anotá una con <b>+ Nueva tarea</b>.'}</div>`}
     ${hechas.length ? `<details class="tk-done"${q ? ' open' : ''}><summary>Hechas (${hechas.length})</summary><ul class="tk-list">${hechas.map(tareaItem).join('')}</ul></details>` : ''}
     ${conCuentas ? `<div class="tk-sub">Cuentas marcadas en ${esc(tabLabel(TASKS_TAB))}</div>` : ''}`);
@@ -2675,9 +2703,10 @@ function renderGanancias() {
     <div class="tk-head"><h2>Tomar ganancia</h2><span>${q ? 'Búsqueda: ' : ''}${plural(list.length, 'cliente', 'clientes')} · ${plural(npos, 'posición', 'posiciones')} · USD ${fmtUSD(tot)} de ganancia${dud ? ` · ${plural(dud, 'posición', 'posiciones')} para revisar (no se suman)` : ''}</span></div>
     <div class="gan-ctl"><label>Avisar desde <input id="ganUmbral" type="number" min="1" max="500" step="1" value="${ganUmbral}"> % de suba desde la compra</label>
       <span>Rendimientos en USD MEP · informe del ${esc(fmtDate(ganancias.fecha))} (${esc(ganancias.fileName)}) · sin fondos ni posiciones de menos de USD ${GAN_MIN_USD}</span></div>
-    ${list.length ? `<div class="scroll"><table class="gan"><thead><tr><th class="nosort">Activo</th><th class="nosort">Comprado</th><th class="nosort num">Compra USD</th><th class="nosort num">Hoy USD</th><th class="nosort num">Suba</th><th class="nosort num">Valor USD</th><th class="nosort num">Ganancia USD</th></tr></thead><tbody>
-    ${list.map((e, i) => { const t = ganTareaDe(e), h = ganHechas[e.key];
-      return (h && i === pendientes.length ? `<tr class="gan-sep"><td colspan="7">Hechos (${hechos.length})</td></tr>` : '') +
+    ${list.length ? (() => {
+      const tabla = lst => `<div class="scroll"><table class="gan"><thead><tr><th class="nosort">Activo</th><th class="nosort">Comprado</th><th class="nosort num">Compra USD</th><th class="nosort num">Hoy USD</th><th class="nosort num">Suba</th><th class="nosort num">Valor USD</th><th class="nosort num">Ganancia USD</th></tr></thead><tbody>
+    ${lst.map((e, i) => { const t = ganTareaDe(e), h = ganHechas[e.key];
+      return (h && i === lst.filter(x => !ganHechas[x.key]).length ? `<tr class="gan-sep"><td colspan="7">Hechos (${lst.filter(x => ganHechas[x.key]).length})</td></tr>` : '') +
       `<tr class="cli ${h ? 'hecho' : ''}" data-gan="${esc(e.key)}"><td colspan="7"><div class="cli-row"><span><b>${esc(e.nombre)}</b>${e.cuenta ? ` <span class="acct">${esc(e.cuenta)}</span>` : ''} · ${plural(e.pos.length, 'activo', 'activos')} · ganancia USD ${fmtUSD(e.gan)}${h ? ` · <span class="pos">hecho el ${esc(fmtDate(h))}</span>` : ''}</span>
         <span class="cli-act">${t ? `<button class="chip" data-gact="ver">Tarea creada ✓</button>` : h ? '' : `<button class="btn primary" data-gact="tarea">+ Tarea</button>`}
         <button class="reu-ok ${h ? 'on' : ''}" data-gact="hecho" title="${h ? 'Volver a pendiente' : 'Marcar como hecho'}" aria-label="${h ? 'Hecho: volver a pendiente' : 'Marcar como hecho'}" aria-pressed="${!!h}">✓</button></span></div></td></tr>` +
@@ -2686,7 +2715,11 @@ function renderGanancias() {
           ${modelo.has(String(r.tk).toUpperCase()) ? ' <span class="chip keep" title="Está en la cartera recomendada del research">En cartera recomendada: vender solo una parte</span>' : ''}</td>
         <td class="muted">${r.compra ? esc(fmtDate(r.compra)) : '—'}</td><td class="num">${fmtPrecio(r.ppc)}</td><td class="num">${fmtPrecio(r.precio)}</td>
         <td class="num pos"><b>${fmtRend(r.rend)}</b></td><td class="num">${fmtUSD(r.val)}</td><td class="num pos">${fmtUSD(r.gan)}</td></tr>`).join(''); }).join('')}
-    </tbody></table></div>` : `<div class="tk-empty">${q ? 'Ningún cliente o activo coincide con la búsqueda.' : `Ningún cliente tiene activos ${ganUmbral}% o más arriba del precio de compra.`}</div>`}`);
+</tbody></table></div>`;
+      const sp = separarGrupos(list, e => e.cuenta);
+      return sp.grupos.map(({ g, items }) => grupoBloque('g-' + g.id, g, items.length,
+        `${plural(items.length, 'cliente', 'clientes')} · ganancia USD ${fmtUSD(items.reduce((a, e) => a + e.gan, 0))}`, tabla(items), !!q)).join('') + (sp.resto.length ? tabla(sp.resto) : '');
+    })() : `<div class="tk-empty">${q ? 'Ningún cliente o activo coincide con la búsqueda.' : `Ningún cliente tiene activos ${ganUmbral}% o más arriba del precio de compra.`}</div>`}`);
 }
 const fmtPrecio = v => v >= 100 ? fmtUSD(v) : v.toLocaleString('es-AR', { maximumFractionDigits: v >= 1 ? 2 : 4 });
 document.addEventListener('change', e => {
