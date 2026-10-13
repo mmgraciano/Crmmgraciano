@@ -2869,7 +2869,7 @@ $('#tareasBox').addEventListener('click', e => {
   if (id !== 'todos' && !g) return;
   const lista = g ? ganVista.filter(c => g.cuentas.includes(String(c.cuenta))) : ganVista;
   const base = g ? `tomar_ganancia_${slug(g.nombre)}_${fecha}` : `tomar_ganancia_${ganUmbral}pct_${fecha}`;
-  if (img) ganImagen(lista, g ? `Tomar ganancia · ${g.nombre}` : 'Tomar ganancia · todos los clientes', base + '.png');
+  if (img) ganImagen(lista, g ? `Wealth Management · ${g.nombre}` : 'Wealth Management', (g ? `wealth_management_${slug(g.nombre)}_${fecha}` : `wealth_management_${fecha}`) + '.png');
   else ganExcel(lista, base + '.xlsx');
 });
 const fmtPrecio = v => v >= 100 ? fmtUSD(v) : v.toLocaleString('es-AR', { maximumFractionDigits: v >= 1 ? 2 : 4 });
