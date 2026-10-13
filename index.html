@@ -137,6 +137,12 @@
   .tk-head { display: flex; align-items: baseline; gap: 10px; padding: 14px 16px 10px; }
   .tk-head h2 { margin: 0; font: 600 17px var(--font-display); }
   .tk-head span { color: var(--muted); font-size: 12.5px; }
+  .tk-orden { margin-left: auto; display: inline-flex; flex-direction: row; align-items: center; gap: 6px; color: var(--muted); font-size: 12.5px; white-space: nowrap; }
+  .tk-orden select { font: 500 12.5px var(--font-body); padding: 5px 8px; border: 1px solid var(--border); border-radius: 7px; background: var(--bg); color: var(--text); cursor: pointer; }
+  .tk-sep { list-style: none; display: flex; align-items: center; gap: 8px; padding: 8px 16px; font: 600 12px var(--font-body); color: var(--muted); background: var(--soft); border-top: 1px solid var(--border); }
+  .tk-sep i { width: 10px; height: 10px; border-radius: 50%; border: 2px solid var(--border); }
+  .tk-sep.si i { background: var(--ok); border-color: var(--ok); } .tk-sep.no i { background: var(--late); border-color: var(--late); }
+  .tk-sep.pend i { background: var(--warn-dot); border-color: var(--warn-dot); }
   .tk-list { list-style: none; margin: 0; padding: 0; }
   .tk { display: flex; align-items: center; gap: 12px; padding: 10px 16px; border-top: 1px solid var(--border); }
   .tk-est { flex: none; display: inline-flex; align-items: center; gap: 6px; width: 112px; justify-content: flex-start; border: 1px solid var(--border); background: var(--panel); color: var(--muted);
@@ -2577,6 +2583,28 @@ document.addEventListener('toggle', e => {
   const dd = e.target.closest?.('[data-grupo]'); if (!dd) return;
   if (dd.open) grupoOpen.add(dd.dataset.grupo); else grupoOpen.delete(dd.dataset.grupo);
 }, true);
+// Orden de Mis tareas: por fecha o agrupadas por color de aprobación (el elegido primero)
+const TK_ORDEN = [
+  { id: 'fecha', label: 'Por fecha' },
+  { id: 'pend', label: 'Amarillas primero', sep: 'Amarillas · pendiente del cliente', cls: 'pend' },
+  { id: 'si', label: 'Verdes primero', sep: 'Verdes · aprobadas', cls: 'si' },
+  { id: 'no', label: 'Rojas primero', sep: 'Rojas · no aprobadas', cls: 'no' },
+  { id: 'nada', label: 'Sin marcar primero', sep: 'Sin marcar', cls: 'nada' },
+];
+let tkOrden = (() => { try { return localStorage.getItem('panel-wm-tkorden') || 'fecha'; } catch { return 'fecha'; } })();
+const apClave = t => t.aprobacion || 'nada';
+function listaTareas(items) {
+  if (tkOrden === 'fecha') return items.map(tareaItem).join('');
+  const orden = [tkOrden, ...['pend', 'si', 'no', 'nada'].filter(x => x !== tkOrden)];
+  return orden.map(k => { const xs = items.filter(t => apClave(t) === k); if (!xs.length) return '';
+    const o = TK_ORDEN.find(x => x.id === k);
+    return `<li class="tk-sep ${o.cls}"><i aria-hidden="true"></i>${esc(o.sep)} · ${xs.length}</li>` + xs.map(tareaItem).join(''); }).join('');
+}
+document.addEventListener('change', e => {
+  if (e.target.id !== 'tkOrden') return;
+  tkOrden = e.target.value; try { localStorage.setItem('panel-wm-tkorden', tkOrden); } catch {}
+  render();
+});
 function renderTareas() {
   // Pendientes: primero las que tienen fecha (la más próxima arriba), después las sin fecha por orden de carga
   const q = norm(tkQ);
@@ -2587,12 +2615,13 @@ function renderTareas() {
   const conCuentas = cuentas.some(c => inTab(c, TASKS_TAB));
   setTareasBox(`
     ${tareas.length ? tkSearch('Buscar tarea, cliente o estado…') : ''}
-    <div class="tk-head"><h2>Tareas</h2><span>${q ? `${plural(pend.length + hechas.length, 'resultado', 'resultados')} · ` : ''}${plural(pend.filter(t => estadoDe(t) === 'sin').length, 'sin hacer', 'sin hacer')} · ${plural(pend.filter(t => estadoDe(t) === 'pend').length, 'pendiente', 'pendientes')} · ${plural(hechas.length, 'hecha', 'hechas')}${vencidas ? ` · ${plural(vencidas, 'vencida', 'vencidas')}` : ''}</span></div>
+    <div class="tk-head"><h2>Tareas</h2><span>${q ? `${plural(pend.length + hechas.length, 'resultado', 'resultados')} · ` : ''}${plural(pend.filter(t => estadoDe(t) === 'sin').length, 'sin hacer', 'sin hacer')} · ${plural(pend.filter(t => estadoDe(t) === 'pend').length, 'pendiente', 'pendientes')} · ${plural(hechas.length, 'hecha', 'hechas')}${vencidas ? ` · ${plural(vencidas, 'vencida', 'vencidas')}` : ''}</span>
+      ${tareas.length ? `<label class="tk-orden">Ordenar <select id="tkOrden" aria-label="Ordenar tareas">${TK_ORDEN.map(o => `<option value="${o.id}"${o.id === tkOrden ? ' selected' : ''}>${esc(o.label)}</option>`).join('')}</select></label>` : ''}</div>
     ${pend.length ? (() => { const sp = separarGrupos(pend, t => cuentas.find(c => c.id === t.cuentaId)?.cuenta);
-        return (sp.resto.length ? grupoBloque('t-mias', { nombre: 'Mis tareas' }, sp.resto.length, `${plural(sp.resto.length, 'tarea pendiente', 'tareas pendientes')}`, `<ul class="tk-list">${sp.resto.map(tareaItem).join('')}</ul>`, !!q) : '')
-          + sp.grupos.map(({ g, items }) => grupoBloque('t-' + g.id, g, items.length, `${plural(items.length, 'tarea pendiente', 'tareas pendientes')}`, `<ul class="tk-list">${items.map(tareaItem).join('')}</ul>`, !!q)).join(''); })()
+        return (sp.resto.length ? grupoBloque('t-mias', { nombre: 'Mis tareas' }, sp.resto.length, `${plural(sp.resto.length, 'tarea pendiente', 'tareas pendientes')}`, `<ul class="tk-list">${listaTareas(sp.resto)}</ul>`, !!q) : '')
+          + sp.grupos.map(({ g, items }) => grupoBloque('t-' + g.id, g, items.length, `${plural(items.length, 'tarea pendiente', 'tareas pendientes')}`, `<ul class="tk-list">${listaTareas(items)}</ul>`, !!q)).join(''); })()
       : `<div class="tk-empty">${loading ? 'Cargando…' : q ? (hechas.length ? 'Ninguna tarea pendiente coincide con la búsqueda.' : tkSinTareas(q)) : 'No tenés tareas pendientes. Anotá una con <b>+ Nueva tarea</b>.'}</div>`}
-    ${hechas.length ? `<details class="tk-done"${q ? ' open' : ''}><summary>Hechas (${hechas.length})</summary><ul class="tk-list">${hechas.map(tareaItem).join('')}</ul></details>` : ''}
+    ${hechas.length ? `<details class="tk-done"${q ? ' open' : ''}><summary>Hechas (${hechas.length})</summary><ul class="tk-list">${listaTareas(hechas)}</ul></details>` : ''}
     ${conCuentas ? `<div class="tk-sub">Cuentas marcadas en ${esc(tabLabel(TASKS_TAB))}</div>` : ''}`);
 }
 const taskForm = $('#taskForm');
