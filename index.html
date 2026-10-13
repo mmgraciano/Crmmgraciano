@@ -539,7 +539,7 @@
     <div class="grid">
       <label class="full">Cliente<input id="r-cliente" list="taskClientes" placeholder="Buscar cliente…" autocomplete="off"></label>
       <label>Día *<input id="r-fecha" type="date" required></label>
-      <label>Hora<input id="r-hora" type="time" step="900"></label>
+      <label>Hora<input id="r-hora" type="time"></label>
       <label class="full">Tema<input id="r-tema" placeholder="Ej: Revisión de cartera y rotación de SPY"></label>
       <label class="full">Notas<textarea id="r-notas" placeholder="Lo que se habló, lo que quedó pendiente…"></textarea></label>
     </div>
@@ -2500,6 +2500,13 @@ function contactoDesdeTarea(t, cuenta) {
   saveCuenta(c)?.catch?.(() => {});
   return c;
 }
+// Una reunión hecha actualiza "Última vez contactado" con el día de la reunión (si es más nuevo)
+function contactoReunion(r) {
+  const c = cuentas.find(x => x.id === r.cuentaId); const dia = r.fecha > today() ? today() : r.fecha;
+  if (!c || !dia || (c.ultimoContacto || '') >= dia) return null;
+  c.ultimoContacto = dia; saveCuenta(c)?.catch?.(() => {});
+  return c;
+}
 function saveTarea(t) {
   if (!tasksRef) { saveLocal(); return Promise.resolve(); }
   return write(() => tasksRef.doc(t.id).set(Object.fromEntries(TASK_FIELDS.map(k => [k, t[k] ?? (k === 'hecha' ? false : '')]))));
@@ -3352,7 +3359,7 @@ function renderReuniones() {
     <div class="tk-head"><h2>Reuniones de la semana</h2><span>${fmtDate(w.desde).slice(0, 5)} al ${fmtDate(w.hasta).slice(0, 5)} · ${plural(sem.length, 'reunión', 'reuniones')}${sem.length ? ` · ${plural(hechas, 'hecha', 'hechas')}` : ''}</span></div>
     ${sem.length ? porDia(sem) : `<div class="tk-empty">${q ? 'Ninguna reunión de esta semana coincide con la búsqueda.' : 'No tenés reuniones esta semana. Agendá una con <b>+ Nueva reunión</b>.'}</div>`}
     ${prox.length ? `<details class="reu-otras" open><summary>Próximas semanas (${prox.length})</summary>${porDia(prox)}</details>` : ''}
-    ${pas.length ? `<details class="reu-otras"${q ? ' open' : ''}><summary>Reuniones anteriores (${pas.length})</summary>${porDia(pas)}</details>` : ''}`);
+    ${pas.length ? `<details class="reu-otras" open><summary>Reuniones anteriores (${pas.length})</summary>${porDia(pas)}</details>` : ''}`);
 }
 let editingReu = null;
 function openReu(r) {
@@ -3378,17 +3385,21 @@ $('#reuForm').addEventListener('submit', async () => {
   const prev = editingReu ? reuniones.find(x => x.id === editingReu) : null;
   const r = { ...(prev || { id: uid(), hecha: false, creado: new Date().toISOString() }), cliente: c ? c.nombre : cliente, cuentaId: c?.id || '',
     fecha, hora: $('#r-hora').value, tema: $('#r-tema').value.trim(), notas: $('#r-notas').value.trim() };
+  // Una reunión nueva con fecha pasada ya fue: queda hecha y cuenta como contacto con el cliente
+  const pasada = !prev && fecha < today();
+  if (pasada) r.hecha = true;
+  const cc = r.hecha ? contactoReunion(r) : null;
   reuniones = [...reuniones.filter(x => x.id !== r.id), r];
   render();
   await saveReunion(r);
-  toast(prev ? 'Reunión actualizada' : 'Reunión agendada');
+  toast(prev ? 'Reunión actualizada' : pasada ? `Reunión del ${fmtDate(fecha)} guardada como hecha${cc ? ' · último contacto actualizado' : ''}` : 'Reunión agendada');
 });
 $('#tareasBox').addEventListener('click', async e => {
   const el = e.target.closest('[data-ract]'); const row = e.target.closest('[data-rid]');
   if (!el || !row) return;
   const r = reuniones.find(x => x.id === row.dataset.rid); if (!r) return;
   if (el.dataset.ract === 'edit') openReu(r);
-  else if (el.dataset.ract === 'ok') { r.hecha = !r.hecha; render(); await saveReunion(r); if (r.hecha) toast('Reunión marcada como hecha'); }
+  else if (el.dataset.ract === 'ok') { r.hecha = !r.hecha; if (r.hecha) contactoReunion(r); render(); await saveReunion(r); if (r.hecha) toast('Reunión marcada como hecha'); }
   else if (el.dataset.ract === 'remove') {
     if (!await confirmAsk('Eliminar reunión', `¿Eliminar la reunión con ${reuCliente(r)} del ${fmtDate(r.fecha)}?`, 'Eliminar')) return;
     reuniones = reuniones.filter(x => x.id !== r.id); render();

@@ -33,7 +33,8 @@ Panel para registrar tu base de cuentas, en un solo archivo (`index.html`).
   con rendimiento % y resultado USD de cada uno. Cada cliente tiene su **⬇ Imagen** (Wealth Management) y arriba están el Excel y la imagen general.
 - **Reuniones:** solapa de Tareas pendientes con las reuniones de la semana (lunes a domingo) agrupadas por día, más las próximas y
   las anteriores. **+ Nueva reunión** agenda una (cliente, día, hora y tema); a la derecha, el tilde verde la marca como hecha, y
-  debajo de cada una hay un cuadro de notas que se guarda solo. Colección `reuniones`.
+  debajo de cada una hay un cuadro de notas que se guarda solo. Una reunión cargada con fecha pasada queda como hecha
+  (en Reuniones anteriores); las reuniones hechas actualizan el último contacto del cliente. Colección `reuniones`.
 - **Clientes Lang:** en Mis tareas y en Tomar ganancia, los clientes que se llevan en conjunto con Lang (Victorel, Lang Esteban,
   Lang Carlos, Tassisto, Barchiesi, D Amico, Morassi Luciano, Haidar, Bengoechea, Olle, Morassi Alejandro, Sorichetti y Laffitte) aparecen arriba en un grupo desplegable "Clientes Lang" (`config.grupos`).
 - **Preguntale a la IA:** tercera solapa de Tareas pendientes. Se le pregunta en lenguaje natural (por ejemplo "¿qué clientes
