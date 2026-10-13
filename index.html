@@ -232,8 +232,31 @@
   .delta.down { background: var(--late-bg); color: var(--late); }
   .delta.flat { background: var(--soft); color: var(--muted); }
   .split { display: flex; flex-direction: column; gap: 6px; margin-top: 14px; font-size: 13px; }
-  .split div { display: flex; justify-content: space-between; gap: 12px; border-top: 1px solid var(--border); padding-top: 6px; }
-  .split span:last-child { font-variant-numeric: tabular-nums; font-weight: 600; white-space: nowrap; }
+  .split > div { display: flex; justify-content: space-between; gap: 12px; border-top: 1px solid var(--border); padding-top: 6px; }
+  .split > div > span:last-child { font-variant-numeric: tabular-nums; font-weight: 600; white-space: nowrap; }
+  .hero > div { min-width: 0; }
+  .split-d { border-top: 1px solid var(--border); padding-top: 6px; }
+  .split-d summary { list-style: none; display: flex; justify-content: space-between; gap: 12px; cursor: pointer; }
+  .split-d summary::-webkit-details-marker { display: none; }
+  .split-d summary span:last-child { font-variant-numeric: tabular-nums; font-weight: 600; white-space: nowrap; }
+  .split-d .chev { display: inline-block; font-style: normal; margin-left: 6px; color: var(--muted); transition: transform .15s; }
+  .split-d[open] .chev { transform: rotate(180deg); }
+  .split-d summary:hover span:first-child { text-decoration: underline; }
+  .split-body { margin: 8px 0 4px; padding: 10px 12px; background: var(--bg); border: 1px solid var(--border); border-radius: 10px; }
+  .split-res { font-size: 12.5px; color: var(--muted); margin-bottom: 8px; }
+  .split-q { width: 100%; box-sizing: border-box; margin-bottom: 8px; padding: 7px 12px; font-size: 13px; }
+  .split-list { list-style: none; margin: 0; padding: 0; max-height: 380px; overflow: auto; }
+  .split-list li { padding: 7px 0; border-top: 1px solid var(--border); }
+  .split-list li:first-child { border-top: none; }
+  .sl-h { display: flex; justify-content: space-between; gap: 10px; }
+  .sl-h > span:first-child { min-width: 0; overflow-wrap: anywhere; }
+  .split-d summary span:first-child { min-width: 0; }
+  .sl-h > span:last-child { font-variant-numeric: tabular-nums; font-weight: 600; white-space: nowrap; }
+  .sl-i { display: flex; flex-wrap: wrap; gap: 4px 12px; margin-top: 3px; font-size: 12px; color: var(--muted); }
+  .sl-i em { font-style: normal; font-variant-numeric: tabular-nums; }
+  .sl-i small { font-size: 11px; }
+  em.pos { color: var(--ok); } em.neg { color: var(--late); }
+  .split-more { margin-top: 8px; padding: 6px 12px; font-size: 12.5px; }
   .acct { color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; }
   .chart { position: relative; min-width: 0; }
   .chart svg { display: block; width: 100%; height: 220px; overflow: visible; }
@@ -992,8 +1015,9 @@ function variacion(f = noFiltro) {
   const hasQty = a.cols.qty >= 0 && b.cols.qty >= 0;
   const porCuenta = new Map(), porEspecie = new Map();
   const add = (map, key, label, x) => {
-    const e = map.get(key) || { label, sub: '', anterior: 0, actual: 0, delta: 0, precio: 0, mov: 0 };
+    const e = map.get(key) || { label, sub: '', anterior: 0, actual: 0, delta: 0, precio: 0, mov: 0, items: [] };
     e.anterior += x.v0; e.actual += x.v1; e.delta += x.v1 - x.v0; e.precio += x.precio; e.mov += x.mov;
+    if (x.especie) e.items.push({ especie: x.especie, mov: x.mov, precio: x.precio, kind: x.kind });
     if (!e.sub && x.sub) e.sub = x.sub;
     map.set(key, e);
   };
@@ -1001,16 +1025,16 @@ function variacion(f = noFiltro) {
   for (const k of new Set([...a.pos.keys(), ...b.pos.keys()])) {
     const p1 = a.pos.get(k), p0 = b.pos.get(k);
     const v1 = p1?.usd || 0, v0 = p0?.usd || 0;
-    let m = 0;
-    if (!p0) m = v1;                         // posición nueva
-    else if (!p1) m = -v0;                   // posición cerrada
+    let m = 0, kind = '';
+    if (!p0) { m = v1; kind = 'nueva'; }                // posición nueva
+    else if (!p1) { m = -v0; kind = 'cerrada'; }        // posición cerrada
     else if (hasQty && p1.hasQ && p0.hasQ && p1.q) m = (p1.q - p0.q) * (v1 / p1.q);
-    const x = { v0, v1, mov: m, precio: v1 - v0 - m };
+    const x = { v0, v1, mov: m, precio: v1 - v0 - m, kind };
     precio += x.precio; mov += x.mov;
     const ref = p1 || p0;
     const kc = norm(ref.cuenta);
     const nombre = a.porCuenta.get(kc)?.nombre || b.porCuenta.get(kc)?.nombre || cuentas.find(c => norm(c.cuenta) === kc)?.nombre || '';
-    add(porCuenta, kc, nombre || `Cuenta ${ref.cuenta}`, { ...x, sub: nombre ? ref.cuenta : '' });
+    add(porCuenta, kc, nombre || `Cuenta ${ref.cuenta}`, { ...x, sub: nombre ? ref.cuenta : '', especie: ref.especie });
     add(porEspecie, norm(ref.especie), ref.especie, x);
   }
   return { actual: a.total, anterior: b.total, delta: a.total - b.total, precio, mov, hasQty, porCuenta, porEspecie };
@@ -1356,6 +1380,48 @@ function shareTable(entries, total, kind, attr) {
     </tbody></table>`;
 }
 
+// Desglose desplegable de la variación: qué comitentes (y qué activos) explican el precio o los movimientos
+const splitOpen = new Set();
+function splitDetalle(d, k, titulo) {
+  const MIN = 1;
+  const cli = [...d.porCuenta.values()].filter(e => Math.abs(e[k]) >= MIN).sort((a, b) => Math.abs(b[k]) - Math.abs(a[k]));
+  const sube = cli.filter(e => e[k] > 0).reduce((a, e) => a + e[k], 0), baja = cli.filter(e => e[k] < 0).reduce((a, e) => a + e[k], 0);
+  const qq = norm(splitQ[k] || '');
+  const vis = cli.filter(e => !qq || norm(e.label + ' ' + e.sub + ' ' + e.items.map(i => i.especie).join(' ')).includes(qq));
+  const show = vis.slice(0, splitTodos.has(k) ? vis.length : 25);
+  // Los fondos vienen con código numérico: se muestra el nombre corto
+  const infoA = valuar(tenencias)?.espInfo, infoB = valuar(tenPrev)?.espInfo;
+  const espName = e => { if (!/^\d+$/.test(e)) return e; const d = (infoA?.get(e) || infoB?.get(e))?.desc || ''; return d ? d.replace(/\s+(clase|cl\.)\s.*$/i, '').slice(0, 28) : e; };
+  const itemTxt = i => k === 'mov'
+    ? (i.kind === 'nueva' ? 'posición nueva' : i.kind === 'cerrada' ? 'posición cerrada' : i.mov > 0 ? 'compró / ingresó' : 'vendió / retiró')
+    : (i.precio > 0 ? 'subió' : 'bajó');
+  return `<details class="split-d" data-split="${k}" ${splitOpen.has(k) ? 'open' : ''}>
+    <summary><span>${titulo}</span><span class="${signCls(d[k])}">${fmtSigned(d[k])} USD <i class="chev" aria-hidden="true">▾</i></span></summary>
+    <div class="split-body">
+      <div class="split-res">${plural(cli.length, 'comitente', 'comitentes')} · suman <b class="pos">${fmtSigned(sube)}</b> y restan <b class="neg">${fmtSigned(baja)}</b> USD</div>
+      ${cli.length > 8 ? `<input class="search split-q" data-splitq="${k}" type="search" placeholder="Buscar comitente o activo…" value="${esc(splitQ[k] || '')}" autocomplete="off">` : ''}
+      <ul class="split-list">${show.map(e => {
+        const its = e.items.filter(i => Math.abs(i[k]) >= MIN).sort((a, b) => Math.abs(b[k]) - Math.abs(a[k]));
+        return `<li><div class="sl-h"><span><b>${esc(e.label)}</b>${e.sub ? ` <span class="acct">${esc(e.sub)}</span>` : ''}</span><span class="${signCls(e[k])}">${fmtSigned(e[k])}</span></div>
+          ${its.length ? `<div class="sl-i">${its.slice(0, 8).map(i => `<span>${esc(espName(i.especie))} <em class="${signCls(i[k])}">${fmtSigned(i[k])}</em> <small>${itemTxt(i)}</small></span>`).join('')}${its.length > 8 ? `<span class="muted">+${its.length - 8} más</span>` : ''}</div>` : ''}</li>`; }).join('') || '<li class="muted">Ningún comitente coincide.</li>'}</ul>
+      ${vis.length > show.length ? `<button class="btn ghost split-more" data-splitmore="${k}">Ver los ${vis.length} comitentes</button>` : ''}
+    </div></details>`;
+}
+const splitQ = {}, splitTodos = new Set();
+document.addEventListener('toggle', e => {
+  const dd = e.target.closest?.('[data-split]'); if (!dd) return;
+  if (dd.open) splitOpen.add(dd.dataset.split); else splitOpen.delete(dd.dataset.split);
+}, true);
+document.addEventListener('input', e => {
+  const k = e.target.dataset?.splitq; if (!k) return;
+  splitQ[k] = e.target.value; const pos = e.target.selectionStart;
+  render();
+  const el = document.querySelector(`[data-splitq="${k}"]`); if (el) { el.focus(); try { el.setSelectionRange(pos, pos); } catch {} }
+});
+document.addEventListener('click', e => {
+  const b = e.target.closest('[data-splitmore]'); if (!b) return;
+  splitTodos.add(b.dataset.splitmore); render();
+});
 function renderSummary() {
   const el = $('#summary');
   const all = valuar(tenencias);
@@ -1389,8 +1455,8 @@ function renderSummary() {
         ${v.needsTC ? `<div class="delta down">Faltan posiciones en pesos: cargá el tipo de cambio en Ajustes</div>` : ''}
         ${d ? `<div class="delta ${dir}">${dir === 'up' ? '▲' : dir === 'down' ? '▼' : '='} ${fmtSigned(d.delta)} USD (${fmtPct(d.delta, d.anterior)}) vs ${fmtDate(prevFecha)}</div>
           ${d.hasQty ? `<div class="split">
-            <div><span>Por precio (mercado y tipo de cambio)</span><span class="${signCls(d.precio)}">${fmtSigned(d.precio)} USD</span></div>
-            <div><span>Por movimientos (ingresos, retiros, compras y ventas)</span><span class="${signCls(d.mov)}">${fmtSigned(d.mov)} USD</span></div>
+            ${splitDetalle(d, 'precio', 'Por precio (mercado y tipo de cambio)')}
+            ${splitDetalle(d, 'mov', 'Por movimientos (ingresos, retiros, compras y ventas)')}
           </div>` : `<div class="meta">Para separar precio y movimientos, el Excel necesita una columna de cantidad.</div>`}`
         : `<div class="meta" style="margin-top:14px">Cuando cargues el próximo informe vas a ver cuánto subió o bajó y por qué.</div>`}
       </div>

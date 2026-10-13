@@ -62,6 +62,8 @@ La pestaña **Tenencia total** muestra el total en USD del último informe de te
 Arriba hay dos filtros: **Tipo de activo** (Obligaciones Negociables, Fondos, CEDEARS…) y **Activo** (AL30, GD30…).
 Al elegir uno se actualizan el total, el % sobre tu tenencia, el gráfico, la variación y la lista de clientes que lo tienen.
 El panel **Composición por tipo de activo** muestra cuánto pesa cada tipo; tocá una fila para filtrar.
+En el Resumen, **Por precio** y **Por movimientos** se despliegan con la flechita (▾) y muestran qué comitentes explican esa
+variación y con qué activos (compró / ingresó, vendió / retiró, posición nueva o cerrada), con buscador.
 Los mismos filtros están en **Tenencias detalladas**. El submenú de Tenencia total tiene: Resumen, Tenencias detalladas, En 0, Menos de 10.000 USD, SGR, Prospects, FAL y Notas Estructuradas (estas cuatro se siguen asignando con **+ pestaña** y se renombran o quitan desde **+**).
 
 En **Ajustes de tenencia** se elige qué columna es la valuación, la moneda, la cantidad y la especie, y se carga el
