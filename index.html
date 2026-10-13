@@ -534,12 +534,12 @@
 
 <!-- Alta / edición de reunión -->
 <dialog id="reuDlg">
-  <form method="dialog" id="reuForm">
+  <form method="dialog" id="reuForm" novalidate>
     <h2 id="reuTitle">Nueva reunión</h2>
     <div class="grid">
       <label class="full">Cliente<input id="r-cliente" list="taskClientes" placeholder="Buscar cliente…" autocomplete="off"></label>
       <label>Día *<input id="r-fecha" type="date" required></label>
-      <label>Hora<input id="r-hora" type="time"></label>
+      <label>Hora<input id="r-hora" type="text" inputmode="numeric" placeholder="Ej: 15:00" autocomplete="off"></label>
       <label class="full">Tema<input id="r-tema" placeholder="Ej: Revisión de cartera y rotación de SPY"></label>
       <label class="full">Notas<textarea id="r-notas" placeholder="Lo que se habló, lo que quedó pendiente…"></textarea></label>
     </div>
@@ -3378,13 +3378,24 @@ function openReu(r) {
 }
 $('#btnReu').addEventListener('click', () => openReu(null));
 $('#reuCancel').addEventListener('click', () => $('#reuDlg').close());
-$('#reuForm').addEventListener('submit', async () => {
-  const fecha = $('#r-fecha').value; if (!fecha) return;
+// Hora escrita libre: "15", "1500", "15:30", "15.30", "3pm", "3:30 p.m." → "HH:MM"
+function parseHora(v) {
+  v = norm(v).replace(/\s+/g, '').replace(/\./g, ':').replace(/hs?$/, '');
+  if (!v) return '';
+  const m = v.match(/^(\d{1,2})(?::?(\d{2}))?(am|pm|a:?m:?|p:?m:?)?$/); if (!m) return null;
+  let h = +m[1]; const mi = +(m[2] || 0), ap = (m[3] || '').replace(/:/g, '');
+  if (ap === 'pm' && h < 12) h += 12; if (ap === 'am' && h === 12) h = 0;
+  return h > 23 || mi > 59 ? null : `${String(h).padStart(2, '0')}:${String(mi).padStart(2, '0')}`;
+}
+$('#reuForm').addEventListener('submit', async e => {
+  const fecha = $('#r-fecha').value;
+  const hora = parseHora($('#r-hora').value);
+  if (!fecha || hora === null) { e.preventDefault(); toast(!fecha ? 'Elegí el día de la reunión' : 'Escribí la hora así: 15:00'); (!fecha ? $('#r-fecha') : $('#r-hora')).focus(); return; }
   const cliente = $('#r-cliente').value.trim();
   const c = cliente ? cuentas.find(x => norm(x.nombre) === norm(cliente)) : null;
   const prev = editingReu ? reuniones.find(x => x.id === editingReu) : null;
   const r = { ...(prev || { id: uid(), hecha: false, creado: new Date().toISOString() }), cliente: c ? c.nombre : cliente, cuentaId: c?.id || '',
-    fecha, hora: $('#r-hora').value, tema: $('#r-tema').value.trim(), notas: $('#r-notas').value.trim() };
+    fecha, hora, tema: $('#r-tema').value.trim(), notas: $('#r-notas').value.trim() };
   // Una reunión nueva con fecha pasada ya fue: queda hecha y cuenta como contacto con el cliente
   const pasada = !prev && fecha < today();
   if (pasada) r.hecha = true;
