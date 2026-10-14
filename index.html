@@ -372,6 +372,10 @@
   .lic-card { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; }
   .lic-top { display: flex; flex-wrap: wrap; gap: 10px 16px; align-items: flex-start; justify-content: space-between; padding: 16px 16px 6px; }
   .lic-top h3 { margin: 0; font: 600 19px var(--font-display); text-wrap: balance; }
+  .lic-tit { flex: 1 1 260px; min-width: 0; }
+  .lic-titulo { width: 100%; max-width: 520px; box-sizing: border-box; font: 600 21px var(--font-display); color: var(--text); background: transparent; border: 1px dashed var(--border); border-radius: 8px; padding: 5px 9px; margin-left: -10px; }
+  .lic-titulo:hover { border-color: var(--muted); } .lic-titulo:focus { outline: none; border-style: solid; border-color: var(--accent); background: var(--bg); }
+  .lic-titulo::placeholder { color: var(--muted); font-weight: 500; }
   .lic-meta { display: flex; flex-wrap: wrap; gap: 6px 14px; color: var(--muted); font-size: 12.5px; margin-top: 4px; }
   .lic-meta .cierre { font-weight: 600; color: var(--text); } .lic-meta .cierre.urg { color: var(--late); } .lic-meta .cierre.fin { color: var(--muted); font-weight: 500; }
   .lic-acts { display: flex; flex-wrap: wrap; gap: 6px; }
@@ -697,7 +701,7 @@
   <form method="dialog" id="licForm" novalidate>
     <h2 id="licTitle">Nueva licitación</h2>
     <div class="grid">
-      <label class="full">Nombre *<input id="l-nombre" placeholder="Ej: LECAP enero 2027" autocomplete="off"></label>
+      <label class="full">Título<input id="l-nombre" placeholder="Ej: S29E7 o LECAP enero 2027" autocomplete="off"></label>
       <label>Instrumento<input id="l-instr" placeholder="Ej: S29E7" autocomplete="off"></label>
       <label>Cierre<input id="l-cierre" type="date"></label>
       <label>Moneda<select id="l-moneda"><option value="ARS">Pesos</option><option value="USD">Dólares</option></select></label>
@@ -3080,6 +3084,7 @@ $('#tareasBox').addEventListener('click', async e => {
 
 // ---------- Licitaciones ----------
 const licHoy = () => today();
+const licTit = l => l?.nombre || 'la licitación sin título';
 const licAbiertas = () => licitaciones.filter(l => !l.cierre || l.cierre >= licHoy());
 // Abiertas primero (la que cierra antes arriba), después las cerradas (la más reciente arriba)
 const licOrden = () => [...licitaciones].sort((a, b) => {
@@ -3141,6 +3146,7 @@ function setLicit(html) {
   const box = $('#licit'), ae = document.activeElement;
   // Conserva lo que se está escribiendo aunque llegue una actualización de la base
   const keep = {}; for (const id of ['licCli', 'licMonto', 'licCom', 'licQ']) { const el = box.querySelector('#' + id); if (el) keep[id] = el.value; }
+  const tit = box.querySelector('#licTitulo'); if (tit && ae === tit && box.querySelector('[data-lic]')?.dataset.lic === licSel) keep.licTitulo = tit.value;
   const foc = ae && box.contains(ae) ? { id: ae.id, iid: ae.closest?.('[data-iid]')?.dataset.iid, f: ae.dataset?.lf, v: ae.value, sel: ae.selectionStart } : null;
   box.innerHTML = html;
   for (const [id, v] of Object.entries(keep)) { const el = box.querySelector('#' + id); if (el) el.value = v; }
@@ -3163,9 +3169,9 @@ function licLogHtml() {
 function licPropHtml(t, i) {
   const dest = licitaciones.find(l => norm(l.nombre) === norm(t.prop.licitacion)) || licitaciones.find(l => l.id === licSel);
   const its = t.prop.items;
-  return `<div class="lic-prop"><b>${plural(its.length, 'comitente', 'comitentes')} para ${dest ? esc(dest.nombre) : 'una licitación'}</b>
+  return `<div class="lic-prop"><b>${plural(its.length, 'comitente', 'comitentes')} para ${dest ? esc(licTit(dest)) : 'una licitación'}</b>
     <ul>${its.map(x => `<li>${esc(x.cuenta || '')} ${esc(x.cliente || '')}${x.monto ? ' · ' + licFmt(x.monto, dest?.moneda) : ''}${x.comision !== '' && x.comision != null ? ' · ' + licPct(x.comision) + '%' : ''}</li>`).join('')}</ul>
-    ${t.estado === 'pendiente' ? (dest ? `<div class="row"><button class="btn primary" data-lprop="${i}" data-lid="${esc(dest.id)}">Agregar a ${esc(dest.nombre)}</button><button class="btn ghost" data-lprop-no="${i}">Descartar</button></div>` : '<span class="note">Creá primero la licitación para poder sumarlos.</span>')
+    ${t.estado === 'pendiente' ? (dest ? `<div class="row"><button class="btn primary" data-lprop="${i}" data-lid="${esc(dest.id)}">Agregar a ${esc(licTit(dest))}</button><button class="btn ghost" data-lprop-no="${i}">Descartar</button></div>` : '<span class="note">Creá primero la licitación para poder sumarlos.</span>')
       : `<span class="note">${t.estado === 'agregados' ? 'Agregados ✓' : 'Descartados'}</span>`}</div>`;
 }
 function licSeparar(text) {
@@ -3180,15 +3186,15 @@ async function renderLicit() {
   if (!lista.some(l => l.id === licSel)) licSel = lista[0]?.id || null;
   const l = lista.find(x => x.id === licSel);
   const pills = lista.length ? `<div class="lic-pills" role="tablist">${lista.map(x => { const ab = !x.cierre || x.cierre >= licHoy();
-    return `<button type="button" role="tab" class="${x.id === licSel ? 'on' : ''} ${ab ? '' : 'cerrada'}" data-lsel="${esc(x.id)}" aria-selected="${x.id === licSel}">${esc(x.nombre)}<span class="n">${(x.items || []).length}${x.cierre ? ' · ' + fmtDate(x.cierre).slice(0, 5) : ''}</span></button>`; }).join('')}</div>` : '';
+    return `<button type="button" role="tab" class="${x.id === licSel ? 'on' : ''} ${ab ? '' : 'cerrada'}" data-lsel="${esc(x.id)}" aria-selected="${x.id === licSel}">${esc(x.nombre || 'Sin título')}<span class="n">${(x.items || []).length}${x.cierre ? ' · ' + fmtDate(x.cierre).slice(0, 5) : ''}</span></button>`; }).join('')}</div>` : '';
   let card = '';
   if (l) {
     const ci = licCierreTxt(l), tt = licTot(l), mon = l.moneda || 'ARS';
     const items = [...(l.items || [])];
     card = `<div class="lic-card" data-lic="${esc(l.id)}">
-      <div class="lic-top"><div><h3>${esc(l.nombre)}</h3>
+      <div class="lic-top"><div class="lic-tit"><input id="licTitulo" class="lic-titulo" value="${esc(l.nombre || '')}" placeholder="Escribí el título, ej: S29E7" aria-label="Título de la licitación" autocomplete="off">
         <div class="lic-meta"><span class="cierre ${ci.cls}">${esc(ci.txt)}</span>${l.instrumento ? `<span>${esc(l.instrumento)}</span>` : ''}<span>${mon === 'USD' ? 'En dólares' : 'En pesos'}</span>${l.comDef !== '' && l.comDef != null ? `<span>Comisión por defecto ${licPct(l.comDef)}%</span>` : ''}</div></div>
-        <div class="lic-acts"><button class="btn ghost" data-lact="xls">⬇ Excel</button><button class="btn ghost" data-lact="editar">Editar</button><button class="btn ghost" data-lact="borrar">Eliminar</button></div></div>
+        <div class="lic-acts"><button class="btn ghost" data-lact="xls">⬇ Excel</button><button class="btn ghost" data-lact="editar">Más datos</button><button class="btn ghost" data-lact="borrar">Eliminar</button></div></div>
       ${l.notas ? `<div class="lic-notas">${esc(l.notas)}</div>` : ''}
       <div class="lic-sum"><div><b>${tt.n}</b><span>comitentes</span></div><div><b>${licFmt(tt.monto, mon)}</b><span>monto a licitar</span></div><div><b>${licFmt(tt.com, mon)}</b><span>comisión estimada</span></div><div><b>${tt.conf} / ${(l.items || []).length}</b><span>confirmados</span></div></div>
       <form class="lic-add" id="licAddForm" autocomplete="off">
@@ -3233,7 +3239,7 @@ async function renderLicit() {
 let editingLic = null;
 function openLic(l) {
   editingLic = l ? l.id : null;
-  $('#licTitle').textContent = l ? 'Editar licitación' : 'Nueva licitación';
+  $('#licTitle').textContent = l ? 'Datos de la licitación' : 'Nueva licitación';
   $('#licForm').reset();
   $('#l-nombre').value = l?.nombre || '';
   $('#l-instr').value = l?.instrumento || '';
@@ -3242,7 +3248,7 @@ function openLic(l) {
   $('#l-com').value = licPct(l?.comDef);
   $('#l-notas').value = l?.notas || '';
   const otras = licOrden().filter(x => x.id !== l?.id && (x.items || []).length);
-  $('#l-copia').innerHTML = '<option value="">No copiar</option>' + otras.map(x => `<option value="${esc(x.id)}">${esc(x.nombre)} (${plural(x.items.length, 'comitente', 'comitentes')})</option>`).join('');
+  $('#l-copia').innerHTML = '<option value="">No copiar</option>' + otras.map(x => `<option value="${esc(x.id)}">${esc(licTit(x))} (${plural(x.items.length, 'comitente', 'comitentes')})</option>`).join('');
   $('#l-copiaWrap').hidden = !otras.length;
   $('#licDlg').showModal();
   $('#l-nombre').focus();
@@ -3250,7 +3256,6 @@ function openLic(l) {
 $('#licCancel').addEventListener('click', () => $('#licDlg').close());
 $('#licForm').addEventListener('submit', async e => {
   const nombre = $('#l-nombre').value.trim();
-  if (!nombre) { e.preventDefault(); toast('Poné un nombre a la licitación (ej: LECAP enero 2027)'); $('#l-nombre').focus(); return; }
   const com = $('#l-com').value.trim() ? parseMonto($('#l-com').value) : '';
   if (com !== '' && isNaN(com)) { e.preventDefault(); toast('Escribí la comisión como número, ej: 0,5'); $('#l-com').focus(); return; }
   const prev = editingLic ? licitaciones.find(x => x.id === editingLic) : null;
@@ -3262,7 +3267,7 @@ $('#licForm').addEventListener('submit', async e => {
   licSel = l.id;
   render();
   await saveLic(l);
-  toast(prev ? 'Licitación actualizada' : `Licitación creada${copiados ? ` con ${plural(copiados, 'comitente', 'comitentes')} copiados de ${src.nombre}` : ''}`);
+  toast(copiados ? `${plural(copiados, 'comitente copiado', 'comitentes copiados')} de ${licTit(src)}` : prev ? 'Licitación actualizada' : `Licitación creada${copiados ? ` con ${plural(copiados, 'comitente', 'comitentes')} copiados de ${licTit(src)}` : ''}`);
 });
 // ---- Acciones dentro de la pestaña ----
 $('#licit').addEventListener('click', async e => {
@@ -3281,25 +3286,30 @@ $('#licit').addEventListener('click', async e => {
     }
     t.estado = 'agregados'; try { localStorage.setItem(LOCAL_LIC_IA, JSON.stringify(licTurns.slice(-20))); } catch {}
     licSel = l.id; render(); await saveLic(l);
-    toast(n ? `${plural(n, 'comitente sumado', 'comitentes sumados')} a ${l.nombre}${u ? ` · ${u} ya estaba${u > 1 ? 'n' : ''}` : ''}` : `Ya estaba${u > 1 ? 'n' : ''} en ${l.nombre}`);
+    toast(n ? `${plural(n, 'comitente sumado', 'comitentes sumados')} a ${licTit(l)}${u ? ` · ${u} ya estaba${u > 1 ? 'n' : ''}` : ''}` : `Ya estaba${u > 1 ? 'n' : ''} en ${licTit(l)}`);
     return;
   }
   const prn = e.target.closest('[data-lprop-no]');
   if (prn) { const t = licTurns[Number(prn.dataset.lpropNo)]; if (t) { t.estado = 'descartados'; try { localStorage.setItem(LOCAL_LIC_IA, JSON.stringify(licTurns.slice(-20))); } catch {} render(); } return; }
   const b = e.target.closest('[data-lact]'); if (!b) return;
   const act = b.dataset.lact;
-  if (act === 'nueva') { openLic(null); return; }
+  if (act === 'nueva') {
+    const l = { id: uid(), creado: new Date().toISOString(), nombre: '', instrumento: '', cierre: '', moneda: 'ARS', comDef: '', notas: '', items: [] };
+    licitaciones = [...licitaciones, l]; licSel = l.id; render(); $('#licTitulo')?.focus();
+    await saveLic(l);
+    return;
+  }
   const l = licitaciones.find(x => x.id === licSel); if (!l) return;
   if (act === 'editar') openLic(l);
   else if (act === 'borrar') {
-    if (!await confirmAsk('Eliminar licitación', `¿Eliminar "${l.nombre}" con ${plural((l.items || []).length, 'comitente', 'comitentes')}?`, 'Eliminar')) return;
+    if (!await confirmAsk('Eliminar licitación', `¿Eliminar "${licTit(l)}" con ${plural((l.items || []).length, 'comitente', 'comitentes')}?`, 'Eliminar')) return;
     licitaciones = licitaciones.filter(x => x.id !== l.id); licSel = null; render();
     if (licRef) await write(() => licRef.doc(l.id).delete()); else saveLocal();
     toast('Licitación eliminada');
   } else if (act === 'quitar') {
     const iid = b.closest('[data-iid]')?.dataset.iid, it = (l.items || []).find(x => x.id === iid); if (!it) return;
     l.items = l.items.filter(x => x.id !== iid); render(); await saveLic(l);
-    toast(`${licNombre(it)} salió de ${l.nombre}`);
+    toast(`${licNombre(it)} salió de ${licTit(l)}`);
   } else if (act === 'xls') {
     const mon = l.moneda === 'USD' ? 'USD' : '$';
     const filas = (l.items || []).map(it => ({ 'N° de cuenta': licCuenta(it), 'Comitente': licNombre(it), [`Monto (${mon})`]: Number(it.monto) || 0, 'Comisión %': it.comision === '' ? null : Number(it.comision), [`Comisión (${mon})`]: Math.round(licComMonto(it) * 100) / 100, 'Estado': LIC_ESTADOS.find(x => x.id === it.estado)?.label || '', 'Notas': it.nota || '' }));
@@ -3308,6 +3318,12 @@ $('#licit').addEventListener('click', async e => {
   }
 });
 $('#licit').addEventListener('change', async e => {
+  if (e.target.id === 'licTitulo') {
+    const l = licitaciones.find(x => x.id === licSel); if (!l) return;
+    l.nombre = e.target.value.trim(); render(); await saveLic(l);
+    if (l.nombre) toast(`Título guardado: ${licTit(l)}`);
+    return;
+  }
   const f = e.target.dataset?.lf; if (!f) return;
   const l = licitaciones.find(x => x.id === licSel), it = l?.items?.find(x => x.id === e.target.closest('[data-iid]')?.dataset.iid); if (!it) return;
   if (f === 'monto' || f === 'comision') {
@@ -3334,11 +3350,12 @@ $('#licit').addEventListener('submit', async e => {
   $('#licCli').value = ''; $('#licMonto').value = ''; $('#licCom').value = '';
   render(); $('#licCli')?.focus();
   await saveLic(l);
-  toast(r === 'nuevo' ? `${c ? c.nombre : txt} sumado a ${l.nombre}${c ? '' : ' (no está en tu base de clientes)'}` : `${c ? c.nombre : txt} ya estaba: se actualizó el monto`);
+  toast(r === 'nuevo' ? `${c ? c.nombre : txt} sumado a ${licTit(l)}${c ? '' : ' (no está en tu base de clientes)'}` : `${c ? c.nombre : txt} ya estaba: se actualizó el monto`);
 });
 $('#licit').addEventListener('keydown', e => {
   if (e.target.id === 'licQ' && e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); licPreguntar(e.target.value); }
   if (e.target.matches?.('table.lic input') && e.key === 'Enter') { e.preventDefault(); e.target.blur(); }
+  if (e.target.id === 'licTitulo' && e.key === 'Enter') { e.preventDefault(); e.target.blur(); $('#licCli')?.focus(); }
 });
 const LIC_REGLAS = `Sos el asistente de Micaela Graciano, asesora financiera en MAX Capital (Argentina), para armar y seguir licitaciones (LECAP, bonos, ONs, letras). Le respondés en español rioplatense, claro y corto.
 Reglas:

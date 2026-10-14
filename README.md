@@ -21,8 +21,8 @@ Panel para registrar tu base de cuentas, en un solo archivo (`index.html`).
   o punto amarillo (pendiente); con **Ordenar** se agrupan por color (amarillas, verdes, rojas o sin marcar primero). Marcar la aprobación (cualquiera de las tres) o hacer la tarea actualiza
   "Última vez contactado" del cliente a hoy;
   tocar el marcado lo desmarca. Se guardan en la base del panel (colección `tareas`).
-- **Licitaciones:** pestaña propia. **+ Nueva licitación** (nombre, instrumento, cierre, moneda, comisión % por defecto; puede
-  copiar los comitentes de otra). En cada una se anotan comitentes con monto y comisión %; la comisión estimada y los totales se
+- **Licitaciones:** pestaña propia. **+ Nueva licitación** crea una y deja escribir el título ahí mismo (ej: S29E7); en **Más datos**
+  van cierre, moneda, comisión % por defecto, notas y copiar los comitentes de otra. En cada una se anotan comitentes con monto y comisión %; la comisión estimada y los totales se
   calculan solos, cada comitente tiene estado (a confirmar, confirmó, orden cargada, adjudicada, no entró) y notas, y se baja en Excel.
   Abajo, **Preguntale a la IA** responde con tenencias (con la moneda de cada activo), rendimientos y licitaciones, y puede proponer
   comitentes para sumar a una licitación (ella confirma). Colección `licitaciones`.
