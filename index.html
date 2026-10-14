@@ -155,6 +155,7 @@
   .tk-est.hecha { background: var(--ok-bg); border-color: transparent; color: var(--ok); }
   .tk-body { flex: 1; min-width: 0; }
   .tk-text { border: none; background: none; padding: 0; font: 500 14px var(--font-body); color: var(--text); text-align: left; cursor: pointer; overflow-wrap: anywhere; }
+  .tk-hecha { background: var(--ok-bg); color: var(--ok); font-weight: 600; padding: 2px 8px; border-radius: 5px; }
   .tk-meta { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; align-items: center; font-size: 12px; color: var(--muted); }
   .tk-due { font: 600 11.5px var(--font-body); padding: 2px 8px; border-radius: 999px; background: var(--soft); color: var(--muted); }
   .tk-due.late { background: var(--late-bg); color: var(--late); }
@@ -607,6 +608,7 @@
       <label>Cliente (opcional)<input id="t-cliente" name="cliente" list="taskClientes" placeholder="Buscar cliente…" autocomplete="off"></label>
       <label>Para cuándo<input id="t-vence" name="vence" type="date"></label>
       <label>Estado<select id="t-estado" name="estado"><option value="sin">Sin hacer</option><option value="pend">Pendiente</option><option value="hecha">Hecha ✓</option></select></label>
+      <label id="t-hechaWrap" hidden>Hecha el<input id="t-hechaEl" type="date"></label>
     </div>
     <datalist id="taskClientes"></datalist>
     <div class="dialog-actions">
@@ -2631,7 +2633,7 @@ function tareaItem(t) {
   const meta = [
     cli ? `<span class="chip">${esc(cli)}</span>` : '',
     v && !t.hecha ? `<span class="tk-due ${v.cls}">${esc(v.text)}</span>` : '',
-    t.hecha && t.hechaEl ? `<span>Hecha el ${esc(fmtDate(t.hechaEl))}</span>` : '',
+    t.hecha ? `<span class="tk-hecha">✓ ${t.hechaEl ? `Hecha el ${esc(fmtDate(t.hechaEl))}` : 'Hecha'}</span>` : '',
   ].join('');
   return `<li class="tk ${t.hecha ? 'done' : ''} ${t.aprobacion ? 'ap-' + t.aprobacion : ''}" data-tid="${esc(t.id)}">
     <button class="tk-est ${est.id}" data-tact="estado" title="Cambiar estado (${esc(est.label)} → ${esc(sig.label)})" aria-label="Estado: ${esc(est.label)}. Tocar para pasar a ${esc(sig.label)}"><span class="ic" aria-hidden="true">${est.id === 'hecha' ? '✓' : ''}</span>${esc(est.label)}</button>
@@ -2742,10 +2744,13 @@ function openTask(t) {
   $('#t-cliente').value = t ? tareaCliente(t) : '';
   $('#t-vence').value = t?.vence || '';
   $('#t-estado').value = t ? estadoDe(t) : 'sin';
+  $('#t-hechaEl').value = t?.hechaEl || '';
+  $('#t-hechaWrap').hidden = $('#t-estado').value !== 'hecha';
   $('#taskDlg').showModal();
   $('#t-texto').focus();
 }
 $('#btnTask').addEventListener('click', () => openTask(null));
+$('#t-estado').addEventListener('change', e => { $('#t-hechaWrap').hidden = e.target.value !== 'hecha'; if (e.target.value === 'hecha' && !$('#t-hechaEl').value) $('#t-hechaEl').value = today(); });
 $('#taskCancel').addEventListener('click', () => $('#taskDlg').close());
 taskForm.addEventListener('submit', async () => {
   const texto = $('#t-texto').value.trim();
@@ -2755,6 +2760,7 @@ taskForm.addEventListener('submit', async () => {
   const prev = editingTask ? tareas.find(x => x.id === editingTask) : null;
   const t = { ...(prev || { id: uid(), hechaEl: '', creado: new Date().toISOString() }), texto, cuentaId: c?.id || '', cliente: c ? c.nombre : cliente, vence: $('#t-vence').value };
   setEstado(t, $('#t-estado').value);
+  if (t.hecha && $('#t-hechaEl').value) t.hechaEl = $('#t-hechaEl').value;
   let fin = t, unida = false;
   if (prev || t.hecha) tareas = [...tareas.filter(x => x.id !== t.id), t];
   else ({ t: fin, unida } = sumarTarea(t));
