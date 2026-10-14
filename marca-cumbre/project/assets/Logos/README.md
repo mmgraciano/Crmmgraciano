@@ -1,8 +1,8 @@
 # Logos
 
-El isotipo de Cumbre: una cumbre con un pico secundario sobre una línea de firma en latón.
+El isotipo de Cumbre: una cordillera dibujada como la línea de una cotización, con un punto de latón en el pico.
 
-- `cumbre-mark-pizarra.svg`: pico en `pizarra` (#1B2D44), línea en `laton` (#8A6A2E). Sobre `paper` y `surface` del tema claro.
-- `cumbre-mark-claro.svg`: pico en `ink` oscuro (#E8EAE6), línea en `laton` oscuro (#CDAE70). Sobre `paper`, `surface` o un fondo `pizarra` del tema claro.
+- `cumbre-isotipo-tinta.svg`: línea en `ink` (#14202e), punto en `laton` (#8a6a2e). Sobre `paper` y `celeste`.
+- `cumbre-isotipo-blanco.svg`: línea blanca (#ffffff), punto en `laton-on-dark` (#cdae70). Sobre `pizarra`.
 
-El nombre no está dibujado: se compone con la fuente `display` (ver el componente Logo). Tamaño mínimo del isotipo: 20px. Dejá a su alrededor un margen libre igual a la mitad de su ancho.
+El nombre no está dibujado: se compone con tipografía, "Cumbre" en `sans` 700 y "Wealth Management" en `display` 300 (ver el componente Logo). Tamaño mínimo del isotipo: 24px de ancho. Dejá a su alrededor un margen libre igual a la mitad de su ancho.

@@ -4,44 +4,45 @@
 <head>
 <meta charset="utf-8">
 <title>Cumbre Wealth Management</title>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Libre+Caslon+Text:ital,wght@0,400;0,700;1,400&family=Public+Sans:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@700&family=Newsreader:opsz,wght@6..72,300&display=swap">
 <style>
   html, body { margin:0; height:100%; }
-  body { background:var(--paper); color:var(--ink); font-family:var(--font-sans); overflow:hidden; }
+  body { background:var(--celeste); color:var(--ink); font-family:var(--font-sans); overflow:hidden; }
   .cover { position:relative; width:960px; height:288px; overflow:hidden; }
-  .band { position:absolute; top:0; left:0; width:960px; height:112px; }
-  .band svg { display:block; width:960px; height:112px; }
-  .piz { fill:var(--pizarra); }
-  .soft { fill:var(--pizarra-soft); }
-  .lat { fill:var(--laton); }
-  .deep { fill:var(--ink); }
-  .ground { fill:var(--paper); }
-  .blk { rx:var(--radius-sm); }
+  .band { position:absolute; top:0; left:0; width:960px; height:120px; }
+  .band svg { display:block; width:960px; height:120px; }
+  .mountain { fill:var(--pizarra); }
+  .horizon { fill:none; stroke:var(--ink); stroke-width:1.5; stroke-linejoin:round; }
+  .row { fill:none; stroke:var(--celeste); stroke-width:1; stroke-linejoin:round; }
+  .row.a { stroke-opacity:.22; }
+  .row.b { stroke-opacity:.4; }
+  .dot { fill:var(--laton); }
   .words { position:absolute; left:var(--space-12); right:var(--space-12); bottom:var(--space-8); }
-  .name { margin:0; font-family:var(--font-display); font-weight:400; font-size:64px; line-height:.95; letter-spacing:-.01em; color:var(--ink); white-space:nowrap; }
-  .tag { margin:var(--space-2) 0 0 2px; font-size:14px; line-height:20px; color:var(--ink-muted); max-width:440px; }
+  .name { margin:0; font-weight:700; font-size:64px; line-height:.95; letter-spacing:-.05em; color:var(--ink); white-space:nowrap; }
+  .name em { font-family:var(--font-display); font-style:normal; font-weight:300; letter-spacing:-.03em; }
+  .tag { margin:var(--space-2) 0 0 2px; font-size:14px; line-height:20px; color:var(--ink-soft); max-width:440px; }
 </style>
 </head>
 <body>
 <div class="cover">
 <div class="band" aria-hidden="true">
-<svg viewBox="0 0 960 112" width="960" height="112">
+<svg viewBox="0 0 960 120" width="960" height="120">
 <!--
-  blocks      pizarra 512×120 (la marca, el bloque mayor) · laton 64×72 (la firma, chico) · pizarra-soft 192×120 (alivio) · ink 152×120 sangrando a la derecha — ≈37% de 960×288
-  arrangement franja de bandas desiguales sangrando arriba, separadas por space-4, como los lomos de un archivo
-  pattern     silueta de cumbres recortada en paper desde la base del bloque pizarra: el motivo literal del nombre, como el isotipo
-  scales      lados en múltiplos de space-4 y space-8; separación space-4; esquinas radius-sm; picos a 48/64/72px de altura en pasos de space-2
+  blocks      celeste ground (el cielo, toda la portada) · pizarra cordillera de 960 de ancho y 8 a 112 de alto (la montaña, el bloque mayor) · laton un solo punto de 12px en el pico — ≈30% de 960×288 en pizarra
+  arrangement una franja superior de lado a lado: la cordillera escalonada sangra por los dos bordes, el nombre debajo sobre el cielo
+  pattern     líneas de cotización: el horizonte en ink y dos filas celeste dentro de la montaña, el motivo literal de la marca ("la cumbre se dibuja como la línea de un gráfico de mercado")
+  scales      tramos planos de 20 a 40px, el pico a space-2 del borde superior, nombre a space-12 del borde izquierdo y space-8 del inferior
 -->
-<rect class="piz blk" x="0" y="-8" width="512" height="120" rx="2"/>
-<polygon class="ground" points="0,112 112,64 160,88 256,40 312,80 360,56 480,112"/>
-<rect class="lat blk" x="528" y="-8" width="64" height="72" rx="2"/>
-<rect class="soft blk" x="608" y="-8" width="192" height="120" rx="2"/>
-<rect class="deep blk" x="816" y="-8" width="152" height="120" rx="2"/>
+<polygon class="mountain" points="0,96 40,96 64,84 96,84 120,90 160,62 184,62 216,40 240,40 268,58 300,50 330,24 352,24 372,8 392,8 416,36 440,30 470,52 500,46 540,70 580,64 620,80 660,72 700,88 760,82 800,94 860,90 900,100 960,98 960,120 0,120"></polygon>
+<polyline class="row a" points="0,104.2 40,104.2 64,96.2 96,96.2 120,100.2 160,81.7 184,81.7 216,67.2 240,67.2 268,79.1 300,73.8 330,56.6 352,56.6 372,46.1 392,46.1 416,64.6 440,60.6 470,75.1 500,71.2 540,87.0 580,83.0 620,93.6 660,88.3 700,98.9 760,94.9 800,102.8 860,100.2 900,106.8 960,105.5"></polyline>
+<polyline class="row b" points="0,111.4 40,111.4 64,107.0 96,107.0 120,109.2 160,99.1 184,99.1 216,91.2 240,91.2 268,97.7 300,94.8 330,85.4 352,85.4 372,79.7 392,79.7 416,89.8 440,87.6 470,95.5 500,93.4 540,102.0 580,99.8 620,105.6 660,102.7 700,108.5 760,106.3 800,110.6 860,109.2 900,112.8 960,112.1"></polyline>
+<polyline class="horizon" points="0,96 40,96 64,84 96,84 120,90 160,62 184,62 216,40 240,40 268,58 300,50 330,24 352,24 372,8 392,8 416,36 440,30 470,52 500,46 540,70 580,64 620,80 660,72 700,88 760,82 800,94 860,90 900,100 960,98"></polyline>
+<circle class="dot" cx="382" cy="8" r="6"></circle>
 </svg>
 </div>
 <div class="words">
-  <h1 class="name">Cumbre Wealth Management</h1>
-  <p class="tag">Patrimonio, mandatos y documentos en orden.</p>
+  <h1 class="name">Cumbre <em>Wealth Management</em></h1>
+  <p class="tag">Patrimonio con perspectiva: decisiones con método, por escrito y a largo plazo.</p>
 </div>
 </div>
 </body>
