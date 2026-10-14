@@ -1,0 +1,14 @@
+<!-- @dsCard group="Formularios" height=128 -->
+<!doctype html>
+<html lang="es">
+<head><meta charset="utf-8"><title>Field</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Libre+Caslon+Text:ital,wght@0,400;0,700;1,400&family=Public+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px;padding:16px}</style></head>
+<body class="cu">
+<div class="grid">
+  <div class="cu-field"><label for="f-cli">Comitente</label><input id="f-cli" value="Laffitte, Ana María"><span class="help">Como figura en el poder.</span></div>
+  <div class="cu-field"><label for="f-cta">N° de cuenta</label><input id="f-cta" class="mono" value="12915"></div>
+  <div class="cu-field invalid"><label for="f-ven">Vencimiento</label><input id="f-ven" value="31/02/2026"><span class="help">Esa fecha no existe. Usá dd/mm/aaaa.</span></div>
+</div>
+</body>
+</html>

@@ -1,0 +1,78 @@
+/* Cumbre — componentes en CSS puro. Cada color sale de tokens.css. */
+.cu, .cu * { box-sizing: border-box; }
+.cu { font: 400 15px/23px var(--font-sans); color: var(--ink); background: var(--paper); -webkit-font-smoothing: antialiased; }
+.cu-row { display: flex; flex-wrap: wrap; gap: var(--space-2); align-items: center; padding: var(--space-4); }
+.cu-stack { display: flex; flex-direction: column; gap: var(--space-4); padding: var(--space-4); }
+.cu :focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+
+/* Logo */
+.cu-logo { display: inline-flex; align-items: center; gap: var(--space-3); color: var(--ink); }
+.cu-logo img { width: 40px; height: 40px; display: block; }
+.cu-logo-name { font: 400 22px/1 var(--font-display); letter-spacing: .01em; }
+.cu-logo-sub { display: block; margin-top: 5px; font: 600 10px/1 var(--font-sans); letter-spacing: .24em; text-transform: uppercase; color: var(--laton); }
+.cu-logo.on-pizarra { background: var(--pizarra); color: var(--on-pizarra); padding: var(--space-4) var(--space-6); border-radius: var(--radius-md); }
+.cu-logo.on-pizarra .cu-logo-sub { color: var(--on-pizarra); opacity: .8; }
+
+/* Button */
+.cu-btn { display: inline-flex; align-items: center; gap: var(--space-2); min-height: 40px; padding: 0 var(--space-4);
+  font: 600 14px/1 var(--font-sans); letter-spacing: .01em; border-radius: var(--radius-sm); border: 1px solid transparent; cursor: pointer;
+  background: var(--surface); color: var(--ink); border-color: var(--line-strong); }
+.cu-btn:hover { background: var(--surface-sunken); }
+.cu-btn.primary { background: var(--pizarra); border-color: var(--pizarra); color: var(--on-pizarra); }
+.cu-btn.primary:hover { filter: brightness(1.12); }
+.cu-btn.quiet { background: transparent; border-color: transparent; color: var(--pizarra); text-decoration: underline; text-underline-offset: 4px; text-decoration-thickness: 1px; }
+.cu-btn.danger { background: var(--lacre-soft); border-color: var(--lacre-soft); color: var(--lacre); }
+.cu-btn[disabled] { opacity: .45; cursor: not-allowed; filter: none; }
+
+/* Badge */
+.cu-badge { display: inline-flex; align-items: center; gap: 6px; padding: 3px 8px; border-radius: var(--radius-sm);
+  font: 600 11px/16px var(--font-sans); letter-spacing: .06em; text-transform: uppercase; background: var(--pizarra-soft); color: var(--pizarra); white-space: nowrap; }
+.cu-badge::before { content: ""; width: 6px; height: 6px; background: currentColor; border-radius: 1px; }
+.cu-badge.ok { background: var(--ok-soft); color: var(--ok); }
+.cu-badge.warn { background: var(--warn-soft); color: var(--warn); }
+.cu-badge.lacre { background: var(--lacre-soft); color: var(--lacre); }
+.cu-badge.firmado { background: var(--laton-soft); color: var(--laton-ink); }
+.cu-badge.firmado::before { width: 8px; height: 8px; border-radius: 50%; background: transparent; border: 1.5px solid currentColor; }
+
+/* Field */
+.cu-field { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.cu-field label { font: 600 11px/16px var(--font-sans); letter-spacing: .08em; text-transform: uppercase; color: var(--ink-muted); }
+.cu-field input, .cu-field select, .cu-field textarea { width: 100%; min-height: 40px; padding: 9px var(--space-3); font: 400 15px/20px var(--font-sans);
+  color: var(--ink); background: var(--surface); border: 1px solid var(--line-strong); border-radius: var(--radius-sm); }
+.cu-field input::placeholder { color: var(--ink-muted); }
+.cu-field input:focus, .cu-field select:focus, .cu-field textarea:focus { outline: 2px solid var(--focus); outline-offset: 1px; border-color: var(--focus); }
+.cu-field .mono { font-family: var(--font-mono); font-size: 14px; }
+.cu-field .help { font-size: 13px; line-height: 19px; color: var(--ink-muted); }
+.cu-field.invalid input { border-color: var(--lacre); }
+.cu-field.invalid .help { color: var(--lacre); }
+
+/* Tabs */
+.cu-tabs { display: flex; flex-wrap: wrap; gap: var(--space-1); border-bottom: 1px solid var(--line); }
+.cu-tab { background: none; border: 0; border-bottom: 2px solid transparent; margin-bottom: -1px; padding: 10px var(--space-3) 11px; cursor: pointer;
+  font: 500 14px/1 var(--font-sans); color: var(--ink-muted); display: inline-flex; gap: var(--space-2); align-items: center; }
+.cu-tab:hover { color: var(--ink); }
+.cu-tab[aria-selected="true"] { color: var(--pizarra); border-bottom-color: var(--laton); font-weight: 600; }
+.cu-tab .n { font: 500 11px/1 var(--font-mono); padding: 3px 6px; border-radius: var(--radius-sm); background: var(--surface-sunken); color: var(--ink-muted); }
+.cu-tab[aria-selected="true"] .n { background: var(--pizarra-soft); color: var(--pizarra); }
+
+/* CaseCard */
+.cu-card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-md); padding: var(--space-6); display: flex; flex-direction: column; gap: var(--space-4); min-width: 0; }
+.cu-card-head { display: flex; justify-content: space-between; gap: var(--space-4); align-items: flex-start; flex-wrap: wrap; }
+.cu-card-ref { font: 400 12px/18px var(--font-mono); letter-spacing: .02em; color: var(--ink-muted); }
+.cu-card h3 { margin: 4px 0 0; font: 700 20px/26px var(--font-display); color: var(--ink); text-wrap: balance; }
+.cu-card-seal { border-top: 1px solid var(--laton); padding-top: var(--space-3); display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: var(--space-4); }
+.cu-card-seal dt { font: 600 11px/16px var(--font-sans); letter-spacing: .08em; text-transform: uppercase; color: var(--ink-muted); }
+.cu-card-seal dd { margin: 2px 0 0; font: 500 14px/20px var(--font-mono); font-variant-numeric: tabular-nums; color: var(--ink); }
+.cu-card-seal dd.laton { color: var(--laton); }
+
+/* DataTable */
+.cu-table-wrap { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-md); overflow-x: auto; }
+.cu-table { width: 100%; border-collapse: collapse; min-width: 560px; }
+.cu-table th { background: var(--surface-sunken); text-align: left; padding: var(--space-3) var(--space-4); font: 600 11px/16px var(--font-sans);
+  letter-spacing: .08em; text-transform: uppercase; color: var(--ink-muted); white-space: nowrap; }
+.cu-table td { padding: var(--space-3) var(--space-4); border-top: 1px solid var(--line); vertical-align: middle; }
+.cu-table .num { text-align: right; font: 500 14px/20px var(--font-mono); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.cu-table .ref { font: 400 12px/18px var(--font-mono); color: var(--ink-muted); }
+.cu-table .pos { color: var(--ok); } .cu-table .neg { color: var(--lacre); }
+.cu-table tbody tr:hover { background: var(--pizarra-soft); }
+.cu-table tfoot td { background: var(--surface-sunken); font-weight: 600; border-top: 1px solid var(--laton); }
