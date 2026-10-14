@@ -361,6 +361,48 @@
   tr.pick:hover td { background: var(--accent-soft); }
   tr.pick td:first-child { font-weight: 500; }
   #research { display: flex; flex-direction: column; gap: 16px; }
+  #licit { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+  #licit .scroll { overflow-x: auto; }
+  .lic-card { min-width: 0; }
+  .lic-pills { display: flex; flex-wrap: wrap; gap: 8px; }
+  .lic-pills button { display: inline-flex; align-items: center; gap: 8px; padding: 8px 14px; border: 1px solid var(--border); border-radius: 999px; background: var(--panel); color: var(--text); font: 500 13px var(--font-body); cursor: pointer; }
+  .lic-pills button.on { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
+  .lic-pills button .n { font-size: 11px; opacity: .8; }
+  .lic-pills button.cerrada:not(.on) { color: var(--muted); }
+  .lic-card { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; }
+  .lic-top { display: flex; flex-wrap: wrap; gap: 10px 16px; align-items: flex-start; justify-content: space-between; padding: 16px 16px 6px; }
+  .lic-top h3 { margin: 0; font: 600 19px var(--font-display); text-wrap: balance; }
+  .lic-meta { display: flex; flex-wrap: wrap; gap: 6px 14px; color: var(--muted); font-size: 12.5px; margin-top: 4px; }
+  .lic-meta .cierre { font-weight: 600; color: var(--text); } .lic-meta .cierre.urg { color: var(--late); } .lic-meta .cierre.fin { color: var(--muted); font-weight: 500; }
+  .lic-acts { display: flex; flex-wrap: wrap; gap: 6px; }
+  .lic-notas { padding: 0 16px 8px; color: var(--muted); font-size: 13px; white-space: pre-wrap; max-width: 80ch; }
+  .lic-sum { display: flex; flex-wrap: wrap; gap: 8px; padding: 6px 16px 12px; }
+  .lic-sum div { background: var(--bg); border: 1px solid var(--border); border-radius: 9px; padding: 8px 12px; min-width: 0; }
+  .lic-sum b { display: block; font: 600 16px var(--font-body); font-variant-numeric: tabular-nums; }
+  .lic-sum span { color: var(--muted); font-size: 11.5px; }
+  .lic-add { display: flex; flex-wrap: wrap; gap: 8px; align-items: flex-end; padding: 12px 16px; border-top: 1px solid var(--border); background: var(--bg); }
+  .lic-add label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--muted); flex: 1 1 140px; min-width: 0; }
+  .lic-add label.cli { flex: 3 1 240px; }
+  .lic-add input { font: 14px var(--font-body); padding: 8px 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--panel); color: var(--text); width: 100%; box-sizing: border-box; }
+  table.lic { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+  table.lic th { text-align: left; font: 600 11px var(--font-body); letter-spacing: .04em; text-transform: uppercase; color: var(--muted); padding: 9px 10px; border-top: 1px solid var(--border); background: var(--soft); white-space: nowrap; }
+  table.lic td { padding: 7px 10px; border-top: 1px solid var(--border); vertical-align: middle; }
+  table.lic .num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  table.lic input { font: 13.5px var(--font-body); padding: 5px 8px; border: 1px solid transparent; border-radius: 6px; background: transparent; color: var(--text); width: 100%; box-sizing: border-box; }
+  table.lic input:hover, table.lic input:focus { border-color: var(--border); background: var(--panel); }
+  table.lic input.n { text-align: right; font-variant-numeric: tabular-nums; min-width: 90px; }
+  table.lic select { font: 500 12.5px var(--font-body); padding: 5px 8px; border-radius: 7px; border: 1px solid var(--border); background: var(--panel); color: var(--text); }
+  table.lic select.conf, table.lic select.ing { background: var(--warn-bg); color: var(--warn); border-color: transparent; }
+  table.lic select.adj { background: var(--ok-bg); color: var(--ok); border-color: transparent; }
+  table.lic select.no { background: var(--late-bg); color: var(--late); border-color: transparent; }
+  table.lic tr.no td { opacity: .6; }
+  table.lic tfoot td { font-weight: 600; background: var(--soft); }
+  .lic-x { border: none; background: none; color: var(--muted); font-size: 16px; cursor: pointer; padding: 2px 6px; border-radius: 6px; }
+  .lic-x:hover { color: var(--late); background: var(--late-bg); }
+  .lic-empty { padding: 18px 16px; color: var(--muted); }
+  .lic-prop { margin-top: 10px; border-top: 1px dashed var(--border); padding-top: 10px; display: flex; flex-direction: column; gap: 6px; }
+  .lic-prop ul { margin: 0; padding-left: 18px; }
+  .lic-prop .row { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
   .res-head { display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end; justify-content: space-between; }
   .res-head h2 { margin: 0; font: 600 22px var(--font-display); }
   .res-note { color: var(--muted); font-size: 12.5px; max-width: 70ch; }
@@ -500,6 +542,7 @@
   <section id="summary" hidden></section>
   <section id="incomeTop" class="breakdown" hidden></section>
   <section id="research" hidden></section>
+  <section id="licit" hidden></section>
   <section id="tareasBox" hidden></section>
 
   <div class="table-wrap" id="tableWrap">
@@ -650,11 +693,30 @@
   </form>
 </dialog>
 
+<dialog id="licDlg">
+  <form method="dialog" id="licForm" novalidate>
+    <h2 id="licTitle">Nueva licitación</h2>
+    <div class="grid">
+      <label class="full">Nombre *<input id="l-nombre" placeholder="Ej: LECAP enero 2027" autocomplete="off"></label>
+      <label>Instrumento<input id="l-instr" placeholder="Ej: S29E7" autocomplete="off"></label>
+      <label>Cierre<input id="l-cierre" type="date"></label>
+      <label>Moneda<select id="l-moneda"><option value="ARS">Pesos</option><option value="USD">Dólares</option></select></label>
+      <label>Comisión % por defecto<input id="l-com" inputmode="decimal" placeholder="Ej: 0,5" autocomplete="off"></label>
+      <label class="full" id="l-copiaWrap">Copiar comitentes de<select id="l-copia"><option value="">No copiar</option></select></label>
+      <label class="full">Notas<textarea id="l-notas" placeholder="Tasa de corte esperada, horario de cierre, liquidación…"></textarea></label>
+    </div>
+    <div class="dialog-actions">
+      <button type="button" class="btn ghost" id="licCancel">Cancelar</button>
+      <button type="submit" class="btn primary">Guardar</button>
+    </div>
+  </form>
+</dialog>
+
 <div id="toast" role="status"></div>
 
 <script>
 const DEFAULT_CONFIG = {
-  v: 6,
+  v: 7,
   principal: 'WM3',
   dias: 21,
   umbral: 10000,
@@ -690,7 +752,7 @@ const SUB_TABS = [SUMMARY_TAB, HOLD_TAB, ZERO_TAB, LOW_TAB];
 // Pestañas de cuentas que también se muestran dentro de "Tenencia total" (siguen siendo editables desde +)
 const GROUP_TAGS = ['sgr', 'prospects', 'fal', 'notas'];
 const GROUP = [...SUB_TABS, ...GROUP_TAGS];
-const AUTO_TABS = new Set([HOLD_TAB, SUMMARY_TAB, ZERO_TAB, LOW_TAB, INCOME_TAB, RESEARCH_TAB]); // no se asignan a mano
+const AUTO_TABS = new Set([HOLD_TAB, SUMMARY_TAB, ZERO_TAB, LOW_TAB, INCOME_TAB, RESEARCH_TAB, 'licitaciones']); // no se asignan a mano
 const HOLD_CHUNK = 150;           // filas por documento en la base de datos
 const LOCAL_HOLD = 'panel-wm-tenencias-v1';
 const LOCAL_PREV = 'panel-wm-tenencias-prev-v1';
@@ -755,6 +817,21 @@ const LOCAL_TASKS = 'panel-wm-tareas-v1';
 let reuniones = [];
 let reuRef = null;
 const LOCAL_REU = 'panel-wm-reuniones-v1';
+// Licitaciones: un documento por licitación en "licitaciones/{id}" {nombre, instrumento, cierre, moneda, comDef, notas, creado, items: [{id, cuentaId, cliente, cuenta, monto, comision, estado, nota}]}
+let licitaciones = [];
+let licRef = null, licSel = null;
+const LOCAL_LIC = 'panel-wm-licitaciones-v1';
+const LIC_TAB = 'licitaciones';
+const LIC_ESTADOS = [
+  { id: 'pend', label: 'A confirmar' },
+  { id: 'conf', label: 'Confirmó' },
+  { id: 'ing', label: 'Orden cargada' },
+  { id: 'adj', label: 'Adjudicada' },
+  { id: 'no', label: 'No entró' },
+];
+const LOCAL_LIC_IA = 'panel-wm-lic-ia-v1';
+let licTurns = (() => { try { return JSON.parse(localStorage.getItem(LOCAL_LIC_IA)) || []; } catch { return []; } })();
+let licBusy = false, licLive = '', licCtl = null;
 // Tomar ganancia: informe de rendimientos por posición en "ganancias/actual" {fecha, fileName, rows: [...]}
 let ganancias = null;
 let tkView = 'tareas';            // solapa de Tareas pendientes: 'tareas' o 'ganancias'
@@ -815,6 +892,13 @@ function migrateConfig(c) {
     if (fwd && fwd.label === 'Tenencias') fwd.label = 'Tenencias detalladas';
     c.v = 6;
   }
+  if (c.v < 7) {
+    if (!c.tabs.some(t => t.id === LIC_TAB)) {
+      const at = c.tabs.findIndex(t => t.id === RESEARCH_TAB) + 1 || c.tabs.length;
+      c.tabs.splice(at, 0, { id: LIC_TAB, label: 'Licitaciones' });
+    }
+    c.v = 7;
+  }
   return c;
 }
 
@@ -858,6 +942,7 @@ function saveLocal() {
     localStorage.setItem(LOCAL_RES, JSON.stringify(research));
     localStorage.setItem(LOCAL_TASKS, JSON.stringify(tareas));
     localStorage.setItem(LOCAL_REU, JSON.stringify(reuniones));
+    localStorage.setItem(LOCAL_LIC, JSON.stringify(licitaciones));
     localStorage.setItem(LOCAL_GAN, JSON.stringify(ganancias));
     localStorage.setItem(LOCAL_GAN_H, JSON.stringify(ganHechas));
   } catch { toast('No se pudo guardar en este navegador'); }
@@ -916,6 +1001,7 @@ async function initStorage() {
     try { research = JSON.parse(localStorage.getItem(LOCAL_RES)) || []; } catch {}
     try { tareas = JSON.parse(localStorage.getItem(LOCAL_TASKS)) || []; } catch {}
     try { reuniones = JSON.parse(localStorage.getItem(LOCAL_REU)) || []; } catch {}
+    try { licitaciones = JSON.parse(localStorage.getItem(LOCAL_LIC)) || []; } catch {}
     try { ganancias = JSON.parse(localStorage.getItem(LOCAL_GAN)) || null; } catch {}
     try { ganHechas = JSON.parse(localStorage.getItem(LOCAL_GAN_H)) || {}; } catch {}
     loading = false; setSync(); render(); return;
@@ -955,6 +1041,11 @@ async function initStorage() {
   ganHechasRef = db.doc('ganancias/hechas');
   ganHechasRef.onSnapshot(s => {
     ganHechas = s.exists ? structuredClone(s.data().items || {}) : {};
+    render();
+  }, fail);
+  licRef = db.collection('licitaciones');
+  licRef.onSnapshot(snap => {
+    licitaciones = snap.docs.map(d => ({ id: d.id, ...structuredClone(d.data()) }));
     render();
   }, fail);
   reuRef = db.collection('reuniones');
@@ -1072,6 +1163,7 @@ function valuar(ds, f = noFiltro) {
   if (!cache || cache.base !== JSON.stringify(config.ten || {}) + '|' + ds.tc) { cache = { base: JSON.stringify(config.ten || {}) + '|' + ds.tc, map: new Map() }; valCache.set(ds, cache); }
   if (cache.map.has(sig)) return cache.map.get(sig);
   const cols = tenCols(ds);
+  const monCol = ds.columns.findIndex(h => /^moneda$/.test(norm(h)));
   const res = { total: 0, porCuenta: new Map(), porEspecie: new Map(), porTipo: new Map(), espInfo: new Map(), pos: new Map(), needsTC: false, cols, ok: cols.val >= 0 };
   if (res.ok) {
     for (const r of ds.rows) {
@@ -1091,7 +1183,7 @@ function valuar(ds, f = noFiltro) {
       res.porEspecie.set(especie, (res.porEspecie.get(especie) || 0) + usd);
       const tipo = rowTipo(r, cols);
       res.porTipo.set(tipo, (res.porTipo.get(tipo) || 0) + usd);
-      if (!res.espInfo.has(especie)) res.espInfo.set(especie, { tipo, desc: cols.desc >= 0 ? String(r['c' + cols.desc] ?? '').trim() : '' });
+      if (!res.espInfo.has(especie)) res.espInfo.set(especie, { tipo, desc: cols.desc >= 0 ? String(r['c' + cols.desc] ?? '').trim() : '', mon: monCol >= 0 ? String(r['c' + monCol] ?? '').trim() : '' });
       const kp = kc + '|' + norm(especie);
       const pp = res.pos.get(kp) || { cuenta, especie, usd: 0, q: 0, hasQ: false };
       pp.usd += usd; if (!isNaN(q)) { pp.q += q; pp.hasQ = true; }
@@ -1191,12 +1283,13 @@ function render() {
     return `<button data-tab="${esc(t.id)}" class="${t.id === tab ? 'on' : ''}">${t.id === SUMMARY_TAB ? 'Resumen' : esc(t.label)}${n === null ? '' : `<span class="n">${n}</span>`}</button>`;
   }).join('') : '';
   $('#tabs').innerHTML = allTabs.map(t => {
-    const n = t.id === SUMMARY_TAB ? null : t.id === HOLD_TAB ? holdCuentas().size : t.id === INCOME_TAB ? factClientes(periodoSel()).length : t.id === RESEARCH_TAB ? (research[0]?.alertas || []).filter(a => accionClase(a.accion) !== 'watch').length : t.id === TASKS_TAB ? tareas.filter(x => !x.hecha).length : cuentas.filter(c => inTab(c, t.id)).length;
+    const n = t.id === SUMMARY_TAB ? null : t.id === HOLD_TAB ? holdCuentas().size : t.id === INCOME_TAB ? factClientes(periodoSel()).length : t.id === RESEARCH_TAB ? (research[0]?.alertas || []).filter(a => accionClase(a.accion) !== 'watch').length : t.id === TASKS_TAB ? tareas.filter(x => !x.hecha).length : t.id === LIC_TAB ? licAbiertas().length : cuentas.filter(c => inTab(c, t.id)).length;
     return `<button class="tab ${t.id === tab || (t.id === SUMMARY_TAB && inGroup) ? 'active' : ''}" data-tab="${esc(t.id)}">${esc(t.label)}${n === null ? '' : `<span class="n">${n}</span>`}</button>`;
   }).join('') + `<button class="tab edit" id="btnTabs" title="Editar pestañas" aria-label="Editar pestañas">+</button>`;
 
-  const hold = tab === HOLD_TAB, summary = tab === SUMMARY_TAB, income = tab === INCOME_TAB, res = tab === RESEARCH_TAB;
-  $('#research').hidden = !res;
+  const hold = tab === HOLD_TAB, summary = tab === SUMMARY_TAB, income = tab === INCOME_TAB, lic = tab === LIC_TAB, res = tab === RESEARCH_TAB || lic;
+  $('#research').hidden = tab !== RESEARCH_TAB;
+  $('#licit').hidden = !lic;
   $('.bar').hidden = res;
   $('#btnSinCuenta').hidden = hold || summary || income;
   const tasks = tab === TASKS_TAB;
@@ -1217,6 +1310,7 @@ function render() {
   $('table').classList.toggle('hold', hold || income);
   if (!hold && !income) $('#holdFilters').innerHTML = '';
   if (summary) { renderSummary(); return; }
+  if (lic) { renderLicit(); return; }
   if (res) { renderResearch(); return; }
   if (income) { renderIngresos(); return; }
   if (hold) { renderTenencias(); restoreFocus(focus); return; }
@@ -2984,6 +3078,314 @@ $('#tareasBox').addEventListener('click', async e => {
   toast(r.unida ? 'Se sumó a la tarea que ya tenía este cliente en Mis tareas' : 'Tarea agregada en Mis tareas');
 });
 
+// ---------- Licitaciones ----------
+const licHoy = () => today();
+const licAbiertas = () => licitaciones.filter(l => !l.cierre || l.cierre >= licHoy());
+// Abiertas primero (la que cierra antes arriba), después las cerradas (la más reciente arriba)
+const licOrden = () => [...licitaciones].sort((a, b) => {
+  const ca = !a.cierre || a.cierre >= licHoy(), cb = !b.cierre || b.cierre >= licHoy();
+  if (ca !== cb) return ca ? -1 : 1;
+  return ca ? (a.cierre || '9999').localeCompare(b.cierre || '9999') : (b.cierre || '').localeCompare(a.cierre || '');
+});
+const licCuentaDe = it => cuentas.find(c => c.id === it.cuentaId);
+const licNombre = it => licCuentaDe(it)?.nombre || it.cliente || 'Sin nombre';
+const licCuenta = it => licCuentaDe(it)?.cuenta || it.cuenta || '';
+const licComMonto = it => (Number(it.monto) || 0) * (Number(it.comision) || 0) / 100;
+function licTot(l) {
+  const ok = (l.items || []).filter(it => it.estado !== 'no');
+  return { n: ok.length, monto: ok.reduce((a, it) => a + (Number(it.monto) || 0), 0), com: ok.reduce((a, it) => a + licComMonto(it), 0),
+    conf: (l.items || []).filter(it => ['conf', 'ing', 'adj'].includes(it.estado)).length };
+}
+const licFmt = (v, mon) => (mon === 'USD' ? 'USD ' : '$ ') + (Number(v) || 0).toLocaleString('es-AR', { maximumFractionDigits: Math.abs(v) < 1000 ? 2 : 0 });
+const licPct = v => v === '' || v == null || isNaN(v) ? '' : String(v).replace('.', ',');
+// Montos escritos libres: "1.500.000", "1,5M", "250k", "1500000,50", "USD 10.000"
+function parseMonto(v) {
+  let t = String(v ?? '').toLowerCase().replace(/usd|u\$s|\$|ars|\s/g, '');
+  if (!t) return null;
+  let mult = 1;
+  if (/m(illones?)?$/.test(t)) { mult = 1e6; t = t.replace(/m(illones?)?$/, ''); } else if (/k$/.test(t)) { mult = 1e3; t = t.slice(0, -1); }
+  if (t.includes(',')) t = t.replace(/\./g, '').replace(',', '.');
+  else if ((t.match(/\./g) || []).length > 1 || /^\d{1,3}\.\d{3}$/.test(t)) t = t.replace(/\./g, '');
+  const n = Number(t);
+  return isFinite(n) ? n * mult : NaN;
+}
+function licCierreTxt(l) {
+  if (!l.cierre) return { txt: 'Sin fecha de cierre', cls: '' };
+  const d = daysSince(l.cierre);   // positivo = ya pasó
+  if (d > 0) return { txt: `Cerró el ${fmtDate(l.cierre)}`, cls: 'fin' };
+  if (d === 0) return { txt: 'Cierra hoy', cls: 'urg' };
+  if (d === -1) return { txt: `Cierra mañana · ${fmtDate(l.cierre)}`, cls: 'urg' };
+  return { txt: `Cierra el ${fmtDate(l.cierre)} · en ${-d} días`, cls: '' };
+}
+function saveLic(l) {
+  if (!licRef) { saveLocal(); return Promise.resolve(); }
+  const doc = { nombre: l.nombre || '', instrumento: l.instrumento || '', cierre: l.cierre || '', moneda: l.moneda || 'ARS', comDef: l.comDef ?? '', notas: l.notas || '', creado: l.creado || new Date().toISOString(),
+    items: (l.items || []).map(it => ({ id: it.id, cuentaId: it.cuentaId || '', cliente: it.cliente || '', cuenta: it.cuenta || '', monto: Number(it.monto) || 0, comision: it.comision === '' || it.comision == null ? '' : Number(it.comision), estado: it.estado || 'pend', nota: it.nota || '' })) };
+  return write(() => licRef.doc(l.id).set(doc));
+}
+// Busca el cliente por nombre o por N° de cuenta (lo que haya escrito)
+function licBuscarCuenta(txt) {
+  const q = norm(txt); if (!q) return null;
+  return cuentas.find(c => norm(c.nombre) === q) || cuentas.find(c => norm(c.cuenta) === q) || cuentas.find(c => norm(c.cuenta + ' ' + c.nombre) === q) || null;
+}
+// Suma (o actualiza) un comitente en una licitación; devuelve 'nuevo' o 'actualizado'
+function licSumar(l, { cuentaId, cliente, cuenta, monto, comision }) {
+  l.items = l.items || [];
+  const ex = l.items.find(it => (cuentaId && it.cuentaId === cuentaId) || (!cuentaId && !it.cuentaId && norm(it.cliente) === norm(cliente)));
+  const com = comision === '' || comision == null || isNaN(comision) ? (l.comDef === '' || l.comDef == null ? '' : Number(l.comDef)) : Number(comision);
+  if (ex) { if (monto != null && !isNaN(monto)) ex.monto = monto; if (comision !== '' && comision != null && !isNaN(comision)) ex.comision = Number(comision); return 'actualizado'; }
+  l.items.push({ id: uid(), cuentaId: cuentaId || '', cliente: cliente || '', cuenta: cuenta || '', monto: monto || 0, comision: com, estado: 'pend', nota: '' });
+  return 'nuevo';
+}
+function setLicit(html) {
+  const box = $('#licit'), ae = document.activeElement;
+  // Conserva lo que se está escribiendo aunque llegue una actualización de la base
+  const keep = {}; for (const id of ['licCli', 'licMonto', 'licCom', 'licQ']) { const el = box.querySelector('#' + id); if (el) keep[id] = el.value; }
+  const foc = ae && box.contains(ae) ? { id: ae.id, iid: ae.closest?.('[data-iid]')?.dataset.iid, f: ae.dataset?.lf, v: ae.value, sel: ae.selectionStart } : null;
+  box.innerHTML = html;
+  for (const [id, v] of Object.entries(keep)) { const el = box.querySelector('#' + id); if (el) el.value = v; }
+  if (foc) {
+    const el = foc.id ? box.querySelector('#' + foc.id) : foc.iid ? box.querySelector(`[data-iid="${foc.iid}"] [data-lf="${foc.f}"]`) : null;
+    if (el) { if (foc.v != null && !foc.id) el.value = foc.v; el.focus(); try { el.setSelectionRange(foc.sel, foc.sel); } catch {} }
+  }
+}
+const LIC_SUG = [
+  '¿Cuántos clientes tienen fondos en pesos y cuánto suman?',
+  '¿A qué clientes les ofrezco la LECAP? Tienen pesos en efectivo o en fondos',
+  'Resumime esta licitación: montos, comisiones y quién falta confirmar',
+  'Sumá a la licitación a los 5 clientes con más pesos disponibles',
+];
+function licLogHtml() {
+  const msgs = licTurns.map((t, i) => t.role === 'user' ? `<div class="ia-msg user">${esc(t.content)}</div>` : `<div class="ia-msg bot">${iaMd(t.content)}${t.prop?.items?.length ? licPropHtml(t, i) : ''}</div>`);
+  if (licBusy) msgs.push(licLive ? `<div class="ia-msg bot" id="licLive">${iaMd(licSeparar(licLive).texto)}</div>` : `<div class="ia-msg bot wait" id="licLive">Pensando… (revisa tenencias y licitaciones)</div>`);
+  return msgs.join('');
+}
+function licPropHtml(t, i) {
+  const dest = licitaciones.find(l => norm(l.nombre) === norm(t.prop.licitacion)) || licitaciones.find(l => l.id === licSel);
+  const its = t.prop.items;
+  return `<div class="lic-prop"><b>${plural(its.length, 'comitente', 'comitentes')} para ${dest ? esc(dest.nombre) : 'una licitación'}</b>
+    <ul>${its.map(x => `<li>${esc(x.cuenta || '')} ${esc(x.cliente || '')}${x.monto ? ' · ' + licFmt(x.monto, dest?.moneda) : ''}${x.comision !== '' && x.comision != null ? ' · ' + licPct(x.comision) + '%' : ''}</li>`).join('')}</ul>
+    ${t.estado === 'pendiente' ? (dest ? `<div class="row"><button class="btn primary" data-lprop="${i}" data-lid="${esc(dest.id)}">Agregar a ${esc(dest.nombre)}</button><button class="btn ghost" data-lprop-no="${i}">Descartar</button></div>` : '<span class="note">Creá primero la licitación para poder sumarlos.</span>')
+      : `<span class="note">${t.estado === 'agregados' ? 'Agregados ✓' : 'Descartados'}</span>`}</div>`;
+}
+function licSeparar(text) {
+  const m = String(text || '').match(/```licitacion\s*([\s\S]*?)(```|$)/);
+  if (!m) return { texto: text };
+  let prop = null;
+  try { const j = JSON.parse(m[1]); prop = Array.isArray(j) ? { licitacion: '', items: j } : j; } catch {}
+  return { texto: text.replace(m[0], '').trim(), prop };
+}
+async function renderLicit() {
+  const lista = licOrden();
+  if (!lista.some(l => l.id === licSel)) licSel = lista[0]?.id || null;
+  const l = lista.find(x => x.id === licSel);
+  const pills = lista.length ? `<div class="lic-pills" role="tablist">${lista.map(x => { const ab = !x.cierre || x.cierre >= licHoy();
+    return `<button type="button" role="tab" class="${x.id === licSel ? 'on' : ''} ${ab ? '' : 'cerrada'}" data-lsel="${esc(x.id)}" aria-selected="${x.id === licSel}">${esc(x.nombre)}<span class="n">${(x.items || []).length}${x.cierre ? ' · ' + fmtDate(x.cierre).slice(0, 5) : ''}</span></button>`; }).join('')}</div>` : '';
+  let card = '';
+  if (l) {
+    const ci = licCierreTxt(l), tt = licTot(l), mon = l.moneda || 'ARS';
+    const items = [...(l.items || [])];
+    card = `<div class="lic-card" data-lic="${esc(l.id)}">
+      <div class="lic-top"><div><h3>${esc(l.nombre)}</h3>
+        <div class="lic-meta"><span class="cierre ${ci.cls}">${esc(ci.txt)}</span>${l.instrumento ? `<span>${esc(l.instrumento)}</span>` : ''}<span>${mon === 'USD' ? 'En dólares' : 'En pesos'}</span>${l.comDef !== '' && l.comDef != null ? `<span>Comisión por defecto ${licPct(l.comDef)}%</span>` : ''}</div></div>
+        <div class="lic-acts"><button class="btn ghost" data-lact="xls">⬇ Excel</button><button class="btn ghost" data-lact="editar">Editar</button><button class="btn ghost" data-lact="borrar">Eliminar</button></div></div>
+      ${l.notas ? `<div class="lic-notas">${esc(l.notas)}</div>` : ''}
+      <div class="lic-sum"><div><b>${tt.n}</b><span>comitentes</span></div><div><b>${licFmt(tt.monto, mon)}</b><span>monto a licitar</span></div><div><b>${licFmt(tt.com, mon)}</b><span>comisión estimada</span></div><div><b>${tt.conf} / ${(l.items || []).length}</b><span>confirmados</span></div></div>
+      <form class="lic-add" id="licAddForm" autocomplete="off">
+        <label class="cli">Comitente<input id="licCli" list="licClientes" placeholder="Nombre o N° de cuenta"></label>
+        <label>Monto (${mon === 'USD' ? 'USD' : '$'})<input id="licMonto" inputmode="decimal" placeholder="Ej: 5.000.000 o 5M"></label>
+        <label>Comisión %<input id="licCom" inputmode="decimal" placeholder="${l.comDef !== '' && l.comDef != null ? licPct(l.comDef) : 'Ej: 0,5'}"></label>
+        <button class="btn primary" type="submit">Agregar</button>
+        <datalist id="licClientes">${cuentas.slice().sort((a, b) => norm(a.nombre).localeCompare(norm(b.nombre), 'es')).map(c => `<option value="${esc(c.nombre)}">${esc(c.cuenta)}</option>`).join('')}</datalist>
+      </form>
+      ${items.length ? `<div class="scroll"><table class="lic"><thead><tr><th>Comitente</th><th class="num">Monto</th><th class="num">Comisión %</th><th class="num">Comisión</th><th>Estado</th><th>Notas</th><th></th></tr></thead><tbody>
+        ${items.map(it => `<tr data-iid="${esc(it.id)}" class="${it.estado === 'no' ? 'no' : ''}"><td><b>${esc(licNombre(it))}</b>${licCuenta(it) ? ` <span class="acct">${esc(licCuenta(it))}</span>` : ''}</td>
+          <td class="num"><input class="n" data-lf="monto" value="${esc((Number(it.monto) || 0).toLocaleString('es-AR', { maximumFractionDigits: 2 }))}" inputmode="decimal" aria-label="Monto de ${esc(licNombre(it))}"></td>
+          <td class="num"><input class="n" data-lf="comision" value="${esc(licPct(it.comision))}" inputmode="decimal" placeholder="—" aria-label="Comisión % de ${esc(licNombre(it))}" style="min-width:60px"></td>
+          <td class="num">${licFmt(licComMonto(it), mon)}</td>
+          <td><select data-lf="estado" class="${esc(it.estado || 'pend')}" aria-label="Estado de ${esc(licNombre(it))}">${LIC_ESTADOS.map(e => `<option value="${e.id}"${e.id === (it.estado || 'pend') ? ' selected' : ''}>${e.label}</option>`).join('')}</select></td>
+          <td><input data-lf="nota" value="${esc(it.nota || '')}" placeholder="Agregar nota" aria-label="Nota de ${esc(licNombre(it))}"></td>
+          <td><button class="lic-x" data-lact="quitar" title="Quitar de la licitación" aria-label="Quitar a ${esc(licNombre(it))}">×</button></td></tr>`).join('')}
+        </tbody><tfoot><tr><td>Total (sin los que no entraron)</td><td class="num">${licFmt(tt.monto, mon)}</td><td></td><td class="num">${licFmt(tt.com, mon)}</td><td colspan="3"></td></tr></tfoot></table></div>`
+      : `<div class="lic-empty">Todavía no anotaste comitentes. Escribí el nombre o N° de cuenta arriba, el monto y la comisión, y tocá <b>Agregar</b>.</div>`}
+    </div>`;
+  }
+  const iaBox = `<div class="lic-card" id="licIA">
+      <div class="tk-head"><h2>Preguntale a la IA</h2><span>Usa tus tenencias, rendimientos, clientes y las licitaciones cargadas. Puede proponerte comitentes para sumar a una licitación.</span></div>
+      <div class="ia-log" id="licLog">${licLogHtml()}</div>
+      <div class="ia-sug" id="licSug" ${licTurns.length ? 'hidden' : ''}>${LIC_SUG.map(q => `<button type="button" data-lq="${esc(q)}">${esc(q)}</button>`).join('')}</div>
+      <form class="ia-form" id="licIAForm"><textarea id="licQ" rows="2" placeholder="Ej: ¿Cuántos clientes tienen fondos en pesos? ¿A quién le ofrezco la LECAP de enero?"></textarea>
+        <button class="btn primary" type="submit" ${licBusy ? 'hidden' : ''}>Preguntar</button><button class="btn ghost" id="licStop" type="button" ${licBusy ? '' : 'hidden'}>Frenar</button></form>
+      <div class="ia-hint"><button class="btn ghost" id="licNew" type="button" style="padding:5px 10px;font-size:12px">Nueva conversación</button>
+        Cada pregunta usa tu cuenta de Claude. Es información de apoyo: revisá los números antes de operar.</div></div>`;
+  setLicit(`<div class="res-head"><div><h2>Licitaciones</h2><p class="res-note">Anotá quién entra en cada licitación, con el monto y la comisión, y seguí el estado de cada orden hasta la adjudicación.</p></div>
+      <button class="btn primary" data-lact="nueva">+ Nueva licitación</button></div>
+    ${pills}
+    ${l ? card : `<div class="lic-card"><div class="lic-empty">No hay licitaciones cargadas. Creá la primera con <b>+ Nueva licitación</b> (por ejemplo, "LECAP enero 2027") y después sumá los comitentes con su monto y comisión.</div></div>`}
+    ${iaBox}`);
+  if (iaSample === undefined) {
+    iaSample = null;
+    const s = window.claude?.use ? await window.claude.use('sample') : null;
+    iaSample = s || false;
+  }
+}
+// ---- Diálogo de licitación ----
+let editingLic = null;
+function openLic(l) {
+  editingLic = l ? l.id : null;
+  $('#licTitle').textContent = l ? 'Editar licitación' : 'Nueva licitación';
+  $('#licForm').reset();
+  $('#l-nombre').value = l?.nombre || '';
+  $('#l-instr').value = l?.instrumento || '';
+  $('#l-cierre').value = l?.cierre || '';
+  $('#l-moneda').value = l?.moneda || 'ARS';
+  $('#l-com').value = licPct(l?.comDef);
+  $('#l-notas').value = l?.notas || '';
+  const otras = licOrden().filter(x => x.id !== l?.id && (x.items || []).length);
+  $('#l-copia').innerHTML = '<option value="">No copiar</option>' + otras.map(x => `<option value="${esc(x.id)}">${esc(x.nombre)} (${plural(x.items.length, 'comitente', 'comitentes')})</option>`).join('');
+  $('#l-copiaWrap').hidden = !otras.length;
+  $('#licDlg').showModal();
+  $('#l-nombre').focus();
+}
+$('#licCancel').addEventListener('click', () => $('#licDlg').close());
+$('#licForm').addEventListener('submit', async e => {
+  const nombre = $('#l-nombre').value.trim();
+  if (!nombre) { e.preventDefault(); toast('Poné un nombre a la licitación (ej: LECAP enero 2027)'); $('#l-nombre').focus(); return; }
+  const com = $('#l-com').value.trim() ? parseMonto($('#l-com').value) : '';
+  if (com !== '' && isNaN(com)) { e.preventDefault(); toast('Escribí la comisión como número, ej: 0,5'); $('#l-com').focus(); return; }
+  const prev = editingLic ? licitaciones.find(x => x.id === editingLic) : null;
+  const l = { ...(prev || { id: uid(), creado: new Date().toISOString(), items: [] }), nombre, instrumento: $('#l-instr').value.trim(), cierre: $('#l-cierre').value, moneda: $('#l-moneda').value, comDef: com, notas: $('#l-notas').value.trim() };
+  const src = $('#l-copia').value && licitaciones.find(x => x.id === $('#l-copia').value);
+  let copiados = 0;
+  if (src) for (const it of src.items || []) if (licSumar(l, { cuentaId: it.cuentaId, cliente: it.cliente, cuenta: it.cuenta, monto: it.monto, comision: it.comision }) === 'nuevo') copiados++;
+  licitaciones = [...licitaciones.filter(x => x.id !== l.id), l];
+  licSel = l.id;
+  render();
+  await saveLic(l);
+  toast(prev ? 'Licitación actualizada' : `Licitación creada${copiados ? ` con ${plural(copiados, 'comitente', 'comitentes')} copiados de ${src.nombre}` : ''}`);
+});
+// ---- Acciones dentro de la pestaña ----
+$('#licit').addEventListener('click', async e => {
+  const sel = e.target.closest('[data-lsel]'); if (sel) { licSel = sel.dataset.lsel; render(); return; }
+  const sug = e.target.closest('[data-lq]'); if (sug) { licPreguntar(sug.dataset.lq); return; }
+  if (e.target.closest('#licStop')) { licCtl?.abort(); return; }
+  if (e.target.closest('#licNew')) { if (licBusy) return; licTurns = []; try { localStorage.setItem(LOCAL_LIC_IA, '[]'); } catch {} render(); return; }
+  const pr = e.target.closest('[data-lprop]');
+  if (pr) {
+    const t = licTurns[Number(pr.dataset.lprop)], l = licitaciones.find(x => x.id === pr.dataset.lid); if (!t || !l || t.estado !== 'pendiente') return;
+    let n = 0, u = 0;
+    for (const x of t.prop.items) {
+      const c = (x.cuenta && cuentas.find(k => norm(k.cuenta) === norm(x.cuenta))) || licBuscarCuenta(x.cliente);
+      const r = licSumar(l, { cuentaId: c?.id, cliente: c ? c.nombre : x.cliente, cuenta: c ? c.cuenta : x.cuenta, monto: Number(x.monto) || null, comision: x.comision });
+      r === 'nuevo' ? n++ : u++;
+    }
+    t.estado = 'agregados'; try { localStorage.setItem(LOCAL_LIC_IA, JSON.stringify(licTurns.slice(-20))); } catch {}
+    licSel = l.id; render(); await saveLic(l);
+    toast(n ? `${plural(n, 'comitente sumado', 'comitentes sumados')} a ${l.nombre}${u ? ` · ${u} ya estaba${u > 1 ? 'n' : ''}` : ''}` : `Ya estaba${u > 1 ? 'n' : ''} en ${l.nombre}`);
+    return;
+  }
+  const prn = e.target.closest('[data-lprop-no]');
+  if (prn) { const t = licTurns[Number(prn.dataset.lpropNo)]; if (t) { t.estado = 'descartados'; try { localStorage.setItem(LOCAL_LIC_IA, JSON.stringify(licTurns.slice(-20))); } catch {} render(); } return; }
+  const b = e.target.closest('[data-lact]'); if (!b) return;
+  const act = b.dataset.lact;
+  if (act === 'nueva') { openLic(null); return; }
+  const l = licitaciones.find(x => x.id === licSel); if (!l) return;
+  if (act === 'editar') openLic(l);
+  else if (act === 'borrar') {
+    if (!await confirmAsk('Eliminar licitación', `¿Eliminar "${l.nombre}" con ${plural((l.items || []).length, 'comitente', 'comitentes')}?`, 'Eliminar')) return;
+    licitaciones = licitaciones.filter(x => x.id !== l.id); licSel = null; render();
+    if (licRef) await write(() => licRef.doc(l.id).delete()); else saveLocal();
+    toast('Licitación eliminada');
+  } else if (act === 'quitar') {
+    const iid = b.closest('[data-iid]')?.dataset.iid, it = (l.items || []).find(x => x.id === iid); if (!it) return;
+    l.items = l.items.filter(x => x.id !== iid); render(); await saveLic(l);
+    toast(`${licNombre(it)} salió de ${l.nombre}`);
+  } else if (act === 'xls') {
+    const mon = l.moneda === 'USD' ? 'USD' : '$';
+    const filas = (l.items || []).map(it => ({ 'N° de cuenta': licCuenta(it), 'Comitente': licNombre(it), [`Monto (${mon})`]: Number(it.monto) || 0, 'Comisión %': it.comision === '' ? null : Number(it.comision), [`Comisión (${mon})`]: Math.round(licComMonto(it) * 100) / 100, 'Estado': LIC_ESTADOS.find(x => x.id === it.estado)?.label || '', 'Notas': it.nota || '' }));
+    const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(filas), 'Comitentes');
+    await guardarArchivo(`licitacion_${slug(l.nombre)}.xlsx`, new Blob([XLSX.write(wb, { type: 'array', bookType: 'xlsx' })], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }));
+  }
+});
+$('#licit').addEventListener('change', async e => {
+  const f = e.target.dataset?.lf; if (!f) return;
+  const l = licitaciones.find(x => x.id === licSel), it = l?.items?.find(x => x.id === e.target.closest('[data-iid]')?.dataset.iid); if (!it) return;
+  if (f === 'monto' || f === 'comision') {
+    const v = e.target.value.trim() === '' ? (f === 'monto' ? 0 : '') : parseMonto(e.target.value);
+    if (v !== '' && isNaN(v)) { toast(f === 'monto' ? 'Escribí el monto como número, ej: 5.000.000' : 'Escribí la comisión como número, ej: 0,5'); render(); return; }
+    it[f] = v;
+  } else if (f === 'estado') it.estado = e.target.value;
+  else if (f === 'nota') it.nota = e.target.value.trim();
+  render(); await saveLic(l);
+});
+$('#licit').addEventListener('submit', async e => {
+  if (e.target.id === 'licIAForm') { e.preventDefault(); licPreguntar($('#licQ').value); return; }
+  if (e.target.id !== 'licAddForm') return;
+  e.preventDefault();
+  const l = licitaciones.find(x => x.id === licSel); if (!l) return;
+  const txt = $('#licCli').value.trim();
+  if (!txt) { toast('Escribí el nombre o N° de cuenta del comitente'); $('#licCli').focus(); return; }
+  const monto = $('#licMonto').value.trim() ? parseMonto($('#licMonto').value) : 0;
+  if (isNaN(monto)) { toast('Escribí el monto como número, ej: 5.000.000 o 5M'); $('#licMonto').focus(); return; }
+  const com = $('#licCom').value.trim() ? parseMonto($('#licCom').value) : '';
+  if (com !== '' && isNaN(com)) { toast('Escribí la comisión como número, ej: 0,5'); $('#licCom').focus(); return; }
+  const c = licBuscarCuenta(txt);
+  const r = licSumar(l, { cuentaId: c?.id, cliente: c ? c.nombre : txt, cuenta: c?.cuenta || '', monto, comision: com });
+  $('#licCli').value = ''; $('#licMonto').value = ''; $('#licCom').value = '';
+  render(); $('#licCli')?.focus();
+  await saveLic(l);
+  toast(r === 'nuevo' ? `${c ? c.nombre : txt} sumado a ${l.nombre}${c ? '' : ' (no está en tu base de clientes)'}` : `${c ? c.nombre : txt} ya estaba: se actualizó el monto`);
+});
+$('#licit').addEventListener('keydown', e => {
+  if (e.target.id === 'licQ' && e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); licPreguntar(e.target.value); }
+  if (e.target.matches?.('table.lic input') && e.key === 'Enter') { e.preventDefault(); e.target.blur(); }
+});
+const LIC_REGLAS = `Sos el asistente de Micaela Graciano, asesora financiera en MAX Capital (Argentina), para armar y seguir licitaciones (LECAP, bonos, ONs, letras). Le respondés en español rioplatense, claro y corto.
+Reglas:
+- Usá SOLO los datos del panel que vienen abajo. No inventes cifras, clientes ni tasas. Si un dato no está, decilo y explicá qué archivo haría falta.
+- Las tenencias están valuadas en USD MEP; la moneda de cada activo va entre paréntesis (Pesos o Dólar). "MON $" son pesos en efectivo. Un fondo con moneda Pesos es un fondo en pesos.
+- Cuando nombres clientes, poné su N° de cuenta y los montos. Si das un total, sumalo con cuidado.
+- Formato: párrafos cortos y listas con "- ". Podés usar **negrita**. No uses tablas.
+- Es información de apoyo: ella decide.
+- Si te pide sumar, anotar o proponer clientes para una licitación, respondé normalmente y AL FINAL agregá un bloque así (y solo en ese caso):
+\`\`\`licitacion
+{"licitacion":"LECAP enero 2027","items":[{"cuenta":"12822","cliente":"MARCUS JAVIER JONATAN","monto":0,"comision":""}]}
+\`\`\`
+  "licitacion" es el nombre exacto de una licitación cargada (o "" para la que está mirando). "monto" en la moneda de la licitación: poné el monto solo si ella lo dijo; si no, 0. "comision" en % solo si ella la dijo; si no, "". Ella revisa y confirma antes de que se sumen.
+
+DATOS DEL PANEL:
+`;
+async function licPreguntar(q) {
+  q = String(q || '').trim(); if (!q || licBusy) return;
+  if (iaSample === undefined) { const s = window.claude?.use ? await window.claude.use('sample') : null; iaSample = s || false; }
+  if (!iaSample) { toast('La IA no está disponible en esta vista. Abrí el panel desde claude.ai.'); return; }
+  const sel = licitaciones.find(x => x.id === licSel);
+  licTurns.push({ role: 'user', content: q });
+  licBusy = true; licLive = ''; const qEl = $('#licQ'); if (qEl) qEl.value = ''; render();
+  licCtl = new AbortController();
+  const hist = licTurns.slice(-9); while (hist.length && hist[0].role !== 'user') hist.shift();
+  const input = [{ role: 'user', content: LIC_REGLAS + iaContexto() + (sel ? `\n\nLICITACIÓN QUE ESTÁ MIRANDO AHORA: ${sel.nombre}` : '') },
+    ...hist.map(t => ({ role: t.role, content: t.content + (t.prop?.items?.length ? `\n\n(Propuse ${t.prop.items.length} comitentes; ella los ${t.estado === 'agregados' ? 'agregó' : t.estado === 'descartados' ? 'descartó' : 'está revisando'}.)` : '') }))];
+  let shown = '';
+  try {
+    const { text, truncated } = await iaSample(input, { cache: false, signal: licCtl.signal,
+      onText: ({ text }) => { shown = text; licLive = text; const el = $('#licLive'); if (el) { el.classList.remove('wait'); el.innerHTML = iaMd(licSeparar(text).texto); } } });
+    const sep = licSeparar(text);
+    licTurns.push({ role: 'assistant', content: (sep.texto || 'Te propongo estos comitentes:') + (truncated ? '\n\n(La respuesta quedó cortada: pedí menos cosas a la vez.)' : ''), ...(sep.prop?.items?.length ? { prop: sep.prop, estado: 'pendiente' } : {}) });
+  } catch (e) {
+    if (e?.code === 'cancelled') { if (e.text || shown) licTurns.push({ role: 'assistant', content: (e.text || shown) + '\n\n(Frenada)' }); else licTurns.pop(); }
+    else {
+      licTurns.push({ role: 'assistant', content: '⚠ ' + (IA_ERR[e?.code] || 'Hubo un problema de conexión con Claude. Probá de nuevo.') });
+      if (e?.code === 'not_granted' || e?.code === 'sampling_disabled') iaSample = false;
+    }
+  } finally {
+    licBusy = false; licCtl = null; licLive = '';
+    try { localStorage.setItem(LOCAL_LIC_IA, JSON.stringify(licTurns.slice(-20))); } catch {}
+    render();
+    $('#licLog')?.lastElementChild?.scrollIntoView({ block: 'nearest' });
+  }
+}
+
 // ---------- Preguntale a la IA ----------
 // La conversación vive en este navegador (comodidad); cada pregunta manda los datos actuales del panel
 const LOCAL_IA = 'panel-wm-ia-v1';
@@ -3006,13 +3408,13 @@ function iaContexto() {
   // Tenencias por cliente
   const v = valuar(tenencias);
   if (v?.ok) {
-    L.push(`\n## TENENCIAS (USD MEP, informe ${tenencias.updatedAt ? fmtDate(String(tenencias.updatedAt).slice(0, 10)) : ''}). Total USD ${r0(v.total)}. Formato: cuenta nombre: activo(tipo) USD; ...`);
+    L.push(`\n## TENENCIAS (USD MEP, informe ${tenencias.updatedAt ? fmtDate(String(tenencias.updatedAt).slice(0, 10)) : ''}). Total USD ${r0(v.total)}. Formato: cuenta nombre: activo(tipo, moneda del activo) valor en USD; ... (MON $ = pesos en efectivo; un fondo con moneda Pesos es un fondo en pesos)`);
     const por = new Map();
     for (const pos of v.pos.values()) { const k = norm(pos.cuenta); (por.get(k) || por.set(k, []).get(k)).push(pos); }
     for (const [k, list] of por) {
       const pc = v.porCuenta.get(k);
       list.sort((a, b) => b.usd - a.usd);
-      L.push(`${pc.cuenta} ${pc.nombre || nombreDe(pc.cuenta)} (total ${r0(pc.usd)}): ` + list.filter(x => Math.abs(x.usd) >= 1).map(x => { const inf = v.espInfo.get(x.especie) || {}; return `${/^\d+$/.test(x.especie) && inf.desc ? inf.desc.slice(0, 30) : x.especie}(${inf.tipo || ''}) ${r0(x.usd)}`; }).join('; '));
+      L.push(`${pc.cuenta} ${pc.nombre || nombreDe(pc.cuenta)} (total ${r0(pc.usd)}): ` + list.filter(x => Math.abs(x.usd) >= 1).map(x => { const inf = v.espInfo.get(x.especie) || {}; return `${/^\d+$/.test(x.especie) && inf.desc ? inf.desc.slice(0, 30) : x.especie}(${inf.tipo || ''}${inf.mon ? ', ' + inf.mon : ''}) ${r0(x.usd)}`; }).join('; '));
     }
   } else L.push('\n## TENENCIAS: no hay informe de tenencias cargado.');
   // Rendimientos desde la compra
@@ -3051,6 +3453,7 @@ function iaContexto() {
   for (const c of cuentas) L.push(`${c.cuenta || 's/c'} ${c.nombre} · ${c.ultimoContacto ? fmtDate(c.ultimoContacto) : 'sin contacto'}${validTags(c).length ? ' · ' + validTags(c).map(tabLabel).join(', ') : ''}`);
   const reus = reuniones.filter(r => r.fecha >= isoLocal(new Date(Date.now() - 30 * 864e5))).sort(reuOrden);
   if (reus.length) L.push('\n## REUNIONES (últimos 30 días y próximas)\n' + reus.map(r => `- ${fmtDate(r.fecha)} ${r.hora || ''} ${reuCliente(r)}${r.tema ? ' · ' + r.tema : ''}${r.hecha ? ' · hecha' : ''}${r.notas ? ' · notas: ' + r.notas.slice(0, 300) : ''}`).join('\n'));
+  if (licitaciones.length) L.push('\n## LICITACIONES (montos en la moneda de cada licitación; comisión en %)\n' + licOrden().map(l => `- ${l.nombre}${l.instrumento ? ' (' + l.instrumento + ')' : ''} · cierre ${l.cierre ? fmtDate(l.cierre) : 'sin fecha'} · ${l.moneda === 'USD' ? 'dólares' : 'pesos'} · total ${r0(licTot(l).monto)} · comisión estimada ${r0(licTot(l).com)}: ` + (l.items || []).map(it => `${licCuenta(it) || 's/c'} ${licNombre(it)} ${r0(it.monto || 0)} com ${it.comision ?? ''}% ${LIC_ESTADOS.find(e => e.id === it.estado)?.label || ''}${it.nota ? ' (' + it.nota + ')' : ''}`).join('; ')).join('\n'));
   const pend = tareas.filter(t => !t.hecha);
   if (pend.length) L.push('\n## TAREAS PENDIENTES\n' + pend.map(t => `- ${t.texto}${t.cliente ? ' (' + t.cliente + ')' : ''}${t.vence ? ' para ' + fmtDate(t.vence) : ''}`).join('\n'));
   return L.join('\n').slice(0, 200000);
@@ -3493,7 +3896,7 @@ $('#tagsForm').addEventListener('submit', async () => {
 let draftTabs = [];
 function renderTabRows() {
   $('#tabRows').innerHTML = [{ id: MAIN, label: config.principal, main: true }, ...draftTabs].map((t, i) => {
-    const n = t.main ? cuentas.length : t.id === SUMMARY_TAB ? null : t.id === HOLD_TAB ? holdCuentas().size : t.id === INCOME_TAB ? factClientes(periodoSel()).length : t.id === RESEARCH_TAB ? (research[0]?.alertas || []).filter(a => accionClase(a.accion) !== 'watch').length : t.id === TASKS_TAB ? tareas.filter(x => !x.hecha).length : cuentas.filter(c => inTab(c, t.id)).length;
+    const n = t.main ? cuentas.length : t.id === SUMMARY_TAB ? null : t.id === HOLD_TAB ? holdCuentas().size : t.id === INCOME_TAB ? factClientes(periodoSel()).length : t.id === RESEARCH_TAB ? (research[0]?.alertas || []).filter(a => accionClase(a.accion) !== 'watch').length : t.id === TASKS_TAB ? tareas.filter(x => !x.hecha).length : t.id === LIC_TAB ? licAbiertas().length : cuentas.filter(c => inTab(c, t.id)).length;
     return `<div class="tab-row" data-i="${i - 1}">
       <input id="tabname-${esc(t.id)}" value="${esc(t.label)}" aria-label="Nombre de la pestaña">
       <span class="count">${n === null ? '' : n + ' cuentas'}</span>

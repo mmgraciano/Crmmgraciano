@@ -21,6 +21,11 @@ Panel para registrar tu base de cuentas, en un solo archivo (`index.html`).
   o punto amarillo (pendiente); con **Ordenar** se agrupan por color (amarillas, verdes, rojas o sin marcar primero). Marcar la aprobación (cualquiera de las tres) o hacer la tarea actualiza
   "Última vez contactado" del cliente a hoy;
   tocar el marcado lo desmarca. Se guardan en la base del panel (colección `tareas`).
+- **Licitaciones:** pestaña propia. **+ Nueva licitación** (nombre, instrumento, cierre, moneda, comisión % por defecto; puede
+  copiar los comitentes de otra). En cada una se anotan comitentes con monto y comisión %; la comisión estimada y los totales se
+  calculan solos, cada comitente tiene estado (a confirmar, confirmó, orden cargada, adjudicada, no entró) y notas, y se baja en Excel.
+  Abajo, **Preguntale a la IA** responde con tenencias (con la moneda de cada activo), rendimientos y licitaciones, y puede proponer
+  comitentes para sumar a una licitación (ella confirma). Colección `licitaciones`.
 - **Tomar ganancia (+10%):** segunda solapa de Tareas pendientes. Con **Importar rendimientos** se sube el Excel de rendimientos
   por posición (Comitente, Ticker, Pppc Mep, Precio Actual Mep) y lista, por cliente, los activos 10% o más arriba del precio de
   compra en USD MEP (el % se puede cambiar). **+ Tarea** crea la tarea en Mis tareas y el tilde verde marca al cliente como hecho:
