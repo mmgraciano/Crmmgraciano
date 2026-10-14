@@ -392,8 +392,9 @@
   table.lic th { text-align: left; font: 600 11px var(--font-body); letter-spacing: .04em; text-transform: uppercase; color: var(--muted); padding: 9px 10px; border-top: 1px solid var(--border); background: var(--soft); white-space: nowrap; }
   table.lic td { padding: 7px 10px; border-top: 1px solid var(--border); vertical-align: middle; }
   table.lic .num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
-  table.lic input { font: 13.5px var(--font-body); padding: 5px 8px; border: 1px solid transparent; border-radius: 6px; background: transparent; color: var(--text); width: 100%; box-sizing: border-box; }
-  table.lic input:hover, table.lic input:focus { border-color: var(--border); background: var(--panel); }
+  table.lic input { font: 13.5px var(--font-body); padding: 6px 8px; border: 1px solid var(--border); border-radius: 7px; background: var(--bg); color: var(--text); width: 100%; box-sizing: border-box; }
+  table.lic input:hover { border-color: var(--muted); } table.lic input:focus { outline: none; border-color: var(--accent); background: var(--panel); }
+  table.lic td.cli { min-width: 220px; } table.lic td.cli input { font-weight: 600; } table.lic td.cli .acct { display: block; margin: 2px 0 0 9px; }
   table.lic input.n { text-align: right; font-variant-numeric: tabular-nums; min-width: 90px; }
   table.lic select { font: 500 12.5px var(--font-body); padding: 5px 8px; border-radius: 7px; border: 1px solid var(--border); background: var(--panel); color: var(--text); }
   table.lic select.conf, table.lic select.ing { background: var(--warn-bg); color: var(--warn); border-color: transparent; }
@@ -3204,11 +3205,11 @@ async function renderLicit() {
         <button class="btn primary" type="submit">Agregar</button>
         <datalist id="licClientes">${cuentas.slice().sort((a, b) => norm(a.nombre).localeCompare(norm(b.nombre), 'es')).map(c => `<option value="${esc(c.nombre)}">${esc(c.cuenta)}</option>`).join('')}</datalist>
       </form>
-      ${items.length ? `<div class="scroll"><table class="lic"><thead><tr><th>Comitente</th><th class="num">Monto</th><th class="num">Comisión %</th><th class="num">Comisión</th><th>Estado</th><th>Notas</th><th></th></tr></thead><tbody>
-        ${items.map(it => `<tr data-iid="${esc(it.id)}" class="${it.estado === 'no' ? 'no' : ''}"><td><b>${esc(licNombre(it))}</b>${licCuenta(it) ? ` <span class="acct">${esc(licCuenta(it))}</span>` : ''}</td>
+      ${items.length ? `<div class="scroll"><table class="lic"><thead><tr><th>Comitente</th><th class="num">Monto (${mon === 'USD' ? 'USD' : '$'})</th><th class="num">Comisión %</th><th class="num">Comisión (${mon === 'USD' ? 'USD' : '$'})</th><th>Estado</th><th>Notas</th><th></th></tr></thead><tbody>
+        ${items.map(it => `<tr data-iid="${esc(it.id)}" class="${it.estado === 'no' ? 'no' : ''}"><td class="cli"><input data-lf="cliente" list="licClientes" value="${esc(licNombre(it))}" aria-label="Comitente" title="Cambiar el comitente">${licCuenta(it) ? `<span class="acct">${esc(licCuenta(it))}</span>` : ''}</td>
           <td class="num"><input class="n" data-lf="monto" value="${esc((Number(it.monto) || 0).toLocaleString('es-AR', { maximumFractionDigits: 2 }))}" inputmode="decimal" aria-label="Monto de ${esc(licNombre(it))}"></td>
           <td class="num"><input class="n" data-lf="comision" value="${esc(licPct(it.comision))}" inputmode="decimal" placeholder="—" aria-label="Comisión % de ${esc(licNombre(it))}" style="min-width:60px"></td>
-          <td class="num">${licFmt(licComMonto(it), mon)}</td>
+          <td class="num"><input class="n" data-lf="comMonto" value="${esc(licComMonto(it).toLocaleString('es-AR', { maximumFractionDigits: 2 }))}" inputmode="decimal" aria-label="Comisión en ${mon === 'USD' ? 'dólares' : 'pesos'} de ${esc(licNombre(it))}" title="Si escribís la comisión en ${mon === 'USD' ? 'dólares' : 'pesos'}, se calcula el %"></td>
           <td><select data-lf="estado" class="${esc(it.estado || 'pend')}" aria-label="Estado de ${esc(licNombre(it))}">${LIC_ESTADOS.map(e => `<option value="${e.id}"${e.id === (it.estado || 'pend') ? ' selected' : ''}>${e.label}</option>`).join('')}</select></td>
           <td><input data-lf="nota" value="${esc(it.nota || '')}" placeholder="Agregar nota" aria-label="Nota de ${esc(licNombre(it))}"></td>
           <td><button class="lic-x" data-lact="quitar" title="Quitar de la licitación" aria-label="Quitar a ${esc(licNombre(it))}">×</button></td></tr>`).join('')}
@@ -3326,7 +3327,17 @@ $('#licit').addEventListener('change', async e => {
   }
   const f = e.target.dataset?.lf; if (!f) return;
   const l = licitaciones.find(x => x.id === licSel), it = l?.items?.find(x => x.id === e.target.closest('[data-iid]')?.dataset.iid); if (!it) return;
-  if (f === 'monto' || f === 'comision') {
+  if (f === 'cliente') {
+    const txt = e.target.value.trim(); if (!txt) { render(); return; }
+    const c = licBuscarCuenta(txt);
+    if (c && (l.items || []).some(x => x !== it && x.cuentaId === c.id)) { toast(`${c.nombre} ya está en esta licitación`); render(); return; }
+    it.cuentaId = c?.id || ''; it.cliente = c ? c.nombre : txt; it.cuenta = c?.cuenta || '';
+  } else if (f === 'comMonto') {
+    const v = e.target.value.trim() === '' ? 0 : parseMonto(e.target.value);
+    if (isNaN(v)) { toast('Escribí la comisión como número'); render(); return; }
+    if (!(Number(it.monto) > 0)) { toast('Cargá primero el monto para calcular el % de comisión'); render(); return; }
+    it.comision = Math.round(v / Number(it.monto) * 100 * 10000) / 10000;
+  } else if (f === 'monto' || f === 'comision') {
     const v = e.target.value.trim() === '' ? (f === 'monto' ? 0 : '') : parseMonto(e.target.value);
     if (v !== '' && isNaN(v)) { toast(f === 'monto' ? 'Escribí el monto como número, ej: 5.000.000' : 'Escribí la comisión como número, ej: 0,5'); render(); return; }
     it[f] = v;
