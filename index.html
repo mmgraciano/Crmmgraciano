@@ -363,6 +363,24 @@
   tr.pick td:first-child { font-weight: 500; }
   #research { display: flex; flex-direction: column; gap: 16px; }
   #licit { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+  #coach { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+  .coach-nav { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .coach-nav span { display: inline-flex; flex-direction: column; align-items: center; font-size: 13.5px; }
+  .coach-nav em { font-style: normal; font-size: 11.5px; color: var(--warn); }
+  .coach-nav .btn[disabled] { opacity: .4; cursor: default; }
+  .coach-kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
+  .coach-kpis div { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 12px 14px; min-width: 0; }
+  .coach-kpis b { display: block; font: 600 26px var(--font-display); font-variant-numeric: tabular-nums; }
+  .coach-kpis span { color: var(--muted); font-size: 12.5px; }
+  .coach-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 14px; align-items: start; }
+  .coach-grid .res-ctx { min-width: 0; }
+  .coach-cli { list-style: none; padding: 0 !important; gap: 6px !important; }
+  .coach-cli li { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 2px 10px; border-bottom: 1px solid var(--border); padding-bottom: 5px; }
+  .coach-tip { font-size: 12px; margin: 8px 0 0 !important; }
+  .coach-l { display: block; font-size: 12px; color: var(--muted); margin-bottom: 4px; }
+  #coach textarea { width: 100%; box-sizing: border-box; font: 13.5px/1.45 var(--font-body); padding: 9px 11px; border: 1px solid var(--border); border-radius: 9px; background: var(--bg); color: var(--text); resize: vertical; }
+  #coach .coach-txt { margin-top: 10px; font-size: 12.5px; color: var(--muted); }
+  .coach-acts { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-top: 10px; }
   #licit .scroll { overflow-x: auto; }
   .lic-card { min-width: 0; }
   .lic-pills { display: flex; flex-wrap: wrap; gap: 8px; }
@@ -549,6 +567,7 @@
   <section id="incomeTop" class="breakdown" hidden></section>
   <section id="research" hidden></section>
   <section id="licit" hidden></section>
+  <section id="coach" hidden></section>
   <section id="tareasBox" hidden></section>
 
   <div class="table-wrap" id="tableWrap">
@@ -723,7 +742,7 @@
 
 <script>
 const DEFAULT_CONFIG = {
-  v: 7,
+  v: 8,
   principal: 'WM3',
   dias: 21,
   umbral: 10000,
@@ -759,14 +778,14 @@ const SUB_TABS = [SUMMARY_TAB, HOLD_TAB, ZERO_TAB, LOW_TAB];
 // Pestañas de cuentas que también se muestran dentro de "Tenencia total" (siguen siendo editables desde +)
 const GROUP_TAGS = ['sgr', 'prospects', 'fal', 'notas'];
 const GROUP = [...SUB_TABS, ...GROUP_TAGS];
-const AUTO_TABS = new Set([HOLD_TAB, SUMMARY_TAB, ZERO_TAB, LOW_TAB, INCOME_TAB, RESEARCH_TAB, 'licitaciones']); // no se asignan a mano
+const AUTO_TABS = new Set([HOLD_TAB, SUMMARY_TAB, ZERO_TAB, LOW_TAB, INCOME_TAB, RESEARCH_TAB, 'licitaciones', 'coach']); // no se asignan a mano
 const HOLD_CHUNK = 150;           // filas por documento en la base de datos
 const LOCAL_HOLD = 'panel-wm-tenencias-v1';
 const LOCAL_PREV = 'panel-wm-tenencias-prev-v1';
 const LOCAL_HIST = 'panel-wm-historial-v1';
 const LOCAL_KEY = 'panel-wm-cuentas-v1';
 const LOCAL_CFG = 'panel-wm-config-v1';
-const FIELDS = ['cuenta', 'nombre', 'telefono', 'email', 'ultimoContacto', 'accion', 'notas', 'pestanas', 'creado'];
+const FIELDS = ['cuenta', 'nombre', 'telefono', 'email', 'ultimoContacto', 'accion', 'notas', 'pestanas', 'creado', 'contactos'];
 const COLUMNS = [
   { key: 'cuenta', label: 'N° de cuenta', cls: 'c-num' },
   { key: 'nombre', label: 'Nombre', cls: 'c-name' },
@@ -829,6 +848,9 @@ let licitaciones = [];
 let licRef = null, licSel = null;
 const LOCAL_LIC = 'panel-wm-licitaciones-v1';
 const LIC_TAB = 'licitaciones';
+// Coach: resumen semanal de jueves a miércoles; las notas de cada semana en "coach/{desde}" {notas}
+const COACH_TAB = 'coach';
+let coachOff = 0, coachNotas = {}, coachRef = null;
 const LIC_ESTADOS = [
   { id: 'pend', label: 'A confirmar' },
   { id: 'conf', label: 'Confirmó' },
@@ -906,6 +928,13 @@ function migrateConfig(c) {
     }
     c.v = 7;
   }
+  if (c.v < 8) {
+    if (!c.tabs.some(t => t.id === COACH_TAB)) {
+      const at = c.tabs.findIndex(t => t.id === LIC_TAB) + 1 || c.tabs.length;
+      c.tabs.splice(at, 0, { id: COACH_TAB, label: 'Coach' });
+    }
+    c.v = 8;
+  }
   return c;
 }
 
@@ -931,7 +960,13 @@ function alarma(c) {
 // ---------- Guardado ----------
 // Publicado en claude.ai: base de datos de la página (colección "cuentas" y documento "config/panel").
 // Abierto como archivo suelto: se guarda en este navegador.
-const clean = c => Object.fromEntries(FIELDS.map(k => [k, k === 'pestanas' ? [...(c.pestanas || [])] : (c[k] ?? '')]));
+const clean = c => Object.fromEntries(FIELDS.map(k => [k, k === 'pestanas' ? [...(c.pestanas || [])] : k === 'contactos' ? [...(c.contactos || [])] : (c[k] ?? '')]));
+// Guarda en el historial de contactos la fecha de "Última vez contactado" (para el resumen semanal del coach)
+function anotarContacto(c) {
+  const d = c.ultimoContacto; if (!d || !/^\d{4}-\d{2}-\d{2}$/.test(d)) return;
+  const l = new Set(c.contactos || []); l.add(d);
+  c.contactos = [...l].sort().slice(-120);
+}
 
 function setSync() {
   const el = $('#sync');
@@ -971,6 +1006,7 @@ async function write(fn) {
   } finally { pending--; setSync(); }
 }
 function saveCuenta(c) {
+  anotarContacto(c);
   if (!col) { saveLocal(); return Promise.resolve(); }
   return write(() => col.doc(c.id).set(clean(c)));
 }
@@ -1049,6 +1085,11 @@ async function initStorage() {
   ganHechasRef.onSnapshot(s => {
     ganHechas = s.exists ? structuredClone(s.data().items || {}) : {};
     render();
+  }, fail);
+  coachRef = db.collection('coach');
+  coachRef.onSnapshot(snap => {
+    coachNotas = Object.fromEntries(snap.docs.map(d => [d.id, d.data().notas || '']));
+    if (tab === COACH_TAB && !document.activeElement?.matches?.('#coachNotas')) render();
   }, fail);
   licRef = db.collection('licitaciones');
   licRef.onSnapshot(snap => {
@@ -1290,13 +1331,14 @@ function render() {
     return `<button data-tab="${esc(t.id)}" class="${t.id === tab ? 'on' : ''}">${t.id === SUMMARY_TAB ? 'Resumen' : esc(t.label)}${n === null ? '' : `<span class="n">${n}</span>`}</button>`;
   }).join('') : '';
   $('#tabs').innerHTML = allTabs.map(t => {
-    const n = t.id === SUMMARY_TAB ? null : t.id === HOLD_TAB ? holdCuentas().size : t.id === INCOME_TAB ? factClientes(periodoSel()).length : t.id === RESEARCH_TAB ? (research[0]?.alertas || []).filter(a => accionClase(a.accion) !== 'watch').length : t.id === TASKS_TAB ? tareas.filter(x => !x.hecha).length : t.id === LIC_TAB ? licAbiertas().length : cuentas.filter(c => inTab(c, t.id)).length;
+    const n = t.id === SUMMARY_TAB ? null : t.id === HOLD_TAB ? holdCuentas().size : t.id === INCOME_TAB ? factClientes(periodoSel()).length : t.id === RESEARCH_TAB ? (research[0]?.alertas || []).filter(a => accionClase(a.accion) !== 'watch').length : t.id === TASKS_TAB ? tareas.filter(x => !x.hecha).length : t.id === LIC_TAB ? licAbiertas().length : t.id === COACH_TAB ? null : cuentas.filter(c => inTab(c, t.id)).length;
     return `<button class="tab ${t.id === tab || (t.id === SUMMARY_TAB && inGroup) ? 'active' : ''}" data-tab="${esc(t.id)}">${esc(t.label)}${n === null ? '' : `<span class="n">${n}</span>`}</button>`;
   }).join('') + `<button class="tab edit" id="btnTabs" title="Editar pestañas" aria-label="Editar pestañas">+</button>`;
 
-  const hold = tab === HOLD_TAB, summary = tab === SUMMARY_TAB, income = tab === INCOME_TAB, lic = tab === LIC_TAB, res = tab === RESEARCH_TAB || lic;
+  const hold = tab === HOLD_TAB, summary = tab === SUMMARY_TAB, income = tab === INCOME_TAB, lic = tab === LIC_TAB, coach = tab === COACH_TAB, res = tab === RESEARCH_TAB || lic || coach;
   $('#research').hidden = tab !== RESEARCH_TAB;
   $('#licit').hidden = !lic;
+  $('#coach').hidden = !coach;
   $('.bar').hidden = res;
   $('#btnSinCuenta').hidden = hold || summary || income;
   const tasks = tab === TASKS_TAB;
@@ -1318,6 +1360,7 @@ function render() {
   if (!hold && !income) $('#holdFilters').innerHTML = '';
   if (summary) { renderSummary(); return; }
   if (lic) { renderLicit(); return; }
+  if (coach) { renderCoach(); return; }
   if (res) { renderResearch(); return; }
   if (income) { renderIngresos(); return; }
   if (hold) { renderTenencias(); restoreFocus(focus); return; }
@@ -3089,6 +3132,98 @@ $('#tareasBox').addEventListener('click', async e => {
   toast(r.unida ? 'Se sumó a la tarea que ya tenía este cliente en Mis tareas' : 'Tarea agregada en Mis tareas');
 });
 
+// ---------- Coach: resumen de jueves a miércoles ----------
+const addDias = (iso, n) => { const d = isoDate(iso); d.setDate(d.getDate() + n); return isoLocal(d); };
+// Semana del informe: la que contiene a ayer (el jueves se informa la semana que terminó el miércoles; el miércoles ya se puede adelantar)
+function coachSemana(off = coachOff) {
+  const ayer = addDias(today(), -1), d = isoDate(ayer);
+  const desde = addDias(ayer, -((d.getDay() - 4 + 7) % 7) + 7 * off);
+  return { desde, hasta: addDias(desde, 6) };
+}
+const enRango = (d, w) => !!d && d >= w.desde && d <= w.hasta;
+function coachDatos(w) {
+  const hoy = today();
+  const reus = reuniones.filter(r => enRango(r.fecha, w)).sort(reuOrden);
+  const tuvo = reus.filter(r => r.hecha || r.fecha < hoy), sinTildar = tuvo.filter(r => !r.hecha), prox = reus.filter(r => !r.hecha && r.fecha >= hoy);
+  const clis = new Map();
+  const sumar = (c, nombre, motivo, dia) => {
+    const k = c ? 'c:' + c.id : 'n:' + norm(nombre); if (!c && !nombre) return;
+    const e = clis.get(k) || { nombre: c ? c.nombre : nombre, cuenta: c?.cuenta || '', motivos: [], dias: new Set() };
+    if (!e.motivos.includes(motivo)) e.motivos.push(motivo); if (dia) e.dias.add(dia);
+    clis.set(k, e);
+  };
+  for (const r of tuvo) sumar(cuentas.find(c => c.id === r.cuentaId), r.cliente, 'reunión', r.fecha);
+  const hechas = tareas.filter(t => t.hecha && enRango(t.hechaEl, w)).sort((a, b) => (a.hechaEl || '').localeCompare(b.hechaEl || ''));
+  for (const t of hechas) { const c = cuentas.find(x => x.id === t.cuentaId); if (c || t.cliente) sumar(c, t.cliente, 'tarea hecha', t.hechaEl); }
+  for (const c of cuentas) for (const d of new Set([...(c.contactos || []), c.ultimoContacto].filter(Boolean))) if (enRango(d, w)) sumar(c, '', 'contacto', d);
+  const creadas = tareas.filter(t => enRango(String(t.creado || '').slice(0, 10), w));
+  const lics = licitaciones.map(l => ({ l, n: (l.items || []).length })).filter(x => enRango(x.l.cierre, w) || enRango(String(x.l.creado || '').slice(0, 10), w));
+  const mes = mesesCargados().find(p => mesDe(p) === String(w.hasta > hoy ? hoy : w.hasta).slice(0, 7)) || null;
+  return { reus, tuvo, sinTildar, prox, clientes: [...clis.values()].sort((a, b) => norm(a.nombre).localeCompare(norm(b.nombre), 'es')), hechas, creadas, lics, mes };
+}
+const diaCorto = iso => `${cap(DIAS[isoDate(iso).getDay()]).slice(0, 3)} ${fmtDate(iso).slice(0, 5)}`;
+function coachTexto(w, D) {
+  const L = [`Resumen semanal · jueves ${fmtDate(w.desde).slice(0, 5)} al miércoles ${fmtDate(w.hasta).slice(0, 5)}`, ''];
+  L.push(`Reuniones: ${D.tuvo.length}`);
+  for (const r of D.tuvo) L.push(`- ${diaCorto(r.fecha)}${r.hora ? ' ' + r.hora : ''} · ${reuCliente(r)}${r.tema ? ' · ' + r.tema : ''}`);
+  L.push('', `Clientes con los que hablé: ${D.clientes.length}`);
+  for (const c of D.clientes) L.push(`- ${c.nombre}${c.cuenta ? ' (' + c.cuenta + ')' : ''}`);
+  L.push('', `Tareas hechas: ${D.hechas.length}`);
+  for (const t of D.hechas) L.push(`- ${t.texto}${tareaCliente(t) ? ' · ' + tareaCliente(t) : ''}`);
+  if (D.lics.length) { L.push('', 'Licitaciones:'); for (const { l, n } of D.lics) L.push(`- ${licTit(l)}: ${plural(n, 'comitente', 'comitentes')} · ${licFmt(licTot(l).monto, l.moneda)}`); }
+  if (D.mes) L.push('', `Facturación de ${perLabel(D.mes)}: USD ${fmtUSD(totalPer(D.mes))} (meta USD ${fmtUSD(config.metaMes || 10000)})`);
+  const n = (coachNotas[w.desde] || '').trim(); if (n) L.push('', n);
+  return L.join('\n');
+}
+function renderCoach() {
+  const w = coachSemana(), D = coachDatos(w), actual = coachOff === 0;
+  const box = $('#coach'), ae = document.activeElement, notasFoc = ae?.id === 'coachNotas' ? { v: ae.value, sel: ae.selectionStart } : null;
+  const enCurso = w.hasta >= today();
+  box.innerHTML = `<div class="res-head"><div><h2>Coach</h2><p class="res-note">Lo que le contás a tu coach los jueves: reuniones y clientes con los que hablaste de jueves a miércoles. Se arma solo con Reuniones, Mis tareas y el último contacto de cada cliente.</p></div>
+      <div class="coach-nav"><button class="btn ghost" data-cnav="-1" aria-label="Semana anterior">◀</button><span><b>Jueves ${fmtDate(w.desde).slice(0, 5)} al miércoles ${fmtDate(w.hasta).slice(0, 5)}</b>${enCurso ? '<em>en curso</em>' : ''}</span><button class="btn ghost" data-cnav="1" aria-label="Semana siguiente" ${actual ? 'disabled' : ''}>▶</button></div></div>
+    <div class="coach-kpis">
+      <div><b>${D.tuvo.length}</b><span>${D.tuvo.length === 1 ? 'reunión' : 'reuniones'}</span></div>
+      <div><b>${D.clientes.length}</b><span>clientes con los que hablaste</span></div>
+      <div><b>${D.hechas.length}</b><span>tareas hechas</span></div>
+      <div><b>${D.creadas.length}</b><span>tareas nuevas</span></div>
+      ${D.mes ? `<div><b>USD ${fmtUSD(totalPer(D.mes))}</b><span>facturado en ${esc(perLabel(D.mes))}</span></div>` : ''}
+    </div>
+    <div class="coach-grid">
+      <div class="res-ctx"><h3>Reuniones (${D.tuvo.length})</h3>
+        ${D.tuvo.length ? `<ul>${D.tuvo.map(r => `<li><b>${esc(diaCorto(r.fecha))}${r.hora ? ' ' + esc(r.hora) : ''}</b> · ${esc(reuCliente(r))}${r.tema ? ` · <span class="muted">${esc(r.tema)}</span>` : ''}${r.hecha ? '' : ' <span class="chip warn">sin tildar</span>'}</li>`).join('')}</ul>` : '<p class="muted">No hay reuniones cargadas en esta semana. Si tuviste alguna, cargala en Tareas pendientes → Reuniones (se puede poner una fecha pasada).</p>'}
+        ${D.sinTildar.length ? `<p class="muted coach-tip">${plural(D.sinTildar.length, 'reunión pasada no está tildada', 'reuniones pasadas no están tildadas')} como hecha; igual se cuenta${D.sinTildar.length > 1 ? 'n' : ''}.</p>` : ''}
+        ${D.prox.length ? `<p class="muted coach-tip">Agendadas para lo que queda de la semana: ${D.prox.map(r => `${esc(diaCorto(r.fecha))} ${esc(reuCliente(r))}`).join(' · ')}</p>` : ''}</div>
+      <div class="res-ctx"><h3>Clientes con los que hablaste (${D.clientes.length})</h3>
+        ${D.clientes.length ? `<ul class="coach-cli">${D.clientes.map(c => `<li><span><b>${esc(c.nombre)}</b>${c.cuenta ? ` <span class="acct">${esc(c.cuenta)}</span>` : ''}</span><span class="muted">${esc(c.motivos.join(' · '))}${c.dias.size ? ' · ' + [...c.dias].sort().map(d => fmtDate(d).slice(0, 5)).join(', ') : ''}</span></li>`).join('')}</ul>` : '<p class="muted">Todavía no hay contactos en esta semana.</p>'}
+        <p class="muted coach-tip">Cuenta las reuniones, las tareas hechas y cada vez que se actualizó "Última vez contactado" (a mano, con el botón de hoy o al marcar la aprobación de una tarea).</p></div>
+      <div class="res-ctx"><h3>Tareas hechas (${D.hechas.length})</h3>
+        ${D.hechas.length ? `<ul>${D.hechas.map(t => `<li><b>${esc(fmtDate(t.hechaEl).slice(0, 5))}</b> · ${esc(t.texto)}${tareaCliente(t) ? ` · <span class="muted">${esc(tareaCliente(t))}</span>` : ''}</li>`).join('')}</ul>` : '<p class="muted">No marcaste tareas como hechas en esta semana.</p>'}
+        ${D.lics.length ? `<h3 style="margin-top:12px">Licitaciones</h3><ul>${D.lics.map(({ l, n }) => `<li>${esc(licTit(l))}: ${plural(n, 'comitente', 'comitentes')} · ${esc(licFmt(licTot(l).monto, l.moneda))}</li>`).join('')}</ul>` : ''}</div>
+      <div class="res-ctx"><h3>Para mandarle al coach</h3>
+        <label class="coach-l" for="coachNotas">Notas de la semana (se suman al final del resumen)</label>
+        <textarea id="coachNotas" rows="3" placeholder="Ej: 2 clientes nuevos en conversación, objetivo de la semana que viene…">${esc(coachNotas[w.desde] || '')}</textarea>
+        <textarea id="coachTxt" class="coach-txt" rows="10" readonly aria-label="Resumen para el coach">${esc(coachTexto(w, D))}</textarea>
+        <div class="coach-acts"><button class="btn primary" data-cact="copiar">Copiar resumen</button><span class="muted">Pegalo en WhatsApp o en un mail.</span></div></div>
+    </div>`;
+  if (notasFoc) { const el = $('#coachNotas'); el.value = notasFoc.v; el.focus(); try { el.setSelectionRange(notasFoc.sel, notasFoc.sel); } catch {} }
+}
+$('#coach').addEventListener('click', async e => {
+  const nav = e.target.closest('[data-cnav]'); if (nav) { coachOff = Math.min(0, coachOff + Number(nav.dataset.cnav)); render(); return; }
+  if (e.target.closest('[data-cact=copiar]')) {
+    const txt = $('#coachTxt').value;
+    try { await navigator.clipboard.writeText(txt); toast('Resumen copiado'); }
+    catch { const el = $('#coachTxt'); el.focus(); el.select(); toast('Seleccioné el resumen: copialo con Ctrl+C o mantené apretado'); }
+  }
+});
+let coachTimer = null;
+$('#coach').addEventListener('input', e => {
+  if (e.target.id !== 'coachNotas') return;
+  const w = coachSemana(); coachNotas[w.desde] = e.target.value;
+  $('#coachTxt').value = coachTexto(w, coachDatos(w));
+  clearTimeout(coachTimer);
+  coachTimer = setTimeout(() => { if (coachRef) write(() => coachRef.doc(w.desde).set({ notas: coachNotas[w.desde] || '' })).catch(() => {}); }, 700);
+});
+
 // ---------- Licitaciones ----------
 const licHoy = () => today();
 const licTit = l => l?.nombre || 'la licitación sin título';
@@ -3930,7 +4065,7 @@ $('#tagsForm').addEventListener('submit', async () => {
 let draftTabs = [];
 function renderTabRows() {
   $('#tabRows').innerHTML = [{ id: MAIN, label: config.principal, main: true }, ...draftTabs].map((t, i) => {
-    const n = t.main ? cuentas.length : t.id === SUMMARY_TAB ? null : t.id === HOLD_TAB ? holdCuentas().size : t.id === INCOME_TAB ? factClientes(periodoSel()).length : t.id === RESEARCH_TAB ? (research[0]?.alertas || []).filter(a => accionClase(a.accion) !== 'watch').length : t.id === TASKS_TAB ? tareas.filter(x => !x.hecha).length : t.id === LIC_TAB ? licAbiertas().length : cuentas.filter(c => inTab(c, t.id)).length;
+    const n = t.main ? cuentas.length : t.id === SUMMARY_TAB ? null : t.id === HOLD_TAB ? holdCuentas().size : t.id === INCOME_TAB ? factClientes(periodoSel()).length : t.id === RESEARCH_TAB ? (research[0]?.alertas || []).filter(a => accionClase(a.accion) !== 'watch').length : t.id === TASKS_TAB ? tareas.filter(x => !x.hecha).length : t.id === LIC_TAB ? licAbiertas().length : t.id === COACH_TAB ? null : cuentas.filter(c => inTab(c, t.id)).length;
     return `<div class="tab-row" data-i="${i - 1}">
       <input id="tabname-${esc(t.id)}" value="${esc(t.label)}" aria-label="Nombre de la pestaña">
       <span class="count">${n === null ? '' : n + ' cuentas'}</span>

@@ -21,6 +21,10 @@ Panel para registrar tu base de cuentas, en un solo archivo (`index.html`).
   o punto amarillo (pendiente); con **Ordenar** se agrupan por color (amarillas, verdes, rojas o sin marcar primero). Marcar la aprobación (cualquiera de las tres) o hacer la tarea actualiza
   "Última vez contactado" del cliente a hoy;
   tocar el marcado lo desmarca. Se guardan en la base del panel (colección `tareas`).
+- **Coach:** pestaña con el resumen semanal de jueves a miércoles (por defecto la semana que contiene a ayer, así el miércoles ya se
+  puede adelantar y el jueves está la semana cerrada; ◀ ▶ para ver otras). Cuenta reuniones (Reuniones), clientes con los que habló
+  (reuniones, tareas hechas y cada fecha de "Última vez contactado", que ahora queda en un historial `contactos` de la cuenta),
+  tareas hechas y nuevas, licitaciones y la facturación del mes. Tiene notas por semana (`coach/{jueves}`) y **Copiar resumen** para WhatsApp.
 - **Licitaciones:** pestaña propia. **+ Nueva licitación** crea una y deja escribir el título ahí mismo (ej: S29E7); en **Más datos**
   van cierre, moneda, comisión % por defecto, notas y copiar los comitentes de otra. En cada una se anotan comitentes con monto y comisión %; la comisión estimada y los totales se
   calculan solos, cada comitente tiene estado (a confirmar, confirmó, orden cargada, adjudicada, no entró) y notas, y se baja en Excel.
