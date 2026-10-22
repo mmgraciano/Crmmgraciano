@@ -23,7 +23,7 @@ Panel para registrar tu base de cuentas, en un solo archivo (`index.html`).
   tocar el marcado lo desmarca. Se guardan en la base del panel (colección `tareas`).
 - **Coach:** pestaña con el resumen semanal de jueves a miércoles (por defecto la semana que contiene a ayer, así el miércoles ya se
   puede adelantar y el jueves está la semana cerrada; ◀ ▶ para ver otras). Cuenta reuniones (Reuniones), clientes con los que habló
-  (reuniones, tareas hechas y cada fecha de "Última vez contactado", que ahora queda en un historial `contactos` de la cuenta),
+  (reuniones, tareas hechas, tareas marcadas en verde/amarillo/rojo esa semana —campo `aprobEl`— y cada fecha de "Última vez contactado", que ahora queda en un historial `contactos` de la cuenta),
   licitaciones y la facturación del mes (sin tareas: es el resumen comercial). Cada reunión muestra su resumen (las notas de la
   reunión), que se puede escribir ahí mismo y entra en el texto para el coach. Tiene notas por semana (`coach/{jueves}`) y **Copiar resumen** para WhatsApp.
 - **Licitaciones:** pestaña propia. **+ Nueva licitación** crea una y deja escribir el título ahí mismo (ej: S29E7); en **Más datos**

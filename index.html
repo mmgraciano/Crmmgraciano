@@ -379,6 +379,7 @@
   .coach-reus { list-style: none; padding: 0 !important; gap: 10px !important; }
   .coach-reus li { display: flex; flex-direction: column; gap: 5px; border-bottom: 1px solid var(--border); padding-bottom: 10px; }
   #coach .coach-reu-n { font-size: 13px; }
+  .coach-ap .si { color: var(--ok); } .coach-ap .pend { color: var(--warn); } .coach-ap .no { color: var(--late); }
   .coach-tip { font-size: 12px; margin: 8px 0 0 !important; }
   .coach-l { display: block; font-size: 12px; color: var(--muted); margin-bottom: 4px; }
   #coach textarea { width: 100%; box-sizing: border-box; font: 13.5px/1.45 var(--font-body); padding: 9px 11px; border: 1px solid var(--border); border-radius: 9px; background: var(--bg); color: var(--text); resize: vertical; }
@@ -2596,7 +2597,7 @@ $('#tbody').addEventListener('keydown', e => {
 });
 
 // ---------- Tareas ----------
-const TASK_FIELDS = ['texto', 'cuentaId', 'cliente', 'vence', 'estado', 'hecha', 'hechaEl', 'creado', 'aprobacion'];
+const TASK_FIELDS = ['texto', 'cuentaId', 'cliente', 'vence', 'estado', 'hecha', 'hechaEl', 'creado', 'aprobacion', 'aprobEl'];
 // Aprobación del cliente: '' (sin marcar), 'si', 'no' o 'pend'
 const APROB = [
   { id: 'si', icon: '✓', label: 'Aprobado por el cliente' },
@@ -2826,6 +2827,7 @@ $('#tareasBox').addEventListener('click', async e => {
   if (el.dataset.tact === 'edit') openTask(t);
   else if (el.dataset.tact === 'aprob') {
     t.aprobacion = t.aprobacion === el.dataset.ap ? '' : el.dataset.ap;   // tocar el marcado lo desmarca
+    if (t.aprobacion) t.aprobEl = today();   // día en que se habló con el cliente (lo usa el resumen del coach)
     const cc = contactoDesdeTarea(t);
     render();
     await saveTarea(t);
@@ -3158,11 +3160,16 @@ function coachDatos(w) {
   for (const r of tuvo) sumar(cuentas.find(c => c.id === r.cuentaId), r.cliente, 'reunión', r.fecha);
   const hechas = tareas.filter(t => t.hecha && enRango(t.hechaEl, w)).sort((a, b) => (a.hechaEl || '').localeCompare(b.hechaEl || ''));
   for (const t of hechas) { const c = cuentas.find(x => x.id === t.cuentaId); if (c || t.cliente) sumar(c, t.cliente, 'tarea hecha', t.hechaEl); }
+  // Tareas marcadas en amarillo, verde o rojo (abiertas o hechas): son clientes con los que se habló ese día
+  const AP_TXT = { pend: 'propuesta, espera respuesta', si: 'aprobó la propuesta', no: 'no aprobó la propuesta' };
+  const props = tareas.filter(t => t.aprobacion && enRango(t.aprobEl, w));
+  for (const t of props) { const c = cuentas.find(x => x.id === t.cuentaId); if (c || t.cliente) sumar(c, t.cliente, AP_TXT[t.aprobacion] || 'propuesta', t.aprobEl); }
+  const ap = { si: props.filter(t => t.aprobacion === 'si').length, pend: props.filter(t => t.aprobacion === 'pend').length, no: props.filter(t => t.aprobacion === 'no').length };
   for (const c of cuentas) for (const d of new Set([...(c.contactos || []), c.ultimoContacto].filter(Boolean))) if (enRango(d, w)) sumar(c, '', 'contacto', d);
   const creadas = tareas.filter(t => enRango(String(t.creado || '').slice(0, 10), w));
   const lics = licitaciones.map(l => ({ l, n: (l.items || []).length })).filter(x => enRango(x.l.cierre, w) || enRango(String(x.l.creado || '').slice(0, 10), w));
   const mes = mesesCargados().find(p => mesDe(p) === String(w.hasta > hoy ? hoy : w.hasta).slice(0, 7)) || null;
-  return { reus, tuvo, sinTildar, prox, clientes: [...clis.values()].sort((a, b) => norm(a.nombre).localeCompare(norm(b.nombre), 'es')), hechas, creadas, lics, mes };
+  return { ap, reus, tuvo, sinTildar, prox, clientes: [...clis.values()].sort((a, b) => norm(a.nombre).localeCompare(norm(b.nombre), 'es')), hechas, creadas, lics, mes };
 }
 const diaCorto = iso => `${cap(DIAS[isoDate(iso).getDay()]).slice(0, 3)} ${fmtDate(iso).slice(0, 5)}`;
 function coachTexto(w, D) {
@@ -3172,6 +3179,7 @@ function coachTexto(w, D) {
     L.push(`- ${diaCorto(r.fecha)}${r.hora ? ' ' + r.hora : ''} · ${reuCliente(r)}${r.tema ? ' · ' + r.tema : ''}`);
     if ((r.notas || '').trim()) L.push(...r.notas.trim().split(/\n+/).map(x => '   ' + x.trim()));
   }
+  if (D.ap.si + D.ap.pend + D.ap.no) L.push('', `Propuestas: ${D.ap.si} aprobadas · ${D.ap.pend} esperando respuesta · ${D.ap.no} no aprobadas`);
   L.push('', `Clientes con los que hablé: ${D.clientes.length}`);
   for (const c of D.clientes) L.push(`- ${c.nombre}${c.cuenta ? ' (' + c.cuenta + ')' : ''}`);
   if (D.lics.length) { L.push('', 'Licitaciones:'); for (const { l, n } of D.lics) L.push(`- ${licTit(l)}: ${plural(n, 'comitente', 'comitentes')} · ${licFmt(licTot(l).monto, l.moneda)} · comisión estimada ${licFmt(licTot(l).com, l.moneda)}`); }
@@ -3189,6 +3197,7 @@ function renderCoach() {
     <div class="coach-kpis">
       <div><b>${D.tuvo.length}</b><span>${D.tuvo.length === 1 ? 'reunión' : 'reuniones'}</span></div>
       <div><b>${D.clientes.length}</b><span>clientes con los que hablaste</span></div>
+      ${D.ap.si + D.ap.pend + D.ap.no ? `<div class="coach-ap"><b><span class="si">${D.ap.si}</span> · <span class="pend">${D.ap.pend}</span> · <span class="no">${D.ap.no}</span></b><span>propuestas: aprobadas · esperando · no aprobadas</span></div>` : ''}
       ${D.lics.length ? `<div><b>${D.lics.reduce((a, x) => a + x.n, 0)}</b><span>comitentes en licitaciones</span></div>` : ''}
       ${D.mes ? `<div><b>USD ${fmtUSD(totalPer(D.mes))}</b><span>facturado en ${esc(perLabel(D.mes))}</span></div>` : ''}
     </div>
@@ -3200,7 +3209,7 @@ function renderCoach() {
         ${D.prox.length ? `<p class="muted coach-tip">Agendadas para lo que queda de la semana: ${D.prox.map(r => `${esc(diaCorto(r.fecha))} ${esc(reuCliente(r))}`).join(' · ')}</p>` : ''}</div>
       <div class="res-ctx"><h3>Clientes con los que hablaste (${D.clientes.length})</h3>
         ${D.clientes.length ? `<ul class="coach-cli">${D.clientes.map(c => `<li><span><b>${esc(c.nombre)}</b>${c.cuenta ? ` <span class="acct">${esc(c.cuenta)}</span>` : ''}</span><span class="muted">${esc(c.motivos.join(' · '))}${c.dias.size ? ' · ' + [...c.dias].sort().map(d => fmtDate(d).slice(0, 5)).join(', ') : ''}</span></li>`).join('')}</ul>` : '<p class="muted">Todavía no hay contactos en esta semana.</p>'}
-        <p class="muted coach-tip">Cuenta las reuniones, las tareas hechas y cada vez que se actualizó "Última vez contactado" (a mano, con el botón de hoy o al marcar la aprobación de una tarea).</p></div>
+        <p class="muted coach-tip">Cuenta las reuniones, las tareas hechas, las tareas que marcaste en verde, amarillo o rojo esa semana y cada vez que se actualizó "Última vez contactado".</p></div>
       ${D.lics.length ? `<div class="res-ctx"><h3>Licitaciones</h3><ul>${D.lics.map(({ l, n }) => `<li><b>${esc(licTit(l))}</b>: ${plural(n, 'comitente', 'comitentes')} · ${esc(licFmt(licTot(l).monto, l.moneda))} · comisión estimada ${esc(licFmt(licTot(l).com, l.moneda))}</li>`).join('')}</ul></div>` : ''}
       <div class="res-ctx"><h3>Para mandarle al coach</h3>
         <label class="coach-l" for="coachNotas">Notas de la semana (se suman al final del resumen)</label>
