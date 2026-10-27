@@ -140,6 +140,8 @@
   .tk-orden { margin-left: auto; display: inline-flex; flex-direction: row; align-items: center; gap: 6px; color: var(--muted); font-size: 12.5px; white-space: nowrap; }
   .tk-orden select { font: 500 12.5px var(--font-body); padding: 5px 8px; border: 1px solid var(--border); border-radius: 7px; background: var(--bg); color: var(--text); cursor: pointer; }
   .tk-sep { list-style: none; display: flex; align-items: center; gap: 8px; padding: 8px 16px; font: 600 12px var(--font-body); color: var(--muted); background: var(--soft); border-top: 1px solid var(--border); }
+  .tk-delall { margin-left: auto; font: 500 11.5px var(--font-body); color: var(--late); background: none; border: 1px solid var(--late-bg); border-radius: 6px; padding: 3px 9px; cursor: pointer; }
+  .tk-delall:hover { background: var(--late-bg); }
   .tk-sep i { width: 10px; height: 10px; border-radius: 50%; border: 2px solid var(--border); }
   .tk-sep.si i { background: var(--ok); border-color: var(--ok); } .tk-sep.no i { background: var(--late); border-color: var(--late); }
   .tk-sep.pend i { background: var(--warn-dot); border-color: var(--warn-dot); }
@@ -2753,7 +2755,7 @@ function listaTareas(items) {
   const orden = [tkOrden, ...['pend', 'si', 'no', 'nada'].filter(x => x !== tkOrden)];
   return orden.map(k => { const xs = items.filter(t => apClave(t) === k); if (!xs.length) return '';
     const o = TK_ORDEN.find(x => x.id === k);
-    return `<li class="tk-sep ${o.cls}"><i aria-hidden="true"></i>${esc(o.sep)} · ${xs.length}</li>` + xs.map(tareaItem).join(''); }).join('');
+    return `<li class="tk-sep ${o.cls}"><i aria-hidden="true"></i>${esc(o.sep)} · ${xs.length}${k !== 'nada' ? `<button type="button" class="tk-delall" data-tdelall="${esc(xs.map(t => t.id).join(','))}" data-tdelsep="${esc(o.sep.split(' · ')[0].toLowerCase())}">Eliminar todo</button>` : ''}</li>` + xs.map(tareaItem).join(''); }).join('');
 }
 document.addEventListener('change', e => {
   if (e.target.id !== 'tkOrden') return;
@@ -2819,6 +2821,14 @@ taskForm.addEventListener('submit', async () => {
   toast(prev ? 'Tarea actualizada' : unida ? `Se sumó a la tarea que ya tenía ${fin.cliente}` : 'Tarea agregada');
 });
 $('#tareasBox').addEventListener('click', async e => {
+  const da = e.target.closest('[data-tdelall]');
+  if (da) {
+    const ids = da.dataset.tdelall.split(',').filter(Boolean);
+    if (!ids.length || !await confirmAsk('Eliminar tareas', `¿Eliminar ${plural(ids.length, 'tarea', 'tareas')} (${da.dataset.tdelsep})? No se puede deshacer.`, 'Eliminar todo')) return;
+    for (const id of ids) await deleteTarea(id);
+    render(); toast(`${plural(ids.length, 'tarea eliminada', 'tareas eliminadas')}`);
+    return;
+  }
   const el = e.target.closest('[data-tact]');
   const li = e.target.closest('[data-tid]');
   if (!el || !li) return;

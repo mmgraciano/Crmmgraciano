@@ -18,7 +18,7 @@ Panel para registrar tu base de cuentas, en un solo archivo (`index.html`).
   (a mano, desde Tomar ganancia o desde la IA) se suma a la que ya tenía. Arriba hay un buscador (por texto, cliente o estado; en Tomar ganancia,
   por cliente, N° de cuenta o activo). En WM3 y las demás pestañas de cuentas, debajo de cada cliente se ven sus tareas abiertas;
   al tocarlas se abre Mis tareas filtrado por ese cliente. A la derecha de cada tarea, "Aprobado por el cliente": ✓ verde, ✗ roja
-  o punto amarillo (pendiente); con **Ordenar** se agrupan por color (amarillas, verdes, rojas o sin marcar primero). Marcar la aprobación (cualquiera de las tres) o hacer la tarea actualiza
+  o punto amarillo (pendiente); con **Ordenar** se agrupan por color (amarillas, verdes, rojas o sin marcar primero); cada grupo de color tiene **Eliminar todo** (pide confirmación). Marcar la aprobación (cualquiera de las tres) o hacer la tarea actualiza
   "Última vez contactado" del cliente a hoy;
   tocar el marcado lo desmarca. Se guardan en la base del panel (colección `tareas`).
 - **Coach:** pestaña con el resumen semanal de jueves a miércoles (por defecto la semana que contiene a ayer, así el miércoles ya se
