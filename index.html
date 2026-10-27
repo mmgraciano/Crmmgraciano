@@ -2755,7 +2755,7 @@ function listaTareas(items) {
   const orden = [tkOrden, ...['pend', 'si', 'no', 'nada'].filter(x => x !== tkOrden)];
   return orden.map(k => { const xs = items.filter(t => apClave(t) === k); if (!xs.length) return '';
     const o = TK_ORDEN.find(x => x.id === k);
-    return `<li class="tk-sep ${o.cls}"><i aria-hidden="true"></i>${esc(o.sep)} · ${xs.length}${k !== 'nada' ? `<button type="button" class="tk-delall" data-tdelall="${esc(xs.map(t => t.id).join(','))}" data-tdelsep="${esc(o.sep.split(' · ')[0].toLowerCase())}">Eliminar todo</button>` : ''}</li>` + xs.map(tareaItem).join(''); }).join('');
+    return `<li class="tk-sep ${o.cls}"><i aria-hidden="true"></i>${esc(o.sep)} · ${xs.length}${k ? `<button type="button" class="tk-delall" data-tdelall="${esc(xs.map(t => t.id).join(','))}" data-tdelsep="${esc(o.sep.split(' · ')[0].toLowerCase())}">Eliminar todo</button>` : ''}</li>` + xs.map(tareaItem).join(''); }).join('');
 }
 document.addEventListener('change', e => {
   if (e.target.id !== 'tkOrden') return;
